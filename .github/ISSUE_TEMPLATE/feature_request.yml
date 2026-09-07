@@ -1,0 +1,29 @@
+name: Feature request
+description: Propose a routing, compatibility, benchmark, or usability improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete workflow problem should be solved?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: true
+  - type: textarea
+    id: quality
+    attributes:
+      label: Quality / token / latency impact
+      description: Explain the expected tradeoff. Provide measurements if available; otherwise say what should be measured.
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility impact

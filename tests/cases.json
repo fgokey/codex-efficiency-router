@@ -1,0 +1,92 @@
+[
+  {
+    "name": "mechanical call-site migration",
+    "signals": {"mechanical": true, "uncertainty": 0, "risk": 1, "coupling": 0, "verifiability": 3},
+    "expected": "luna"
+  },
+  {
+    "name": "approved normal feature",
+    "signals": {"mechanical": false, "uncertainty": 1, "risk": 1, "coupling": 1, "verifiability": 3},
+    "expected": "terra"
+  },
+  {
+    "name": "cross-module state flow",
+    "signals": {"uncertainty": 1, "risk": 1, "coupling": 2, "verifiability": 2},
+    "expected": "sol"
+  },
+  {
+    "name": "public contract commitment boundary",
+    "signals": {"uncertainty": 2, "risk": 2, "coupling": 2, "verifiability": 1, "irreversibility": 2, "commitment_boundary": true},
+    "expected": "astra"
+  },
+  {
+    "name": "credible diagnosis disagreement",
+    "signals": {"uncertainty": 3, "risk": 2, "coupling": 2, "verifiability": 1, "evidence_conflict": true},
+    "expected": "astra"
+  },
+  {
+    "name": "costly migration strategy unresolved",
+    "signals": {"uncertainty": 2, "risk": 2, "coupling": 2, "verifiability": 2, "irreversibility": 3},
+    "expected": "astra"
+  },
+  {
+    "name": "novel cross-domain mechanism",
+    "signals": {"uncertainty": 2, "risk": 1, "coupling": 2, "verifiability": 1, "novelty": 3},
+    "expected": "astra"
+  },
+  {
+    "name": "frozen security implementation with strong tests",
+    "signals": {"uncertainty": 0, "risk": 3, "coupling": 1, "verifiability": 3},
+    "expected": "terra"
+  },
+  {
+    "name": "frozen migration execution",
+    "signals": {"uncertainty": 0, "risk": 2, "coupling": 1, "verifiability": 3, "irreversibility": 3},
+    "expected": "terra"
+  },
+  {
+    "name": "missing requirements are not astra",
+    "signals": {"uncertainty": 3, "risk": 3, "coupling": 3, "verifiability": 0, "spec_complete": false},
+    "expected": "local"
+  },
+  {
+    "name": "environment failure is not astra",
+    "signals": {"uncertainty": 3, "risk": 3, "coupling": 3, "verifiability": 0, "environment_ready": false},
+    "expected": "local"
+  },
+  {
+    "name": "observability gap is not astra",
+    "signals": {"uncertainty": 3, "risk": 3, "coupling": 3, "verifiability": 0, "observability_ready": false},
+    "expected": "local"
+  },
+  {
+    "name": "two unexplained executor failures",
+    "signals": {"uncertainty": 1, "risk": 1, "coupling": 1, "verifiability": 2, "failed_attempts": 2, "prior_lane": "terra"},
+    "expected": "sol"
+  },
+  {
+    "name": "proven sol capability failure",
+    "signals": {"uncertainty": 2, "risk": 2, "coupling": 2, "verifiability": 1, "failed_attempts": 1, "prior_lane": "sol", "capability_failure": true},
+    "expected": "astra"
+  },
+  {
+    "name": "sol environment failure does not escalate",
+    "signals": {"uncertainty": 3, "risk": 3, "coupling": 3, "verifiability": 0, "failed_attempts": 2, "prior_lane": "sol", "capability_failure": false, "environment_ready": false},
+    "expected": "local"
+  },
+  {
+    "name": "many files but deterministic",
+    "signals": {"mechanical": true, "uncertainty": 0, "risk": 1, "coupling": 1, "verifiability": 3},
+    "expected": "luna"
+  },
+  {
+    "name": "user disables subagents",
+    "signals": {"uncertainty": 3, "risk": 3, "coupling": 3, "verifiability": 1, "no_subagents": true},
+    "expected": "local"
+  },
+  {
+    "name": "user forces astra",
+    "signals": {"mechanical": true, "uncertainty": 0, "risk": 0, "coupling": 0, "verifiability": 3, "force_astra": true},
+    "expected": "astra"
+  }
+]

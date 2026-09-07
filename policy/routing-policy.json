@@ -1,0 +1,52 @@
+{
+  "schema_version": 2,
+  "checked_against_openai_docs": "2026-09-07",
+  "models": {
+    "luna": {"model": "gpt-5.6-luna", "effort": "medium"},
+    "terra": {"model": "gpt-5.6-terra", "effort": "medium"},
+    "sol": {"model": "gpt-5.6-sol", "effort": "medium"},
+    "astra": {"model": "gpt-6-astra", "effort": "high"}
+  },
+  "principles": [
+    "quality_is_a_hard_constraint",
+    "one_agent_by_default",
+    "direct_tool_concurrency_before_agent_parallelism",
+    "no_router_model_call",
+    "route_by_marginal_value_of_stronger_reasoning",
+    "separate_reducible_uncertainty_from_missing_prerequisites",
+    "failure_triage_before_capability_escalation",
+    "deescalate_after_decision_freezes",
+    "max_never_automatic",
+    "verification_is_the_quality_gate"
+  ],
+  "astra_preconditions": [
+    "reasoning_can_materially_reduce_current_uncertainty",
+    "decision_is_consequential_or_exceptionally_difficult",
+    "cheap_deterministic_falsification_is_insufficient"
+  ],
+  "astra_task_shapes": [
+    "commitment_boundary_with_open_consequential_tradeoffs",
+    "high_consequence_ambiguous_policy_or_design",
+    "deep_diagnosis_with_surviving_or_conflicting_hypotheses",
+    "irreversible_or_costly_migration_rollout_recovery_strategy",
+    "novel_mechanism_or_open_ended_cross_domain_design",
+    "technical_arbitration_or_independent_high_consequence_review",
+    "proven_sol_capability_or_reasoning_failure"
+  ],
+  "non_capability_failures": [
+    "specification_or_authority_gap",
+    "environment_dependency_permission_credential_or_tool_failure",
+    "verifiability_or_observability_gap",
+    "ordinary_bounded_implementation_mistake"
+  ],
+  "never_astra_by_itself": [
+    "file_count",
+    "context_length",
+    "task_duration",
+    "slow_build_or_test",
+    "technology_keyword",
+    "single_tool_failure",
+    "missing_tests_or_observability",
+    "missing_requirements_or_permissions"
+  ]
+}
