@@ -6,6 +6,8 @@ from typing import Literal
 
 Lane = Literal["local", "luna", "terra", "sol", "astra"]
 LANES = ("local", "luna", "terra", "sol", "astra")
+SameLaneReason = Literal["none", "context_recovery", "independent_review", "scope_isolation"]
+SAME_LANE_REASONS = ("none", "context_recovery", "independent_review", "scope_isolation")
 
 
 @dataclass(frozen=True)
@@ -94,22 +96,35 @@ class DispatchDecision:
 
 def choose_dispatch(s: TaskSignals, *, current_lane: Lane, current_sufficient: bool,
                     available_lanes: tuple[str, ...] = (), host_supports_routing: bool = False,
-                    benefit_clear: bool = False, no_escalation: bool = False) -> DispatchDecision:
-    """Reference admission gate. Flags represent observations, never assumed facts."""
+                    benefit_clear: bool = False, no_escalation: bool = False,
+                    same_lane_reason: SameLaneReason = "none") -> DispatchDecision:
+    """Offline admission gate; caller-supplied evidence is not model telemetry.
+
+    A same-lane route needs a concrete contextual purpose AND a net benefit.
+    Neither a purpose label nor a fresh agent makes an incapable model sufficient.
+    Re-scope the task before treating cheaper execution as safe after insufficiency.
+    """
     if current_lane not in LANES or any(lane not in LANES[1:] for lane in available_lanes):
         raise ValueError("unknown execution lane")
     if any(type(v) is not bool for v in (current_sufficient, host_supports_routing, benefit_clear, no_escalation)):
         raise ValueError("execution flags must be boolean")
+    if same_lane_reason not in SAME_LANE_REASONS:
+        raise ValueError("unknown same_lane_reason")
     lane = choose_lane(s)
-    def result(action, reason):
+
+    def result(action: Literal["local", "delegate", "blocked", "prerequisite"], reason: str) -> DispatchDecision:
         return DispatchDecision(lane, action, reason)
     if lane == "local":
         return result("prerequisite", "repair prerequisites or run the safe discriminating check")
     forbidden = s.no_subagents or (no_escalation and LANES.index(lane) > LANES.index(current_lane))
     if forbidden:
         return result("local" if current_sufficient else "blocked", "user routing constraint; quality floor retained")
-    if current_lane == lane and current_sufficient:
-        return result("local", "current sufficient lane already matches")
+    if current_lane == lane:
+        if same_lane_reason == "none" or not benefit_clear:
+            return result("local" if current_sufficient else "blocked",
+                          "same-lane delegation requires a concrete contextual reason and net benefit")
+    elif not current_sufficient and LANES.index(lane) < LANES.index(current_lane):
+        return result("blocked", "insufficient current capability cannot be repaired by a cheaper lane; re-scope first")
     if current_sufficient and not s.force_astra and not benefit_clear:
         return result("local", "delegation benefit not established")
     if host_supports_routing and lane in available_lanes:

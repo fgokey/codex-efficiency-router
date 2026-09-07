@@ -33,3 +33,7 @@ Per-file replacement is atomic; a multi-directory operation is not power-loss at
 Runtime behavior: [SKILL.md](../skills/codex-efficiency-router/SKILL.md) and its referenced files. Shipped presets: `agents/*.toml`, checked against `scripts/package.py` and `policy/routing-policy.json`. Offline regression behavior: `scripts/policy_reference.py`. A passing unit test only establishes the tested code property, not model capability or host integration.
 
 [Official and industry sources](PRIOR-ART.md) explain the adopted principles and their limits.
+
+## v0.2.1 closure
+
+Same-lane delegation requires an explicit contextual purpose and benefit; it is not a capability promotion. Unresolved insufficiency never justifies downward delegation. The core and full-reference instruction budgets are defined once in `scripts/package.py` and checked by doctor, tests and policy metadata. Optional CI measures named reference encodings as well as bytes. Live host acceptance stays separate in [ACCEPTANCE](ACCEPTANCE.md); no automated model smoke task is bundled.

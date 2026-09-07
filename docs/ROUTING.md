@@ -32,3 +32,9 @@ A targeted implementation fix stays in its lane. Repeated unexplained failure st
 Explicit Astra requests override cost preference, not permissions or missing prerequisites. No-subagent and no-escalation constraints retain the quality floor. Disable requests stop the router for that task. Configuration changes remain explicit user operations, not hidden runtime fallbacks.
 
 The Python reference is an offline approximation for boundary tests, not the Skill's runtime execution engine. Its `local` prerequisite result does not authorize blind implementation. See [dispatch contract](../skills/codex-efficiency-router/references/dispatch.md), [quality gates](QUALITY-GATES.md), and [benchmarking](BENCHMARKING.md).
+
+## v0.2.1 same-lane admission
+
+A same-lane child is not a capability upgrade. `choose_dispatch` now requires both `same_lane_reason` (`context_recovery`, `independent_review`, or `scope_isolation`) and `benefit_clear=True`. The caller must have task evidence for those values; labels are not proof. Without them, a sufficient current agent stays local and an insufficient one is blocked. A justified fresh independent review may be useful even when the current agent is otherwise sufficient.
+
+Opt-outs are evaluated first; neither contextual recovery nor forced Astra bypasses them. A currently insufficient agent cannot hand the same unresolved task to a cheaper lane. First resolve/re-scope it and reassess sufficiency. Host availability still gates every child. These are offline reference semantics; the Skill applies the same rule in prose without running Python per turn.

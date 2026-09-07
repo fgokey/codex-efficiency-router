@@ -16,7 +16,7 @@ try:
 except ImportError as exc:
     raise SystemExit("Python 3.11+ is required") from exc
 
-from package import EXPECTED, MANIFEST, PROJECT, resolve_targets
+from package import EXPECTED, INSTRUCTION_BUDGETS, MANIFEST, PROJECT, resolve_targets
 
 HEADINGS = ("Route once per meaningful decision", "Decide whether delegation is worth it",
             "Handoff without losing the decision", "Failure, validation, and stopping", "Context and reporting")
@@ -49,13 +49,34 @@ def validate_tree(skill_file: Path, agent_dir: Path) -> list[str]:
     if len(parts) != 3 or parts[0]:
         errors.append("Skill requires opening and closing YAML frontmatter")
     else:
-        meta = dict(line.split(": ", 1) for line in parts[1].splitlines() if ": " in line)
+        # This package deliberately uses only two plain, single-line YAML scalars.
+        # Reject ambiguous YAML instead of treating a broken description as loaded.
+        meta = {}
+        for line in parts[1].splitlines():
+            if not line.strip():
+                continue
+            key, separator, value = line.partition(": ")
+            if (key not in ("name", "description") or not separator or key in meta
+                    or not value or not value[0].isalnum() or ": " in value
+                    or " #" in value or "\t" in value):
+                errors.append("package frontmatter requires unique plain single-line name/description scalars")
+                continue
+            meta[key] = value
         if meta.get("name") != PROJECT or not meta.get("description"):
             errors.append("Skill name/description are missing or invalid")
-        if len(meta.get("description", "")) > 400:
-            errors.append("Skill description exceeds this project's 400-character discovery budget")
-    if len(text.encode("utf-8")) > 8000:
-        errors.append("Skill exceeds this project's 8000-byte on-demand core budget")
+        if len(meta.get("description", "")) > INSTRUCTION_BUDGETS["discovery_description_characters"]:
+            errors.append("Skill description exceeds the project discovery budget")
+    core_bytes = len(text.encode("utf-8"))
+    if core_bytes > INSTRUCTION_BUDGETS["core_skill_bytes"]:
+        errors.append("Skill exceeds the project core instruction budget")
+    full_bytes = core_bytes
+    for reference in sorted((skill_file.parent / "references").rglob("*.md")):
+        if not reference.resolve().is_relative_to(skill_file.parent.resolve()):
+            errors.append(f"reference escapes Skill: {reference.name}")
+            continue
+        full_bytes += len(reference.read_text(encoding="utf-8").encode("utf-8")) + 1
+    if full_bytes > INSTRUCTION_BUDGETS["full_skill_bytes"]:
+        errors.append("core plus ALL references exceeds the project full instruction budget")
     for heading in HEADINGS:
         if f"## {heading}" not in text:
             errors.append(f"missing policy section: {heading}")
@@ -79,7 +100,7 @@ def validate_catalog(data: dict) -> list[str]:
         return ["expected a model/list JSON object"]
     payload = data.get("result", data)
     if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-        return ["expected exported Codex model/list result with a data array"]
+        return ["expected exported Codex model/list JSON object with a data array"]
     if payload.get("nextCursor") is not None:
         return ["catalog export is incomplete: follow pagination before assessing availability"]
     found = {}
@@ -93,12 +114,17 @@ def validate_catalog(data: dict) -> list[str]:
             for _, model, effort in EXPECTED.values() if effort not in found.get(model, set())]
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("user", "project"), default="user")
     parser.add_argument("--project-root", type=Path)
     parser.add_argument("--source-tree", type=Path)
     parser.add_argument("--catalog", type=Path, help="exported, fully paginated model/list JSON; no live probing")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
     try:
         if args.source_tree:

@@ -6,6 +6,12 @@ from pathlib import Path
 
 PROJECT = "codex-efficiency-router"
 MANIFEST = ".cer-install.json"
+# Project-specific source budgets, not platform limits or billed-token estimates.
+INSTRUCTION_BUDGETS = {
+    "core_skill_bytes": 6500,
+    "full_skill_bytes": 12000,
+    "discovery_description_characters": 400,
+}
 EXPECTED = {
     "luna-worker.toml": ("luna_worker", "gpt-5.6-luna", "medium"),
     "terra-executor.toml": ("terra_executor", "gpt-5.6-terra", "medium"),

@@ -22,3 +22,7 @@ Model catalog entries checked in documentation: `gpt-5.6-luna`, `gpt-5.6-terra`,
 4. Live read-only smoke task: observe actual model, effort, role, permission behavior, and completion from host/session metadata. This is not performed by the installer or static doctor.
 
 The model's self-description is not runtime evidence. Where available, account for `model/rerouted` events instead of assuming requested configuration was honored. No live Codex installation was available in the audit environment, so the audit does not claim live execution validation.
+
+## Release versus host acceptance
+
+v0.2.1 ships the same four model/effort pairs; no additional Sol/high preset, automatic xhigh/max step or automatic model switch is introduced. An account catalog can confirm availability at export time, not actual dispatch. Installation/doctor never authenticates, reads private sessions or probes models. Follow [user-run acceptance](ACCEPTANCE.md) and preserve UNKNOWN where runtime metadata is absent.

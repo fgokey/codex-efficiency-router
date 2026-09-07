@@ -1,51 +1,51 @@
 ---
 name: codex-efficiency-router
-description: Reduce avoidable model, context, and coordination cost in substantial Codex coding, debugging, design, review, and refactoring work. Use quality-gated Luna/Terra/Sol/Astra delegation. Not for simple questions or tiny edits; do not stack with another active router.
+description: Quality-gated model routing for substantial Codex engineering tasks; reserve Astra for exceptional decisions and use sufficient cheaper executors when worthwhile. Use for efficiency-sensitive coding, diagnosis, design or review; not tiny edits, simple questions, or alongside another active router.
 ---
 
 # Codex Efficiency Router
 
-Optimize verified completion, total token use, and elapsed time together. Quality and user authorization are constraints, not a score to trade away. This is a routing policy, not a model-switching API. Do not invoke scripts or another LLM just to classify every turn.
+Optimize verified completion, total tokens and elapsed time. Quality and authorization are constraints. This Skill recommends native delegation; it cannot switch the parent model. No extra LLM classifier, per-turn script or mandatory ledger.
 
 ## Route once per meaningful decision
 
-Use evidence already present. Reconsider only after a phase change, invalidated assumption, or classified failure. First identify acceptance criteria and the smallest unresolved question. Missing requirements, authority, environment, or observability call for prerequisite repair, not an expensive guess. Run a safe, cheap discriminating check first when it can settle the question.
+Identify acceptance criteria and the smallest unresolved question from available evidence. Reclassify after phase changes, classified failures or contrary evidence, not every tool call. Missing requirements, authority, environment or observability require prerequisite repair, not a more expensive guess. Prefer a safe cheap discriminating check when it can settle the question.
 
-| Role | Preset | Suitable work |
+| Role | Model / effort | Work |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` / medium | Low-risk mechanical work with explicit changes and strong checks |
-| `terra_executor` | `gpt-5.6-terra` / medium | Bounded implementation with settled design and ordinary local judgment |
+| `luna_worker` | `gpt-5.6-luna` / medium | Low-risk mechanical changes with explicit scope and strong checks |
+| `terra_executor` | `gpt-5.6-terra` / medium | Settled design, bounded implementation, ordinary local judgment |
 | `sol_engineer` | `gpt-5.6-sol` / medium | Material uncertainty, coupled behavior, difficult integration or review |
-| `astra_architect` | `gpt-6-astra` / high | Exceptional unresolved reasoning; read-only decision support |
+| `astra_architect` | `gpt-6-astra` / high | Exceptional unresolved reasoning; read-only decisions |
 
-Astra requires stronger reasoning to be useful now, a consequential or exceptionally difficult decision, and insufficient cheap falsification. Task shapes include durable contract choices, high-consequence ambiguity, conflicting evidence, costly migration strategy, novel mechanisms, independent technical arbitration, and qualified Sol capability failure. Technology names, file count, slow builds, and task length are not triggers. Before an ambiguous escalation, read [routing.md](references/routing.md).
-
-These are conservative presets, not benchmark-proven optima. Do not force a cheap attempt before an obviously hard decision, climb every tier, or assume a more expensive model has higher total task cost. A large model that avoids retries can be cheaper overall. Never auto-select `max` or Ultra. “High quality” alone does not request maximum effort.
+Automatic Astra requires all three: stronger reasoning can help now; the decision is consequential or exceptionally difficult; cheap safe falsification is insufficient. Technology keywords, file count and slow builds are not triggers. Consult [routing.md](references/routing.md) only for ambiguous boundaries. These are four conservative presets, not proven optima or a compulsory ladder. Never auto-select `max` or Ultra; explicit effort overrides require actual host support and cannot override a pinned role by assertion.
 
 ## Decide whether delegation is worth it
 
-Prefer current sufficient agent and direct tools; parallelize only independent safe tool calls. Spawn one bounded leaf when capability requires it, or a supported lower-cost route clearly beats startup, duplicated context, handoff, verification, and likely rework. Keep tiny/tool-bound tasks local. Same-model delegation needs a concrete isolation or independent-review benefit.
+Keep sufficient, tiny or tool-bound work local. Prefer independent safe tool concurrency over extra model contexts. Delegate for necessary capability or a clear benefit after startup, duplicated context, handoff, verification and likely rework.
 
-For multiple leaves, require independent acceptance criteria, disjoint write ownership, safe shared resources, observed capacity, and a net latency benefit compatible with the token budget. Default to one leaf; allow at most two simultaneous leaves unless explicitly justified. No agent per file, recursive delegation, or mandatory planner/reviewer chain. Never parallelize conflicting edits, shared build directories, credentials, devices, deployments, or external side effects.
+Same-model delegation needs a concrete reason (context recovery, independent review or scope isolation) AND a net benefit. Insufficiency alone does not justify another copy of the same model. An insufficient current agent must not downgrade the same unresolved task; first resolve or re-scope it. Do not exhaust cheap tiers before an obviously difficult decision.
 
-Before the first delegation, read [dispatch.md](references/dispatch.md). Use only the host's actual tool schema and discovered roles. Custom agent files pin model AND effort and may override spawn requests. A recommendation is not evidence of actual model use. Keep the parent model unchanged; do not edit configuration or call nested `codex exec` as a hidden fallback. If routing fails, continue locally only when the current agent is sufficient; otherwise report the limitation and stop risky writes. Never bypass permissions or silently weaken the quality gate.
+Default to one leaf, at most two concurrent leaves unless justified. Require independent acceptance, disjoint write ownership, safe resources and observed capacity. No agent per file, recursive delegation or mandatory reviewer chain. Never parallelize conflicting writes, shared build state, devices, credentials, deployments or external side effects.
+
+Before first dispatch read [dispatch.md](references/dispatch.md) once. Use only discovered roles and the actual host schema. Distinguish recommended, requested and runtime-observed models; self-identification is not evidence. Do not edit global configuration or start hidden nested `codex exec`/API sessions. On unavailable routing, stay local only if sufficient; otherwise report the blocker and stop risky writes. Never bypass permissions.
 
 ## Handoff without losing the decision
 
-Pass a compact execution contract: goal; relevant paths and workspace revision/dirty state; confirmed evidence versus assumptions; frozen decisions and invariants; allowed changes/non-goals; acceptance checks; stop and escalation conditions. Preserve critical edge cases even when that needs more context. Share conclusions and evidence pointers, not a transcript. A decision freezes the agreed scope, not errors: new user instructions or contrary evidence reopen it.
+Pass: goal; revision/dirty state and relevant paths; facts versus assumptions with evidence pointers; decisions/invariants; allowed writes/non-goals; acceptance checks; stop/escalation conditions. Keep critical edge cases even when longer context is needed. Do not copy transcripts or secrets. Contrary evidence or new user requirements reopen a contract.
 
-After a decision is settled, re-evaluate the remaining unit for Terra/Luna and hand it off when worthwhile. Do not mechanically spawn for a tiny tail or lower the model while implementation still requires unresolved reasoning. Astra's read-only role returns decisions or proposed changes; it does not gain write privileges. Each leaf returns changed paths, observed checks/results, and residual risks, then stops. The parent checks integration against the current workspace.
+Once decisions settle, reassess remaining work for Terra/Luna; hand off only when worthwhile, not for a tiny tail or unresolved implementation reasoning. Astra stays read-only even if the host grants broader permissions. Leaves report changed paths, checks actually run, outcomes and risks, then stop. Parent verifies integration on the current workspace.
 
 ## Failure, validation, and stopping
 
-Classify failure as specification/authority, environment/tooling, observability, implementation, or capability. Repair prerequisites first. Allow one targeted same-lane repair after a failed implementation attempt; if the same unexplained failure remains, stop patching and escalate the unresolved question. Escalate immediately when evidence invalidates the contract. A retry counter alone never justifies Astra. Send only the attempts, evidence, and exact unresolved question; do not ask for private reasoning transcripts.
+Classify specification/authority, environment/tooling, observability, implementation and capability failures. Repair prerequisites first. Allow one targeted same-lane repair of an implementation mistake; repeated unexplained failure stops patching for diagnosis. Contract invalidation warrants immediate escalation. Retry count alone never justifies Astra; send attempts, evidence and the exact question, not private reasoning transcripts.
 
-Use checks that can falsify the required behavior. Honor repository-required checks. For fixes, reproduce the defect or establish a valid before/after test; preserve existing behavior. Newly generated tests are not independent proof. Do not weaken assertions, delete relevant tests, or change acceptance to get green. Risky changes need appropriate integration/adversarial review; use fresh independent reasoning only for residual judgment risk, not ritual Astra review.
+Honor repository-required checks. Reproduce a defect or establish a valid before/after test; preserve unrelated behavior. Newly generated tests are not independent proof. Do not weaken assertions, delete relevant tests or rewrite acceptance to get green. Risky changes need appropriate integration/adversarial checks; fresh review is for residual judgment risk, not ritual Astra approval.
 
-Stop once required checks pass on the final state and remaining risks are resolved or explicitly disclosed. Repeat checks only after relevant changes, failures, or unresolved concerns. An unrun check is UNKNOWN, not PASS. Performance claims need measured baselines; uncertain optimizations remain analysis/measurement plans.
+Stop when required checks pass on the final state and residual risks are resolved or disclosed. Repeat checks only for relevant changes, failures or unresolved concerns. Unrun checks are UNKNOWN, not PASS. Speculative optimizations remain analysis/measurement plans until supported by evidence.
 
 ## Context and reporting
 
-Read narrowly; use available native search tools and preserve key error excerpts plus full-log paths. Do not load all references, all history, or all logs. Keep stable instructions stable; do not promise cross-model cache reuse or host compaction/cache controls this Skill does not expose. On long tasks retain one compact checkpoint only when needed, with unresolved risks and workspace state.
+Read narrowly with available native tools; retain key errors and full-log paths. Do not preload all references, history or logs. Keep stable instructions stable; do not promise cross-model cache reuse or unsupported compaction controls. Retain one compact checkpoint only when needed, including workspace state and unresolved risks.
 
-Honor no-subagent/no-escalation/disable requests immediately; they do not certify the current model as sufficient. Explicit Astra requests may override the cost preference, never prerequisites or authorization. Return the project result, checks, and blockers. Mention routing only on material changes, and distinguish requested, observed, and unknown models. Do not invent token savings, speedups, completion, or worker cleanup. Before final response, collect required leaves and stop only this request's unnecessary work using available lifecycle tools.
+Honor disable/no-subagent/no-escalation requests; they never certify insufficient capability. Explicit Astra changes cost preference, not prerequisites or authority. Return results, observed checks and blockers; mention routing only for material changes. Never invent savings, speedups or actual model identity. Collect required leaves and stop only this request's superseded work with supported lifecycle tools; do not claim unobserved cleanup.

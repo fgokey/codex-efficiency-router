@@ -1,10 +1,10 @@
 # Codex Efficiency Router
 
-[English](README.md) · [架构设计](docs/ARCHITECTURE.md) · [本次体检报告](docs/AUDIT-2026-09-07.md) · [官方资料与业界经验](docs/PRIOR-ART.md)
+[English](README.md) · [架构设计](docs/ARCHITECTURE.md) · [本次修复与验证](docs/VALIDATION-v0.2.1.md) · [官方资料与业界经验](docs/PRIOR-ART.md)
 
 面向 Codex 的轻量模型路由 Skill：把 GPT-6 Astra 用在真正需要强推理的未决问题上；方案确定后，仅在收益足够时，把有边界的实现交给合适模型。
 
-**v0.2.0 · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.2.1 · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 这是独立社区项目，并非 OpenAI 官方产品。目标是在保留必要验收的前提下，减少无效 token、交接与等待；不承诺所有任务都省 token、都变快或质量绝对不变。路由回归测试不是实际模型编码能力评测。
 
@@ -33,6 +33,14 @@
 | `astra_architect` | `gpt-6-astra` | `high` |
 
 模型标识和配置方式已按 **2026-09-07** 的官方资料核对；你的账号目录、Codex 宿主能力、权限和实际执行元数据才决定是否可用。自定义 Agent 文件中的模型及档位可能优先于 spawn 参数，不能把“请求 Astra”当作“实际运行 Astra”。详见[兼容性说明](docs/COMPATIBILITY.md)。
+
+## v0.2.1 修复状态与说明更正
+
+已修复同档无收益重复委派：必须说明新上下文、独立审核或范围隔离的具体价值，并证明交接收益；当前能力不足不能靠把同一未决任务降到更低模型解决。“禁止子 Agent”现在有宿主能力和模型均可用的正反对照测试，故意删除开关时测试必须失败。
+
+实际仍为**四个角色预设**，Sol 默认 `medium`，没有第五个 Sol/high 角色，也不强制逐档尝试。安装器不会替换主线程模型。**默认卸载只移除受管理文件，不自动恢复旧版本**；恢复单独使用 `install.py --restore`。没有 `--no-restore` 参数。以 Python `--help` 和下方命令为准；PowerShell 包装脚本透传的是 `--scope`、`--dry-run`，不是 `-Scope`、`-DryRun` 别名。
+
+[修复与离线复测记录](docs/VALIDATION-v0.2.1.md)保留历史失败证据。实际角色发现、模型/档位生效、编码质量、完整 token 与耗时由使用者实装验收，不冒充已完成。[实装验收清单](docs/ACCEPTANCE.md)提供静态检查及可选的小型只读验证。安装器、单元测试和变异测试均不调用 Codex；分词 CI 仅运行普通 Python，不发起模型推理。
 
 ## 安装
 
@@ -162,10 +170,10 @@ python3 scripts/compare_runs.py runs.json
 
 测试覆盖路由边界、真正委派的准入条件、安装/升级/卸载/恢复、包完整性及统计结果的诚实表达。CI 配置包含 Windows、macOS、Linux，哪些平台实际通过应以对应提交的 Actions 结果为准。
 
-v0.2.0 通过按需加载参考资料缩小核心 Skill，而不是删除验收规则。体检报告中的压缩量是**指令字节数**，不是实测任务总 token 节省率。目前不声称已完成 Astra/Terra/Sol/Luna 实际编码质量、token 或耗时对照实验。[评估方案](docs/BENCHMARKING.md)说明了如何进行同任务、多次试验、全链路计费和耗时比较。
+v0.2.1 同时控制核心 Skill 和全部参考文件的指令体积，而不是只缩短入口文件；必要验收规则继续保留。体检报告中的压缩量是**指令字节数**，不是实测任务总 token 节省率。目前不声称已完成 Astra/Terra/Sol/Luna 实际编码质量、token 或耗时对照实验。[评估方案](docs/BENCHMARKING.md)说明了如何进行同任务、多次试验、全链路计费和耗时比较。
 
 ## 项目资料
 
-[架构](docs/ARCHITECTURE.md) · [路由](docs/ROUTING.md) · [Astra 升级](docs/ASTRA-ESCALATION.md) · [Token 与耗时](docs/TOKEN-EFFICIENCY.md) · [质量门](docs/QUALITY-GATES.md) · [兼容性](docs/COMPATIBILITY.md) · [体检报告](docs/AUDIT-2026-09-07.md) · [参考资料](docs/PRIOR-ART.md)
+[架构](docs/ARCHITECTURE.md) · [路由](docs/ROUTING.md) · [Astra 升级](docs/ASTRA-ESCALATION.md) · [Token 与耗时](docs/TOKEN-EFFICIENCY.md) · [质量门](docs/QUALITY-GATES.md) · [兼容性](docs/COMPATIBILITY.md) · [本次验证](docs/VALIDATION-v0.2.1.md) · [参考资料](docs/PRIOR-ART.md)
 
 [贡献指南](CONTRIBUTING.md) · [安全](SECURITY.md) · [支持](SUPPORT.md) · [行为准则](CODE_OF_CONDUCT.md) · [更新记录](CHANGELOG.md) · [MIT 许可](LICENSE)

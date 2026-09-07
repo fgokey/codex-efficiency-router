@@ -1,5 +1,5 @@
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "checked_against_openai_docs": "2026-09-07",
   "models": {
     "luna": {
@@ -32,7 +32,10 @@
     "benefit_gated_deescalation",
     "separate_recommendation_dispatch_and_observation",
     "do_not_silently_lower_quality_when_dispatch_unavailable",
-    "stop_after_required_final_state_verification"
+    "stop_after_required_final_state_verification",
+    "same_lane_requires_contextual_reason_and_benefit",
+    "no_downgrade_of_unresolved_insufficiency",
+    "full_reference_load_budget_not_core_only"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -64,12 +67,19 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.2.0",
+  "version": "0.2.1",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
-    "core_skill_bytes": 8000,
+    "core_skill_bytes": 6500,
     "discovery_description_characters": 400,
     "default_parallel_children": 2,
-    "notes": "Project policy, not official platform limits; no fixed assumed startup latency."
-  }
+    "notes": "Project policy, not official platform limits; no fixed assumed startup latency.",
+    "full_skill_bytes": 12000
+  },
+  "same_lane_reasons": [
+    "none",
+    "context_recovery",
+    "independent_review",
+    "scope_isolation"
+  ]
 }

@@ -19,7 +19,7 @@ def install(scope: str, project_root: Path | None, dry_run: bool, *,
     return manage.install(source_root(), scope, project_root, dry_run, force, adopt_v01)
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("user", "project"), default="user")
     parser.add_argument("--project-root", type=Path)
@@ -27,6 +27,11 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="back up and replace locally edited OWNED files")
     parser.add_argument("--adopt-v01", action="store_true", help="adopt only exact known legacy file contents")
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
     try:
         if args.restore:

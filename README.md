@@ -1,10 +1,10 @@
 # Codex Efficiency Router
 
-[简体中文](README.zh-CN.md) · [Design](docs/ARCHITECTURE.md) · [Audit](docs/AUDIT-2026-09-07.md) · [Evidence and prior art](docs/PRIOR-ART.md)
+[简体中文](README.zh-CN.md) · [Design](docs/ARCHITECTURE.md) · [Current validation](docs/VALIDATION-v0.2.1.md) · [Evidence and prior art](docs/PRIOR-ART.md)
 
 A small, quality-gated Codex Skill that reserves GPT-6 Astra for difficult unresolved decisions and delegates bounded implementation only when the benefit justifies the overhead.
 
-**Version 0.2.0 · MIT · Python 3.11+ · Windows / macOS / Linux**
+**Version 0.2.1 · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 This is a community project, not an OpenAI product. It aims to reduce avoidable tokens and elapsed time while preserving required acceptance checks. It cannot guarantee unchanged model quality, lower cost, or faster completion for every task. Offline policy tests are not live coding benchmarks.
 
@@ -33,6 +33,14 @@ No router-model call, daemon, mandatory planner/reviewer chain, per-turn ledger,
 | `astra_architect` | `gpt-6-astra` | `high` |
 
 Presets were checked against official documentation on **2026-09-07**. Your account, host, model catalog, permissions, and actual child metadata determine availability. Agent files can take precedence over spawn-time model/effort requests: a requested model is not proof of the model that ran. See [compatibility](docs/COMPATIBILITY.md).
+
+## v0.2.1 status and corrections
+
+The same-lane admission gap is fixed: a new copy needs a concrete contextual reason **and** net benefit; unresolved insufficiency cannot be repaired by downgrading. User opt-outs are tested with real dispatch availability, including causal positive controls and deliberate guard removal.
+
+Exactly **four** role presets are shipped. Sol defaults to `medium`; there is no fifth Sol/high role or required five-step ladder. The installer keeps your parent model unchanged. Default uninstall removes owned files **without restoring an old installation**; restoration is a separate `install.py --restore` operation. There is no `--no-restore` flag. Python `--help` and the commands below are authoritative; PowerShell wrappers forward Python-style `--scope`/`--dry-run`, not `-Scope`/`-DryRun` aliases.
+
+[Offline validation and retained historical failures](docs/VALIDATION-v0.2.1.md) distinguish fixed implementation from unverified model behavior. Live role discovery, model/effort identity, coding quality, whole-task usage and latency remain **user acceptance items**, not release guarantees. [Installation acceptance checklist](docs/ACCEPTANCE.md) includes a small optional read-only check. No installer, unit test or mutation test invokes Codex; the separate tokenizer CI job uses ordinary Python, not model inference.
 
 ## Install
 
@@ -158,10 +166,10 @@ python3 scripts/compare_runs.py runs.json
 
 The suite checks routing boundaries, dispatch admission, install/update/uninstall/restore safety, static package integrity, and honest measurement handling. CI defines Windows, macOS and Linux jobs. See the actual workflow result for which platforms passed.
 
-The v0.2.0 core Skill is smaller through progressive disclosure, not removal of acceptance gates. This is **instruction-byte reduction**, not a measured percentage of total task tokens. No live Astra/Terra/Sol/Luna task-quality, token, or latency benchmark is claimed. [Benchmarking](docs/BENCHMARKING.md) describes controlled paired trials and whole-task accounting.
+v0.2.1 budgets the core **and all references**, not only the small entry file. Required acceptance gates remain. This is **instruction-byte reduction**, not a measured percentage of total task tokens. No live Astra/Terra/Sol/Luna task-quality, token, or latency benchmark is claimed. [Benchmarking](docs/BENCHMARKING.md) describes controlled paired trials and whole-task accounting.
 
 ## Project documentation
 
-[Architecture](docs/ARCHITECTURE.md) · [Routing](docs/ROUTING.md) · [Astra gates](docs/ASTRA-ESCALATION.md) · [Token and latency](docs/TOKEN-EFFICIENCY.md) · [Quality gates](docs/QUALITY-GATES.md) · [Compatibility](docs/COMPATIBILITY.md) · [Audit](docs/AUDIT-2026-09-07.md) · [Prior art](docs/PRIOR-ART.md)
+[Architecture](docs/ARCHITECTURE.md) · [Routing](docs/ROUTING.md) · [Astra gates](docs/ASTRA-ESCALATION.md) · [Token and latency](docs/TOKEN-EFFICIENCY.md) · [Quality gates](docs/QUALITY-GATES.md) · [Compatibility](docs/COMPATIBILITY.md) · [Current validation](docs/VALIDATION-v0.2.1.md) · [Prior art](docs/PRIOR-ART.md)
 
 Contributions: [CONTRIBUTING](CONTRIBUTING.md). Safety/reporting: [SECURITY](SECURITY.md). Support: [SUPPORT](SUPPORT.md). Community conduct: [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md). Changes: [CHANGELOG](CHANGELOG.md). License: [MIT](LICENSE).

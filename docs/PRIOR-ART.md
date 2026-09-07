@@ -6,7 +6,7 @@ Reviewed on **2026-09-07**. This project synthesizes workflow principles; it doe
 
 | Primary source | Relevant guidance | Application and boundary |
 | --- | --- | --- |
-| [Codex Skills](https://developers.openai.com/codex/skills) | Skill metadata discovery, on-demand instructions, packaged references and UI policy | Short metadata, small core, two optional references. Our 400-character/8000-byte budgets are project limits, not official per-Skill limits. |
+| [Codex Skills](https://developers.openai.com/codex/skills) | Skill metadata discovery, on-demand instructions, packaged references and UI policy | Short metadata, small core, two optional references. Our description, core and full-reference budgets are project limits in `scripts/package.py`, not official platform limits. |
 | [Codex subagents](https://developers.openai.com/codex/subagents) | Standalone agent configuration, model/effort precedence, parent permissions and extra token work | Use native roles; distinguish requested/observed models; avoid unnecessary children. Parent configuration stays unchanged. |
 | [Using GPT-6 Astra](https://developers.openai.com/api/docs/guides/latest-model) | Instruction sensitivity, appropriate verification scope and avoiding repeated tests without need | Keep necessary checks and final-state evidence, then stop. Do not automatically increase effort to maximum. |
 | [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna) | Current model identities and effort support | Pin documented presets; require the user's catalog and actual runtime evidence for availability. No account access guarantee. |
@@ -34,3 +34,7 @@ Reviewed on **2026-09-07**. This project synthesizes workflow principles; it doe
 No paid inference solely to select a model; no unbounded agent swarm; no fixed startup-time assumptions from another machine; no retry-count-only escalation; no technology keyword forcing Astra; no automatic `max`; no automatic test deletion; no blanket independent reviewer for every change. We also avoid importing undocumented hook/configuration fields from small community projects.
 
 [Audit decisions and validation limits](AUDIT-2026-09-07.md)
+
+## v0.2.1 recheck
+
+The official Skills and Subagents pages and all four model pages were rechecked on 2026-09-07. Four presets remain unchanged; role-file model/effort precedence is preserved. Same-lane recovery and instruction-budget thresholds are local engineering decisions motivated by the retained failed evaluation, not newly claimed platform features. User acceptance, not this documentation review, establishes actual model execution.

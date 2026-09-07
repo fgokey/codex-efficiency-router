@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.1] - 2026-09-07
+
+### Fixed
+- Same-lane delegation now requires a specific contextual reason and net benefit;
+  an insufficient agent cannot solve the same unresolved task by downgrading.
+- User opt-out tests enable real dispatch availability and causal positive controls;
+  removing the guard is detected by mutation testing.
+- Compressed duplicated core/reference instructions with full-load budgets, rather
+  than claiming savings from the entry file alone.
+- Kept four role presets; corrected five-tier and uninstall/auto-restore misunderstandings.
+- Added CLI/documentation consistency checks and separate offline mutation/token CI.
+
+### Validation boundary
+- No Codex model task or paid API inference is run by this release workflow.
+- Actual host role/model identity, coding quality, total usage and latency remain
+  user-run acceptance; historical failing evaluations are retained.
+
+
 ## [0.2.0] - 2026-09-07
 
 ### Changed

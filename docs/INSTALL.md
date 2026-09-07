@@ -29,3 +29,9 @@ Uninstall reads the manifest, checks modifications, backs up affected bytes, rem
 - No bundled script needs administrator access or a disabled sandbox. Direct Python commands avoid PowerShell script policy changes; shell wrappers may be invoked with `sh`.
 - Restart/reload Codex if roles/Skills are stale. Uninstalling cannot erase text already loaded into an existing conversation. Duplicate user/project installs can leave another copy visible.
 - Manually merged optional config defaults are not owned by the installer and are not automatically undone. Remove those specific user-added keys manually only when appropriate; never replace the entire config from an old backup.
+
+## v0.2.1 command contract
+
+There are four role files, not five. Both PowerShell wrappers forward Python CLI flags unchanged: use `--scope`, `--project-root`, `--dry-run`, and `--force` as documented, not PowerShell-style aliases. Direct Python remains the canonical cross-platform entry point. `--help` lists accepted parameters.
+
+Default uninstall removes owned files and preserves backups; it does not automatically restore an older installation. There is no `--no-restore` option. To restore, use `scripts/install.py --restore BACKUP` with the original scope and target. Explicit restore is already supported; this release does not change its semantics. Read [acceptance](ACCEPTANCE.md) after updating.
