@@ -1,96 +1,132 @@
 #!/usr/bin/env python3
-"""Validate source-tree or installed codex-efficiency-router files."""
+"""Static integrity/preset checks plus optional exported Codex model/list validation.
 
+Does not start Codex, spend model tokens, read credentials or prove live routing.
+"""
 from __future__ import annotations
 
 import argparse
-import os
+import json
+import re
 import sys
 from pathlib import Path
 
 try:
     import tomllib
-except ImportError as exc:  # pragma: no cover
-    raise SystemExit("Python 3.11+ is required (tomllib missing)") from exc
+except ImportError as exc:
+    raise SystemExit("Python 3.11+ is required") from exc
 
-PROJECT = "codex-efficiency-router"
-EXPECTED = {
-    "luna-worker.toml": ("luna_worker", "gpt-5.6-luna", "medium"),
-    "terra-executor.toml": ("terra_executor", "gpt-5.6-terra", "medium"),
-    "sol-engineer.toml": ("sol_engineer", "gpt-5.6-sol", "medium"),
-    "astra-architect.toml": ("astra_architect", "gpt-6-astra", "high"),
-}
+from package import EXPECTED, MANIFEST, PROJECT, resolve_targets
+
+HEADINGS = ("Route once per meaningful decision", "Decide whether delegation is worth it",
+            "Handoff without losing the decision", "Failure, validation, and stopping", "Context and reporting")
 
 
 def validate_agent(path: Path, expected: tuple[str, str, str]) -> list[str]:
-    errors: list[str] = []
-    if not path.exists():
-        return [f"missing: {path}"]
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
-        return [f"invalid TOML {path}: {exc}"]
-
-    name, model, effort = expected
-    for key, value in (("name", name), ("model", model), ("model_reasoning_effort", effort)):
+    except (OSError, ValueError) as exc:
+        return [f"invalid or missing agent {path}: {exc}"]
+    errors = []
+    for key, value in zip(("name", "model", "model_reasoning_effort"), expected):
         if data.get(key) != value:
-            errors.append(f"{path}: expected {key}={value!r}, got {data.get(key)!r}")
-    if not data.get("description"):
-        errors.append(f"{path}: description is required")
-    if not data.get("developer_instructions"):
-        errors.append(f"{path}: developer_instructions is required")
+            errors.append(f"{path}: shipped preset expects {key}={value!r}")
+    for key in ("description", "developer_instructions"):
+        if not isinstance(data.get(key), str) or not data[key].strip():
+            errors.append(f"{path}: nonempty {key} is required")
+    if expected[0] == "astra_architect" and data.get("sandbox_mode") != "read-only":
+        errors.append(f"{path}: architect must remain read-only")
     return errors
 
 
 def validate_tree(skill_file: Path, agent_dir: Path) -> list[str]:
-    errors: list[str] = []
-    if not skill_file.exists():
-        errors.append(f"missing: {skill_file}")
-    else:
+    errors = []
+    try:
         text = skill_file.read_text(encoding="utf-8")
-        if "name: codex-efficiency-router" not in text:
-            errors.append(f"{skill_file}: expected Skill name not found")
-        if "gpt-6-astra" not in text:
-            errors.append(f"{skill_file}: Astra routing rule not found")
+    except OSError as exc:
+        return [f"missing Skill: {exc}"]
+    parts = text.split("---\n", 2)
+    if len(parts) != 3 or parts[0]:
+        errors.append("Skill requires opening and closing YAML frontmatter")
+    else:
+        meta = dict(line.split(": ", 1) for line in parts[1].splitlines() if ": " in line)
+        if meta.get("name") != PROJECT or not meta.get("description"):
+            errors.append("Skill name/description are missing or invalid")
+        if len(meta.get("description", "")) > 400:
+            errors.append("Skill description exceeds this project's 400-character discovery budget")
+    if len(text.encode("utf-8")) > 8000:
+        errors.append("Skill exceeds this project's 8000-byte on-demand core budget")
+    for heading in HEADINGS:
+        if f"## {heading}" not in text:
+            errors.append(f"missing policy section: {heading}")
+    for link in re.findall(r"\]\(([^)]+)\)", text):
+        if "://" not in link:
+            path = (skill_file.parent / link.split("#")[0]).resolve()
+            if not path.is_relative_to(skill_file.parent.resolve()) or not path.is_file():
+                errors.append(f"reference not packaged with Skill: {link}")
+    if "gpt-6-astra" not in text:
+        errors.append("missing Astra preset")
+    metadata = skill_file.parent / "agents/openai.yaml"
+    if not metadata.is_file():
+        errors.append("missing UI/invocation metadata")
     for filename, expected in EXPECTED.items():
         errors.extend(validate_agent(agent_dir / filename, expected))
     return errors
 
 
-def installed_paths(scope: str, project_root: Path | None) -> tuple[Path, Path]:
-    if scope == "user":
-        home = Path.home()
-        codex_home = Path(os.environ.get("CODEX_HOME", home / ".codex")).expanduser()
-        return home / ".agents" / "skills" / PROJECT / "SKILL.md", codex_home / "agents"
-    root = (project_root or Path.cwd()).resolve()
-    return root / ".agents" / "skills" / PROJECT / "SKILL.md", root / ".codex" / "agents"
+def validate_catalog(data: dict) -> list[str]:
+    if not isinstance(data, dict):
+        return ["expected a model/list JSON object"]
+    payload = data.get("result", data)
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+        return ["expected exported Codex model/list result with a data array"]
+    if payload.get("nextCursor") is not None:
+        return ["catalog export is incomplete: follow pagination before assessing availability"]
+    found = {}
+    for entry in payload["data"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("supportedReasoningEfforts"), list):
+            return ["invalid model catalog entry"]
+        if not isinstance(entry.get("model"), str):
+            return ["catalog model must be a string"]
+        found[entry["model"]] = {e.get("reasoningEffort") for e in entry["supportedReasoningEfforts"] if isinstance(e, dict)}
+    return [f"catalog does not confirm {model}/{effort}"
+            for _, model, effort in EXPECTED.values() if effort not in found.get(model, set())]
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("user", "project"), default="user")
-    parser.add_argument("--project-root", type=Path, default=None)
-    parser.add_argument("--source-tree", type=Path, default=None, help="validate a checkout instead of installed files")
+    parser.add_argument("--project-root", type=Path)
+    parser.add_argument("--source-tree", type=Path)
+    parser.add_argument("--catalog", type=Path, help="exported, fully paginated model/list JSON; no live probing")
     args = parser.parse_args()
-
-    if args.source_tree:
-        root = args.source_tree.resolve()
-        skill = root / "skills" / PROJECT / "SKILL.md"
-        agents = root / "agents"
-    else:
-        skill, agents = installed_paths(args.scope, args.project_root)
-
-    errors = validate_tree(skill, agents)
-    if errors:
-        print("doctor: FAILED")
+    try:
+        if args.source_tree:
+            root = args.source_tree.resolve()
+            skill, agents = root / "skills" / PROJECT / "SKILL.md", root / "agents"
+        else:
+            skill_dir, agents, _ = resolve_targets(args.scope, args.project_root)
+            skill = skill_dir / "SKILL.md"
+        errors = validate_tree(skill, agents)
+        if not args.source_tree:
+            from manage import digest, load_manifest, read_bytes, target
+            if not (skill.parent / MANIFEST).exists():
+                errors.append("missing ownership manifest; source-only copy or legacy installation")
+            else:
+                for key, expected in load_manifest(skill.parent, agents).items():
+                    if digest(read_bytes(target(key, skill.parent, agents))) != expected:
+                        errors.append(f"installed file missing or modified: {key}")
+        if args.catalog:
+            errors.extend(validate_catalog(json.loads(args.catalog.read_text(encoding="utf-8"))))
         for error in errors:
             print(f"- {error}")
+        print("doctor: STATIC FAIL" if errors else "doctor: STATIC PASS")
+        print("live Codex discovery/model execution: NOT VERIFIED")
+        print("catalog: checked supplied export only" if args.catalog else "catalog: NOT CHECKED")
+        return int(bool(errors))
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"doctor: STATIC FAIL: {exc}", file=sys.stderr)
         return 1
-
-    print("doctor: OK")
-    print(f"skill: {skill}")
-    print(f"agents: {agents}")
-    return 0
 
 
 if __name__ == "__main__":

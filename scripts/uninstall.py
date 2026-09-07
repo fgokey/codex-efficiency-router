@@ -1,42 +1,27 @@
 #!/usr/bin/env python3
-"""Remove only files installed by codex-efficiency-router."""
-
+"""Uninstall manifest-owned files only; preserve config, backups, and untracked files."""
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from install import AGENT_FILES, resolve_targets
+from manage import uninstall
 
 
-def uninstall(scope: str, project_root: Path | None, dry_run: bool) -> int:
-    skill_dir, agent_dir, _ = resolve_targets(scope, project_root)
-    targets = [skill_dir] + [agent_dir / name for name in AGENT_FILES]
-
-    for target in targets:
-        if not target.exists():
-            continue
-        if dry_run:
-            print(f"[dry-run] remove {target}")
-            continue
-        if target.is_dir():
-            import shutil
-            shutil.rmtree(target)
-        else:
-            target.unlink()
-        print(f"removed {target}")
-
-    return 0
-
-
-def parse_args() -> argparse.Namespace:
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--scope", choices=("user", "project"), default="user")
-    parser.add_argument("--project-root", type=Path, default=None)
+    parser.add_argument("--project-root", type=Path)
     parser.add_argument("--dry-run", action="store_true")
-    return parser.parse_args()
+    parser.add_argument("--force", action="store_true", help="back up and remove locally edited OWNED files")
+    args = parser.parse_args()
+    try:
+        return uninstall(args.scope, args.project_root, args.dry_run, args.force)
+    except (OSError, ValueError) as exc:
+        print(f"uninstall: FAILED: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    raise SystemExit(uninstall(args.scope, args.project_root, args.dry_run))
+    raise SystemExit(main())

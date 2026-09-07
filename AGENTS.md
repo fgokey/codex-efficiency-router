@@ -1,14 +1,9 @@
-# Repository instructions for coding agents
+# Repository work instructions
 
-This repository defines a routing policy whose primary invariant is: **do not claim efficiency by accepting lower verified quality**.
+This repository implements a quality-gated policy, not a model-switching API. Preserve that distinction. Prefer the smallest evidence-supported improvement; do not add mandatory model calls, nested Codex processes or runtime ledgers.
 
-When changing the project:
+Keep the core Skill and its packaged references self-contained. Model/effort presets must match `scripts/package.py`, TOML roles and policy metadata. Never claim live host compatibility or actual savings from static tests. Legacy fixtures are test data only.
 
-- keep runtime dependencies at zero unless a measurable requirement justifies one;
-- do not add a separate LLM routing call to the default path;
-- preserve the default installer's non-destructive behavior and its rule of not modifying `config.toml`;
-- verify current OpenAI model identifiers/effort support before changing compatibility claims;
-- add/update `tests/cases.json` when routing behavior changes;
-- run `python -m unittest discover -s tests -v` and `python scripts/doctor.py --source-tree .`;
-- do not fabricate token/latency improvements; label unmeasured expectations as such;
-- avoid unrelated repository-wide formatting changes.
+Before completion run the unittest suite, source doctor, Python compileall, and `git diff --check`. Add negative cases for new boundaries. For lifecycle changes test dry-run, unowned collisions, customization preservation, migration, rollback and uninstall/restore. Never test against a real user's config when temporary directories suffice.
+
+Update English and Chinese READMEs for installation/removal changes and keep links valid. Do not weaken acceptance to obtain green tests. Do not publish credentials, private prompts or installation backups.

@@ -1,103 +1,35 @@
 # Architecture
 
-## Objective
+## Objective and boundaries
 
-`codex-efficiency-router` optimizes three outcomes together:
+Preserve required correctness/authorization gates while reducing avoidable expensive-model reasoning, total tokens, and task elapsed time. These are separate quantities. Cheap model selection alone optimizes none of them reliably; duplicated context and repairs count too. No universal non-inferiority or savings guarantee is made.
 
-1. verified correctness must not intentionally decrease;
-2. expensive-model and duplicated-context token use should decrease;
-3. wall-clock time should decrease when safe concurrency or a faster sufficient model can help.
+## Three layers
 
-The router is intentionally a **thin policy Skill**, not a daemon and not another LLM call.
+1. **On-demand Skill**: a compact policy applied by the current coordinator. No classifier LLM, daemon, per-turn Python invocation, or always-on ledger. Metadata participates in discovery; full instructions load on activation, with two references loaded only when needed.
+2. **Native Codex leaves**: four role files with explicit model and effort. Astra is read-only decision support. Leaves cannot delegate, create a hidden Codex process, or publish changes. The parent owns user intent, integration, live capability checks, permissions, and the final answer.
+3. **Offline maintenance**: installer, uninstaller, static doctor, policy regression reference, and optional paired-run comparison. These utilities are not a runtime dispatcher and cannot prove the model followed the Skill.
 
-## Why there is no router model
+## Decision versus execution
 
-A separate model invocation to classify every request adds context ingestion, reasoning tokens, startup latency, and another failure mode before useful work starts. The Skill therefore asks the current coordinator to make one bounded routing decision from evidence already in context.
+Classify the smallest meaningful work unit from available evidence. A phase label does not fix a model: exploration may be a cheap lookup, while implementation may discover a difficult invariant. `choose_lane` in the offline reference recommends capability; `choose_dispatch` separately accounts for user constraints, the current agent's sufficiency, supported routes, and delegation benefit. No-subagent means no dispatch, not automatic permission to finish with an insufficient model.
 
-The reference classifier in `scripts/policy_reference.py` exists only for regression tests and documentation. Codex does not need to invoke it in normal work.
+A settled decision initiates a new cost/capability judgment. It does not mandate creating another child for a trivial tail. Substantial deterministic work should leave the expensive reasoning lane when the verified handoff is worthwhile. If uncertainty persists, retain suitable capability.
 
-## Capability ladder
+## Handoff and ownership
 
-```text
-L0  GPT-5.6 Luna / medium
-    deterministic, repetitive, narrow, strongly verifiable
+An execution contract preserves goal, code revision and dirty state, known facts versus assumptions, decisions, invariants, write scope, acceptance, and stop/escalation conditions. Store pointers to evidence rather than full transcripts. Do not drop material edge cases to meet a text quota.
 
-L1  GPT-5.6 Terra / medium
-    default bounded coding executor
+Use one child by default. Multiple children require independent acceptance, nonoverlapping write scopes, safe shared resources, observed capacity, and a clear net latency benefit. The parent validates current-workspace integration and collects required work before finishing. Do not manipulate other requests' workers.
 
-L2  GPT-5.6 Sol / medium
-    complex engineering, difficult debugging, cross-module reasoning
+## Distribution and safe lifecycle
 
-L3  GPT-6 Astra / high
-    exceptional reasoning: commitment boundaries, consequential ambiguity, evidence arbitration, novel design, costly migration strategy, or proven Sol capability failure
-```
+The Skill packages its own references and UI metadata. Four existing role names are retained for v0.1 compatibility. Installation records exact payload hashes in `.cer-install.json`, refuses unowned collisions and edited owned content, and never edits configuration. Updates are idempotent; ordinary write failures roll back already-written files. Uninstall removes only manifest-owned files and preserves user additions.
 
-The ladder is not a prestige ranking. Each lane has a different economic role.
+Per-file replacement is atomic; a multi-directory operation is not power-loss atomic. Backups, checksums and target-path checks support recovery. This is a local trusted-directory tool, not a hostile filesystem security boundary. See [security](../SECURITY.md).
 
-## Root model is not replaced
+## Source of truth
 
-The installer does not change the user's top-level Codex model. The user's selected root remains the coordinator. The Skill may create a bounded child agent only when a different model has clear net benefit.
+Runtime behavior: [SKILL.md](../skills/codex-efficiency-router/SKILL.md) and its referenced files. Shipped presets: `agents/*.toml`, checked against `scripts/package.py` and `policy/routing-policy.json`. Offline regression behavior: `scripts/policy_reference.py`. A passing unit test only establishes the tested code property, not model capability or host integration.
 
-This avoids forcing every turn of a long conversation through Astra merely because one decision required Astra.
-
-## Decision freeze and de-escalation
-
-The central state transition is:
-
-```text
-EXPLORE -> DECIDE -> EXECUTE -> VERIFY
-   |          |          |          |
- Sol/Astra  Sol/Astra  Terra/Luna  cheapest sufficient check
-```
-
-Once the consequential decision, invariants, scope, and acceptance criteria are sufficiently known, the expensive lane produces an `EXECUTION CONTRACT` and stops. Deterministic implementation goes back down the ladder.
-
-This transition is mandatory because keeping a frontier model active after the decision is frozen wastes tokens without adding proportional quality.
-
-## Parallelism policy
-
-Parallelism order:
-
-1. independent safe tool calls in the current agent;
-2. one child agent when a model change has material net benefit;
-3. multiple child agents only for independent workstreams with exclusive ownership or read-only evidence gathering.
-
-Do not use a swarm as the default. Parallel agents often reduce elapsed time but increase total tokens due to duplicated context and aggregation.
-
-## Context contracts
-
-### Execution Contract
-
-Transfers only stable decisions to a cheaper executor:
-
-- goal;
-- confirmed facts;
-- decisions/invariants;
-- in-scope files/components;
-- required changes;
-- non-goals;
-- acceptance criteria;
-- verification;
-- escalation triggers.
-
-### Escalation Packet
-
-Transfers only unresolved evidence upward:
-
-- goal and frozen decision;
-- attempts;
-- observed evidence;
-- expected vs actual;
-- exact unresolved question;
-- minimal relevant files/log excerpts.
-
-Full transcripts are explicitly discouraged.
-
-## Installation architecture
-
-The default installer copies files only:
-
-- Skill: user `$HOME/.agents/skills/codex-efficiency-router` or repo `$REPO_ROOT/.agents/skills/codex-efficiency-router`;
-- Agents: user `$CODEX_HOME/agents` (default `~/.codex/agents`) or repo `$REPO_ROOT/.codex/agents`.
-
-It does not modify `config.toml`. An optional fragment is provided for users who explicitly want Terra/medium as the default unnamed subagent model.
+[Official and industry sources](PRIOR-ART.md) explain the adopted principles and their limits.

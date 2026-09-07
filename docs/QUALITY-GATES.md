@@ -1,55 +1,25 @@
-# Quality Gates
+# Quality gates
 
-## Definition
+## Before routing
 
-A lower-cost route is acceptable only when its verification strategy can reasonably detect the failures that matter for the task. A higher-cost route is justified only when stronger reasoning can reduce material uncertainty that evidence alone cannot cheaply resolve.
+Clarify the required behavior, repository constraints, material edge cases, available evidence, write scope and authorization. A vague specification cannot be repaired merely by buying a more capable model. Do not downgrade solely because coding begins; coding can expose unresolved design.
 
-## Gate levels
+## During execution
 
-### Q0 — Mechanical
+Keep accepted decisions unless new evidence or user intent invalidates them. Respect disjoint write ownership and the active workspace state. Preserve the failure evidence. One targeted same-lane correction is allowed for ordinary implementation mistakes; repeated unexplained failure stops patching for diagnosis. Classify specification, environment, observation and capability failures separately.
 
-Examples: rename, generated config, known call-site migration.
+## Verification
 
-Evidence: compiler/type check, exact search, focused test, or deterministic diff invariant.
+Use observable acceptance checks capable of failing on the defect; a regression test should reproduce the original issue when feasible. Run repository-required checks and risk-proportionate integration, compatibility or adversarial checks. Generated tests and their implementation can share a mistake; neither self-review nor passing narrow new tests is independent proof.
 
-### Q1 — Bounded implementation
+Do not weaken assertions, delete relevant tests, rewrite acceptance, or hide skipped checks for green status. Obsolete tests may be changed only when changed requirements and the user's scope justify it, with remaining coverage explained. A check is PASS only when observed on the relevant final state; unrun or inaccessible checks are UNKNOWN.
 
-Examples: approved feature, localized bug fix.
+Stop once required checks pass and residual risks are resolved or disclosed. Additional validation needs relevant changes, failures or unresolved concerns, not a ritual request for maximum confidence. Fresh independent review is reserved for material judgment risk; it is not an Astra tax on every patch.
 
-Evidence: focused tests plus repository-required checks relevant to changed code.
+## Fail safely
 
-### Q2 — Cross-module/risky integration
+If the actual host cannot supply sufficient capability, report the limitation and avoid risky writes. No-subagent/no-escalation constraints do not certify the current model. Read-only advice does not grant execution permission. Backups do not justify unsafe edits. Measurements are required before performance claims.
 
-Examples: cross-module state flow, lifecycle, persistent behavior, protocol integration, or complex refactor with frozen target design.
+## What the repository tests prove
 
-Evidence: focused tests + integration checks + review of changed invariants. Use Sol when reasoning evidence remains important.
-
-### Q3 — Exceptional reasoning decision
-
-Astra is appropriate when the task passes the reasoning escalation gate and involves a commitment boundary, high-consequence ambiguity, deep unresolved diagnosis/evidence conflict, costly irreversible migration strategy, novel mechanism, technical arbitration, or proven Sol capability failure.
-
-Evidence: Astra resolves/narrows the decision; lower lanes implement; verification targets the exact invariants that justified escalation. Independent high-level review may be appropriate only when deterministic evidence cannot cover the residual high-consequence risk.
-
-## Failure-class gate
-
-Before increasing model capability, classify the failure:
-
-- Spec failure -> repair requirements/context/authority.
-- Environment failure -> repair/report environment, permissions, dependencies, state, credentials, or tooling.
-- Verifiability gap -> add instrumentation/tests or explicitly surface the gap.
-- Implementation failure -> bounded same-lane repair.
-- Capability/reasoning failure -> escalate one level with evidence.
-
-A stronger model does not fix a broken harness or missing evidence.
-
-## Evidence-driven optimization
-
-For performance, memory, stability, or architecture optimizations:
-
-1. establish a baseline;
-2. identify a measurable mechanism;
-3. change only when evidence supports expected benefit;
-4. measure after the change;
-5. revert or reconsider when benefit is absent or regression risk dominates.
-
-Do not modify production code solely because an optimization sounds plausible.
+Unit/property/scenario tests check the offline policy and lifecycle implementation. They cannot establish actual Skill trigger accuracy, live model routing, reasoning quality, or equivalence on arbitrary repositories. [Paired model evaluations](BENCHMARKING.md) are a separate acceptance layer.

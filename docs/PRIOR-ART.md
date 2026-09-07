@@ -1,41 +1,36 @@
-# Prior Art and Design Context
+# Primary sources and adopted experience
 
-This project is an original implementation built around current OpenAI Codex Skills/custom-agent capabilities and public work on quality/cost routing.
+Reviewed on **2026-09-07**. This project synthesizes workflow principles; it does not vendor these projects' code. Model-family ranking and policy thresholds are project heuristics, not facts established by the references. Community star counts and unverified benchmark savings are intentionally not used as quality evidence.
 
-## Sources studied
+## OpenAI documentation
 
-- OpenAI Codex custom agents / Skills documentation — native per-agent model and reasoning configuration.
-- `orange-the-weak/codex-auto-model-router` — fail-open benefit gating, no unnecessary child agents, direct tool concurrency, one-dimension-at-a-time escalation, and the rule that environment failures are not capability failures.
-- `capitalparser/codex-model-router` — routing by verifiability, failure cost, volume, depth, decomposability, observed outcomes, and evidence-gated escalation rather than phase names.
-- `giannhs2454/code-complexity-router` — inspection-based escalation when repository evidence disproves initial scope; de-escalation when work becomes local/mechanical.
-- `2manslkh/codex-orchestrator` / related Sol-Terra-Luna orchestration work — blast-radius routing, independent verification for consequential closes, and migration/security/arbitration as judgment-heavy categories.
-- `vimoxshah/claude-router` and `nobodyohm-web/claude-code-model-router` — premium reasoning at commitment boundaries, persistent bounded workers, evidence-based escalation, and strongest-model participation in substantial ambiguous planning rather than all implementation.
-- `midego1/claude-orchestrate` — explicit failure taxonomy: specification, environment, capability, and verifiability gaps; a stronger model should not be used to compensate for a bad task packet or broken harness.
-- LMSYS `RouteLLM` — quality/cost routing as a calibrated tradeoff rather than a prestige ranking; empirical routing should be evaluated against a strong-model quality baseline.
-- 2026 cascaded routing research — route cheaply first where appropriate, then escalate based on observed/estimated quality rather than sending every request to the oracle.
+| Primary source | Relevant guidance | Application and boundary |
+| --- | --- | --- |
+| [Codex Skills](https://developers.openai.com/codex/skills) | Skill metadata discovery, on-demand instructions, packaged references and UI policy | Short metadata, small core, two optional references. Our 400-character/8000-byte budgets are project limits, not official per-Skill limits. |
+| [Codex subagents](https://developers.openai.com/codex/subagents) | Standalone agent configuration, model/effort precedence, parent permissions and extra token work | Use native roles; distinguish requested/observed models; avoid unnecessary children. Parent configuration stays unchanged. |
+| [Using GPT-6 Astra](https://developers.openai.com/api/docs/guides/latest-model) | Instruction sensitivity, appropriate verification scope and avoiding repeated tests without need | Keep necessary checks and final-state evidence, then stop. Do not automatically increase effort to maximum. |
+| [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna) | Current model identities and effort support | Pin documented presets; require the user's catalog and actual runtime evidence for availability. No account access guarantee. |
+| [Latency optimization](https://developers.openai.com/api/docs/guides/latency-optimization) | Reduce unnecessary requests/output; parallelize suitable work; use non-LLM methods | Native tools first, bounded independent concurrency and stop conditions. No universal speedup percentage. |
+| [Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching) | Prefix-sensitive reuse of stable input | Avoid rewriting stable instructions; do not claim cross-model reuse, zero cached tokens or host controls the Skill lacks. |
+| [Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices) | Evaluate workflow components and final outcomes; justify multi-agent complexity through evidence | Separate routing/dispatch tests from real task-quality trials and account for regressions. |
+| [Codex App Server](https://developers.openai.com/codex/app-server) | `model/list`, `model/rerouted`, token-usage events | Optional saved catalog validation; actual execution metadata and cumulative-usage deduplication. No silent API/CLI calls. |
 
-## Design conclusions adopted here
+## Mature industry practice
 
-1. **Marginal reasoning value beats keyword routing.** Domain labels are examples, not triggers.
-2. **Reducible uncertainty is the scarce-resource target.** Missing requirements, permissions, environment, or observability are prerequisite failures, not reasons for Astra.
-3. **Failure cost and reversibility matter.** Commitment boundaries and costly-to-reverse decisions justify more reasoning than equivalent-volume local edits.
-4. **Verifiability pushes execution downward.** Strong deterministic checks let cheaper lanes safely handle more volume.
-5. **Failure must be classified before escalation.** Capability escalation is only one failure class.
-6. **Escalate with evidence; de-escalate with certainty.** Once the decision is frozen, expensive reasoning stops.
-7. **Independent review is selective.** Use it for high-consequence residual judgment, not every successful patch.
-8. **No routing model on the critical path.** The live Skill remains a thin policy layer; deterministic code exists only for regression testing.
+**Anthropic, [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents).** Start with the simplest sufficient workflow; orchestration is useful when its added complexity pays. We avoid a permanent planner/router/reviewer chain and choose tools before additional model contexts.
 
-## Deliberate differences
+**Anthropic, [Multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system).** Delegation needs clear task boundaries, output requirements and coordination. Independent research differs from shared-state coding. We require disjoint write ownership and capacity checks; their research-system results are not claimed as Codex coding results.
 
-`codex-efficiency-router` deliberately differs from several prior projects:
+**Anthropic, [Effective context engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).** Retrieve relevant context when needed, using compact state and evidence pointers. We preserve critical invariants and unresolved questions rather than copying full transcripts or dropping details to satisfy arbitrary compression targets.
 
-1. GPT-6 Astra is an explicit exceptional reasoning lane above Sol/Terra/Luna.
-2. Quality is a hard constraint rather than merely another weighted score.
-3. Terra is the default quality-sensitive executor; Luna is reserved for strongly deterministic work.
-4. Astra requires a three-part reasoning escalation gate and is not triggered by technology names alone.
-5. De-escalation after the decision freezes is mandatory.
-6. The default installer does not edit `config.toml`.
-7. Runtime routing requires no additional classifier model or daemon.
-8. Synthetic policy code is used only for regression tests, not for live routing.
+**Anthropic, [Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents).** Tasks, trials, graders, traces and final outcomes are distinct. We test structural behavior offline and document repeated, independently graded live evaluations separately. A syntactically valid Skill or plausible trajectory is not a successful engineering outcome.
 
-No third-party source code is required at runtime.
+**Aider, [Separating code reasoning and editing](https://aider.chat/2024/09/26/architect.html), [chat modes](https://aider.chat/docs/usage/modes.html).** Architect/editor separation motivates a compact decision contract followed by bounded implementation. We adopt the separation, not a mandatory two-call sequence or a claim that every model pair benefits.
+
+**LMSYS, [RouteLLM](https://github.com/lm-sys/RouteLLM).** Cost-quality routing requires workload-specific calibration. We adopt the evaluation mindset, not a learned online classifier or transferred benchmark percentages. This package makes no model-optimality claim without user-host measurements.
+
+## Deliberately not adopted
+
+No paid inference solely to select a model; no unbounded agent swarm; no fixed startup-time assumptions from another machine; no retry-count-only escalation; no technology keyword forcing Astra; no automatic `max`; no automatic test deletion; no blanket independent reviewer for every change. We also avoid importing undocumented hook/configuration fields from small community projects.
+
+[Audit decisions and validation limits](AUDIT-2026-09-07.md)

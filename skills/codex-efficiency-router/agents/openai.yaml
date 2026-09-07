@@ -1,0 +1,6 @@
+interface:
+  display_name: "Codex Efficiency Router"
+  short_description: "Quality-gated Astra and lower-cost delegation"
+  default_prompt: "Use $codex-efficiency-router to complete this task with evidence-based routing and proportionate verification."
+policy:
+  allow_implicit_invocation: true

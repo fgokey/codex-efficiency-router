@@ -1,11 +1,23 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "checked_against_openai_docs": "2026-09-07",
   "models": {
-    "luna": {"model": "gpt-5.6-luna", "effort": "medium"},
-    "terra": {"model": "gpt-5.6-terra", "effort": "medium"},
-    "sol": {"model": "gpt-5.6-sol", "effort": "medium"},
-    "astra": {"model": "gpt-6-astra", "effort": "high"}
+    "luna": {
+      "model": "gpt-5.6-luna",
+      "effort": "medium"
+    },
+    "terra": {
+      "model": "gpt-5.6-terra",
+      "effort": "medium"
+    },
+    "sol": {
+      "model": "gpt-5.6-sol",
+      "effort": "medium"
+    },
+    "astra": {
+      "model": "gpt-6-astra",
+      "effort": "high"
+    }
   },
   "principles": [
     "quality_is_a_hard_constraint",
@@ -15,9 +27,12 @@
     "route_by_marginal_value_of_stronger_reasoning",
     "separate_reducible_uncertainty_from_missing_prerequisites",
     "failure_triage_before_capability_escalation",
-    "deescalate_after_decision_freezes",
     "max_never_automatic",
-    "verification_is_the_quality_gate"
+    "verification_is_the_quality_gate",
+    "benefit_gated_deescalation",
+    "separate_recommendation_dispatch_and_observation",
+    "do_not_silently_lower_quality_when_dispatch_unavailable",
+    "stop_after_required_final_state_verification"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -48,5 +63,13 @@
     "single_tool_failure",
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
-  ]
+  ],
+  "version": "0.2.0",
+  "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
+  "budgets": {
+    "core_skill_bytes": 8000,
+    "discovery_description_characters": 400,
+    "default_parallel_children": 2,
+    "notes": "Project policy, not official platform limits; no fixed assumed startup latency."
+  }
 }

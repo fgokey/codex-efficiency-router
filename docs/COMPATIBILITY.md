@@ -1,35 +1,24 @@
-# Compatibility
+# Compatibility and verification levels
 
-Last documentation verification: **2026-09-07**.
+Documentation review date: **2026-09-07**. See [primary references](PRIOR-ART.md).
 
-## Expected model identifiers
+## Supported package layout
 
-- `gpt-6-astra`
-- `gpt-5.6-sol`
-- `gpt-5.6-terra`
-- `gpt-5.6-luna`
+User Skills install under `~/.agents/skills`; project Skills under `.agents/skills`. Agents use `$CODEX_HOME/agents` (normally `~/.codex/agents`) or `.codex/agents`. The optional `agents/openai.yaml` inside the Skill contains UI metadata and implicit-invocation policy, not the four model roles. Duplicate Skill names are not merged; prefer one installation scope.
 
-The project uses Astra `high` and GPT-5.6 `medium` presets. Current OpenAI documentation lists Astra reasoning efforts `low`, `medium`, `high`, `xhigh`, and `max`; GPT-5.6 Sol/Terra/Luna support the documented GPT-5.6 reasoning range.
+Standalone role TOML requires `name`, `description` and `developer_instructions`. The four shipped roles additionally pin model and reasoning effort. Official documentation gives custom-file model/effort priority over spawn-time choices; do not claim a contradictory spawn override changed the role. The fallback precedence described by the host is spawn parameters, configured defaults, then inherited parent values when not pinned by the role.
 
-## Codex features used
+## Execution is host dependent
 
-- local Skills;
-- custom agents;
-- per-agent `model`;
-- per-agent `model_reasoning_effort`;
-- optional multi-agent execution.
+A Skill cannot switch its parent model. Use only the actual exposed collaboration schema and discovered role names; do not invent fields or start hidden nested CLI processes. The host's live permission/sandbox rules may supersede role defaults, so Astra's instructions independently retain a read-only boundary. No provider, sandbox, authentication or feature flag is changed by installation.
 
-The installer does not require a third-party daemon, proxy, API key, or Python package.
+Model catalog entries checked in documentation: `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `gpt-6-astra`. Availability varies; the project does not assume that your account exposes them. Effort remains medium for the first three and high for Astra. `max` is never automatically selected.
 
-## Source links
+## Four distinct checks
 
-Current OpenAI references used when preparing v0.1.0:
+1. `doctor --source-tree .`: local package structure, references and shipped presets.
+2. `doctor --scope ...`: installed structure plus manifest hashes; custom edits are reported, not rewritten.
+3. `doctor --catalog FILE`: optional offline validation of a supplied, fully paginated Codex App Server `model/list` response. Supports a `result` wrapper or its raw object, a `data` array, `model`, `supportedReasoningEfforts[].reasoningEffort`, and `nextCursor`. A non-null cursor is incomplete. A saved export is not a live availability guarantee.
+4. Live read-only smoke task: observe actual model, effort, role, permission behavior, and completion from host/session metadata. This is not performed by the installer or static doctor.
 
-- https://developers.openai.com/api/docs/models/gpt-6-astra
-- https://developers.openai.com/api/docs/models/gpt-5.6-sol
-- https://developers.openai.com/api/docs/models/gpt-5.6-terra
-- https://developers.openai.com/api/docs/models/gpt-5.6-luna
-- https://learn.chatgpt.com/zh-Hans/docs/agent-configuration/subagents
-- https://learn.chatgpt.com/zh-Hans/docs/build-skills
-
-Codex and model catalogs change quickly. Verify these references before changing compatibility claims.
+The model's self-description is not runtime evidence. Where available, account for `model/rerouted` events instead of assuming requested configuration was honored. No live Codex installation was available in the audit environment, so the audit does not claim live execution validation.

@@ -1,224 +1,167 @@
-<div align="center">
-
 # Codex Efficiency Router
 
-**Quality-gated model routing for OpenAI Codex — use GPT-6 Astra only when the decision truly needs it, then de-escalate execution to GPT-5.6 Sol, Terra, or Luna.**
+[简体中文](README.zh-CN.md) · [Design](docs/ARCHITECTURE.md) · [Audit](docs/AUDIT-2026-09-07.md) · [Evidence and prior art](docs/PRIOR-ART.md)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![CI](https://github.com/fgokey/codex-efficiency-router/actions/workflows/validate.yml/badge.svg)](https://github.com/fgokey/codex-efficiency-router/actions/workflows/validate.yml)
-[![GPT-6 Astra](https://img.shields.io/badge/GPT--6-Astra-111111)](https://developers.openai.com/api/docs/models/gpt-6-astra)
-[![Codex Skill](https://img.shields.io/badge/Codex-Skill-10a37f)](https://learn.chatgpt.com/zh-Hans/docs/build-skills)
+A small, quality-gated Codex Skill that reserves GPT-6 Astra for difficult unresolved decisions and delegates bounded implementation only when the benefit justifies the overhead.
 
-**English** · [简体中文](README.zh-CN.md)
+**Version 0.2.0 · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-*Spend frontier reasoning on uncertainty, not on typing.*
+This is a community project, not an OpenAI product. It aims to reduce avoidable tokens and elapsed time while preserving required acceptance checks. It cannot guarantee unchanged model quality, lower cost, or faster completion for every task. Offline policy tests are not live coding benchmarks.
 
-</div>
-
----
-
-## Why
-
-GPT-6 Astra is OpenAI's most capable model for the hardest end-to-end work, but running the strongest model through every deterministic coding, build, test, migration, and cleanup step can waste expensive reasoning tokens and increase latency.
-
-The opposite extreme—routing everything to a cheap model—can also be inefficient when it creates failed loops, rework, or missed correctness issues.
-
-`codex-efficiency-router` uses a different objective:
-
-> **Minimize expensive-model tokens and wall-clock time subject to a verified-quality constraint.**
-
-The Skill routes by the **marginal value of stronger reasoning**: reducible uncertainty, failure cost/reversibility, coupling, verifiability, novelty, evidence conflict, and qualified prior failure — never by file count or task length alone.
-
-## Model ladder
-
-| Lane | Default preset | Use for |
-|---|---|---|
-| L0 | GPT-5.6 Luna / medium | Mechanical, repetitive, narrow, strongly verifiable work |
-| L1 | GPT-5.6 Terra / medium | Default bounded coding executor |
-| L2 | GPT-5.6 Sol / medium | Complex debugging, cross-module reasoning, difficult integration/review |
-| L3 | GPT-6 Astra / high | Exceptional reasoning: commitment boundaries, consequential ambiguity, evidence arbitration, novel design, costly migration strategy, proven Sol capability failure |
-
-Astra `max` is **never automatic**.
-
-## The key transition
+## How it works
 
 ```text
-material unresolved decision
-            |
-            v
-       Sol or Astra
-            |
-       decision frozen
-            |
-            v
-     Execution Contract
-            |
-       de-escalate
-            v
-    Terra or Luna
-            |
-      code / tests / build
-            |
-            v
-     cheapest valid verification
+Current coordinator (your selected model stays unchanged)
+  ├─ sufficient, tiny, or tool-bound task → direct tools
+  ├─ safe independent operations         → bounded tool concurrency
+  └─ worthwhile or necessary delegation  → one bounded leaf
+       Luna  → mechanical, low-risk, strongly verifiable work
+       Terra → bounded implementation with a settled design
+       Sol   → difficult integration, uncertainty, or review
+       Astra → exceptional unresolved reasoning, read-only advice
+                    ↓ decision resolved
+             reconsider the remaining work; hand off only when worthwhile
 ```
 
-Astra is a reasoning resource for the few decisions where additional intelligence has high marginal value, not the default construction crew.
+No router-model call, daemon, mandatory planner/reviewer chain, per-turn ledger, hidden nested Codex process, or automatic `max` effort. Technology keywords and file counts do not determine capability. A missing requirement, permission, environment, or observation is repaired before escalating the model.
 
-## What makes this router efficient
+| Custom role | Model preset | Reasoning |
+| --- | --- | --- |
+| `luna_worker` | `gpt-5.6-luna` | `medium` |
+| `terra_executor` | `gpt-5.6-terra` | `medium` |
+| `sol_engineer` | `gpt-5.6-sol` | `medium` |
+| `astra_architect` | `gpt-6-astra` | `high` |
 
-- **No router LLM call.** The current coordinator makes one cheap policy decision from existing context.
-- **One agent by default.** A child agent is created only when model-switch benefit clearly exceeds context/startup/aggregation overhead.
-- **Tool concurrency before model concurrency.** Parallelize safe reads/searches/checks without multiplying model contexts.
-- **Mandatory de-escalation.** As soon as the hard decision is resolved, deterministic work goes back to Terra/Luna.
-- **Compact handoffs.** Pass a frozen decision/execution contract, not the entire exploration transcript.
-- **Bounded escalation.** Ordinary implementation mistakes stay with the executor; unexplained repeated failures move up one lane.
-- **Evidence-driven optimization.** Performance/memory/stability changes require measurement, not speculative edits.
-- **Verification is the quality gate.** Token savings do not count when acceptance fails or human repair increases.
+Presets were checked against official documentation on **2026-09-07**. Your account, host, model catalog, permissions, and actual child metadata determine availability. Agent files can take precedence over spawn-time model/effort requests: a requested model is not proof of the model that ran. See [compatibility](docs/COMPATIBILITY.md).
 
-## Quick start
+## Install
 
-### Ask Codex to install it
+Requirements: Git, Python **3.11 or newer**, and a Codex host that supports local Skills and custom agents. Installation is offline after cloning; it does not request an API key or alter your Codex authentication.
 
-```text
-Install the `codex-efficiency-router` Skill from
-https://github.com/fgokey/codex-efficiency-router
-and validate the installation. Do not overwrite unrelated Codex settings.
-```
-
-### Windows PowerShell
+### Windows / PowerShell
 
 ```powershell
 git clone https://github.com/fgokey/codex-efficiency-router.git
 cd codex-efficiency-router
-.\install.ps1 --scope user
-python .\scripts\doctor.py --scope user
+py -3 scripts/install.py --scope user --dry-run
+py -3 scripts/install.py --scope user
+py -3 scripts/doctor.py --scope user
+```
+
+Use `python` instead of `py -3` when that is your Python 3.11+ interpreter. Direct Python commands do not require changing PowerShell execution policy.
+
+### macOS / Linux
+
+```sh
+git clone https://github.com/fgokey/codex-efficiency-router.git
+cd codex-efficiency-router
+python3 scripts/install.py --scope user --dry-run
+python3 scripts/install.py --scope user
+python3 scripts/doctor.py --scope user
+```
+
+The shell wrappers are also usable as `sh install.sh --scope user` and `sh uninstall.sh --scope user`; no executable-bit assumption is required.
+
+### Install for one project instead
+
+Choose **one scope**, rather than installing duplicate Skill names at both scopes. From this router repository, substitute the real existing project root:
+
+```powershell
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
+py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
+```
+
+On macOS/Linux replace `py -3` with `python3` and use an absolute project path. Local project configuration remains subject to Codex trust/administration policies.
+
+| Scope | Skill | Four named agent files | Retained backups |
+| --- | --- | --- | --- |
+| User | `~/.agents/skills/codex-efficiency-router/` | `$CODEX_HOME/agents/` or `~/.codex/agents/` | `$CODEX_HOME/backups/codex-efficiency-router/` |
+| Project | `<project>/.agents/skills/codex-efficiency-router/` | `<project>/.codex/agents/` | `<project>/.codex-router-local/backups/` |
+
+The installer never changes `config.toml`, `AGENTS.md`, MCP servers, providers, permissions, or unrelated agents/Skills. It refuses unowned filename collisions. A hash manifest tracks only the installed payload; user edits require explicit review before replacement.
+
+`doctor` reports **STATIC PASS/FAIL**, separately from **live model execution: NOT VERIFIED**. It does not run models. Reload/restart Codex if the Skill or roles are not discovered. Installing only `SKILL.md` through another Skill installer does not install the four role presets; use the full installer for this package.
+
+## Use
+
+```text
+$codex-efficiency-router
+Implement the requested change. Preserve the agreed design and required checks.
+Use Astra only for consequential unresolved reasoning; avoid unnecessary delegation.
+```
+
+Implicit invocation is enabled in the packaged UI metadata for relevant substantial engineering work. Explicit `$codex-efficiency-router` is the reliable way to request it. Requests to disable routing, avoid subagents, or avoid escalation take precedence, but do not make an insufficient current model sufficient. Do not stack several routers on the same task.
+
+For an initial live smoke test, ask for a small **read-only** bounded child task and inspect host/session metadata for the actual role, model, effort, and result. Model self-identification is not evidence. A successful installation or catalog export alone does not prove child dispatch works.
+
+## Update and migrate from v0.1.0
+
+```powershell
+git pull --ff-only
+# Existing v0.2+ managed installation:
+py -3 scripts/install.py --scope user --dry-run
+py -3 scripts/install.py --scope user
+# ONLY for the original v0.1.0 installation without an ownership manifest:
+py -3 scripts/install.py --scope user --adopt-v01 --dry-run
+py -3 scripts/install.py --scope user --adopt-v01
+```
+
+These are alternative upgrade paths, not commands to run all at once. On macOS/Linux use `python3`. For project scope, append the same `--scope project --project-root ...` arguments used at installation.
+
+Legacy adoption recognizes the exact published v0.1.0 content, including CRLF-equivalent copies. Unknown or customized legacy files are preserved and require manual review. Even `--force` cannot claim an unrelated file. Reinstalling an unchanged managed version is a no-op.
+
+## Uninstall
+
+Run these from your retained clone of this repository, using the **same scope and CODEX_HOME** as installation. Do not use the old v0.1.0 uninstaller on customized files.
+
+### Windows / PowerShell
+
+```powershell
+py -3 scripts/uninstall.py --scope user --dry-run
+py -3 scripts/uninstall.py --scope user
+# For project scope instead:
+py -3 scripts/uninstall.py --scope project --project-root "C:/Work/my-project"
 ```
 
 ### macOS / Linux
 
-```bash
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-./install.sh --scope user
-python3 scripts/doctor.py --scope user
+```sh
+python3 scripts/uninstall.py --scope user --dry-run
+python3 scripts/uninstall.py --scope user
+# For project scope instead:
+python3 scripts/uninstall.py --scope project --project-root "/path/to/my-project"
 ```
 
-The default installer **does not modify `config.toml`**.
+Only manifest-owned files are removed. Unrelated/untracked files, other agents, existing configuration, and backups remain. Locally edited owned files block removal by default. After reviewing them, `--force` backs them up and removes only owned files; it is not a broad cleanup switch. Legacy installations must first be adopted with `--adopt-v01`. Reload Codex after uninstalling; an already-loaded conversation may still contain the old instructions.
 
-See [docs/INSTALL.md](docs/INSTALL.md) for repository-scoped install, dry-run, optional defaults, and uninstall.
+### Restore an installation or uninstall
 
-## Use
+Use the backup directory printed by the operation, not a guessed timestamp:
 
-Explicit invocation:
-
-```text
-$codex-efficiency-router implement this change end to end
+```powershell
+py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP" --dry-run
+py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP"
 ```
 
-Typical behavior:
+On macOS/Linux use `python3` and the actual backup path. Restore refuses different target paths, corrupt backups, and intervening local changes unless explicitly overridden after review. Each restore also retains a recovery backup. Files manually added to `config.toml`, such as [optional defaults](config/optional-defaults.toml), are never removed automatically. See [detailed installation and recovery](docs/INSTALL.md).
 
-```text
-Task: redesign a long-lived public contract and implement the selected option
+## Validation and measurable claims
 
-1. Sol maps requirements, constraints, compatibility obligations, and evidence.
-2. Several viable designs remain; the choice is a costly-to-reverse commitment boundary.
-3. Astra/high compares the tradeoffs and freezes the decision.
-4. Astra emits a compact Execution Contract and stops.
-5. Terra implements the approved design.
-6. Luna handles mechanical migrations/check matrices where appropriate.
-7. Focused verification passes; Astra is not added as a ceremonial final reviewer.
+```sh
+python3 -m unittest discover -s tests -v
+python3 scripts/doctor.py --source-tree .
+python3 -m compileall -q scripts tests
+# Optional: compare your own normalized paired runs, no API call:
+python3 scripts/compare_runs.py runs.json
 ```
 
-Useful overrides:
+The suite checks routing boundaries, dispatch admission, install/update/uninstall/restore safety, static package integrity, and honest measurement handling. CI defines Windows, macOS and Linux jobs. See the actual workflow result for which platforms passed.
 
-```text
-$codex-efficiency-router auto route this task
-$codex-efficiency-router save tokens but keep the quality gate
-$codex-efficiency-router no subagents
-$codex-efficiency-router use Astra for the architecture decision, then downgrade
-```
+The v0.2.0 core Skill is smaller through progressive disclosure, not removal of acceptance gates. This is **instruction-byte reduction**, not a measured percentage of total task tokens. No live Astra/Terra/Sol/Luna task-quality, token, or latency benchmark is claimed. [Benchmarking](docs/BENCHMARKING.md) describes controlled paired trials and whole-task accounting.
 
-## Repository layout
+## Project documentation
 
-```text
-codex-efficiency-router/
-├── skills/codex-efficiency-router/SKILL.md
-├── agents/
-│   ├── astra-architect.toml
-│   ├── sol-engineer.toml
-│   ├── terra-executor.toml
-│   └── luna-worker.toml
-├── policy/routing-policy.json
-├── scripts/
-│   ├── install.py
-│   ├── uninstall.py
-│   ├── doctor.py
-│   └── policy_reference.py
-├── tests/
-├── config/optional-defaults.toml
-├── docs/
-└── .github/
-```
+[Architecture](docs/ARCHITECTURE.md) · [Routing](docs/ROUTING.md) · [Astra gates](docs/ASTRA-ESCALATION.md) · [Token and latency](docs/TOKEN-EFFICIENCY.md) · [Quality gates](docs/QUALITY-GATES.md) · [Compatibility](docs/COMPATIBILITY.md) · [Audit](docs/AUDIT-2026-09-07.md) · [Prior art](docs/PRIOR-ART.md)
 
-## Design docs
-
-- [Architecture](docs/ARCHITECTURE.md)
-- [Routing decision tree](docs/ROUTING.md)
-- [Token and latency efficiency](docs/TOKEN-EFFICIENCY.md)
-- [Quality gates](docs/QUALITY-GATES.md)
-- [Benchmarking methodology](docs/BENCHMARKING.md)
-- [Compatibility](docs/COMPATIBILITY.md)
-- [Installation](docs/INSTALL.md)
-
-## Compatibility
-
-v0.1.0 was checked against OpenAI documentation on **2026-09-07**.
-
-Expected model identifiers:
-
-- `gpt-6-astra`
-- `gpt-5.6-sol`
-- `gpt-5.6-terra`
-- `gpt-5.6-luna`
-
-OpenAI currently documents GPT-6 Astra as the highest-capability model for the hardest end-to-end work and lists `low`, `medium`, `high`, `xhigh`, and `max` reasoning efforts. Codex custom agents support per-agent `model` and `model_reasoning_effort` settings. See [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md) for source links.
-
-> This is an independent community project. It is not created by, affiliated with, or endorsed by OpenAI.
-
-## Safety of installation
-
-The default installer:
-
-- copies only this Skill and its four named agent files;
-- backs up previously installed files owned by this project;
-- preserves unrelated custom agents;
-- does not edit `config.toml`;
-- does not read API keys or auth tokens;
-- does not change Git remotes;
-- does not commit, push, deploy, or upload code.
-
-Run a preview first with `--dry-run` if desired.
-
-## Development
-
-Python 3.11+; no third-party runtime dependencies.
-
-```bash
-python -m unittest discover -s tests -v
-python scripts/doctor.py --source-tree .
-```
-
-The synthetic route cases test policy consistency only; they are not a model-quality benchmark.
-
-## Contributing
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md). Routing and efficiency changes should include reproducible evidence or regression cases where practical.
-
-## Security
-
-See [SECURITY.md](SECURITY.md). Do not post credentials, private source code, proprietary logs, or sensitive configuration in public issues.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Contributions: [CONTRIBUTING](CONTRIBUTING.md). Safety/reporting: [SECURITY](SECURITY.md). Support: [SUPPORT](SUPPORT.md). Community conduct: [CODE_OF_CONDUCT](CODE_OF_CONDUCT.md). Changes: [CHANGELOG](CHANGELOG.md). License: [MIT](LICENSE).

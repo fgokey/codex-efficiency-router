@@ -1,45 +1,25 @@
-# Token and Latency Efficiency
+# Token and latency efficiency
 
-## What actually saves tokens
+## Account for the whole task
 
-The project targets structural waste rather than merely selecting the cheapest model:
+Measure parent plus all children, retries, tool-result input, verification and coordination. Distinguish total tokens, expensive-model tokens, monetary cost when actually available, and elapsed time. A cheaper model may emit more tokens. A parallel plan can finish sooner and consume more tokens. API prices are not Codex subscription quota conversion rates.
 
-- avoid an extra LLM call just to route;
-- avoid feeding the full root conversation to every worker;
-- stop high-end reasoning once the decision is frozen;
-- pass compact contracts instead of transcripts;
-- prefer direct tool concurrency before model concurrency;
-- avoid duplicate agents discovering the same facts;
-- avoid repeated successful verification;
-- escalate before a weak model enters a long brute-force loop.
+## Low-overhead defaults
 
-## What can increase tokens
+Keep classification in the current coordinator; no extra LLM classifier. Use native tools for deterministic operations and safe tool concurrency before parallel model contexts. Avoid a child for a tiny/tool-bound task. Independent reasoning or capability requirements, not a file count, justify children.
 
-- spawning many agents for a small task;
-- using a planner, router, executor, reviewer, and integrator for work one agent could finish;
-- asking multiple models to independently solve the same problem;
-- keeping Astra as the root for long deterministic follow-up work;
-- using `xhigh`/`max` by default;
-- copying full logs and full exploration history into every handoff.
+Keep discovery metadata short. Load the core Skill only when relevant, and load routing/dispatch references only when necessary. Preserve evidence pointers, invariants, accepted decisions and final-workspace state in a compact handoff. Do not dump repository trees, full logs, the whole chat, or unrelated documentation into every child.
 
-## Speed strategy
+Prefer one child; cap ordinary parallelism at two and observe the actual host capacity. No fixed seconds or token-savings thresholds are presented as measured platform constants. Startup/context costs must be observed or conservatively estimated for the user's host and workload.
 
-Fastest safe ordering:
+## Preserve useful cache and verification
 
-1. parallelize independent I/O/tool calls;
-2. use a faster sufficient model for bounded work;
-3. parallelize independent reasoning work only when startup/context/merge overhead is smaller than the expected wall-clock saving;
-4. keep dependent reasoning sequential.
+Stable instructions and append-oriented context can help caching where the host supports it. This Skill does not control cache keys, compaction, or mid-conversation configuration APIs, and cannot promise cache reuse across model changes. Cached input still exists as tokens even when processing or pricing differs.
 
-## Quality constraint
+Specify required checks and stop conditions before work. Run checks that can falsify the intended behavior, plus repository requirements. Avoid repeated already-successful tests after no relevant change, but do not omit integration or residual-risk checks to make numbers look better.
 
-Efficiency claims are invalid if they increase retries, escaped defects, or manual repair. Measure the whole task, not only the successful final attempt.
+## Evidence before claims
 
-A useful comparison records:
+The v0.2 core was reduced from 13,264 to 7,206 UTF-8 bytes (45.67%) by removing duplication and moving detail to optional references. This is an instruction-size measurement, not tokenizer output, total-context savings, task-cost savings, latency improvement or proven quality equivalence. Actual gains require [paired trials](BENCHMARKING.md).
 
-- success/failure against the same acceptance criteria;
-- total tokens across all agents and retries;
-- elapsed time;
-- number of model invocations/agents;
-- number of failed loops;
-- human intervention required.
+[Primary sources and applicability limits](PRIOR-ART.md)

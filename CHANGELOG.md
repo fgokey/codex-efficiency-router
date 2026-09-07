@@ -1,10 +1,25 @@
 # Changelog
 
-All notable changes to this project are documented here.
+## [0.2.0] - 2026-09-07
 
-The format is based on Keep a Changelog and this project follows Semantic Versioning.
+### Changed
+- Audited against current OpenAI documentation and primary industry engineering guidance.
+- Reduced the on-demand Skill core through packaged progressive references; kept quality gates.
+- Separated capability recommendation, dispatch admission and observed runtime identity.
+- Replaced mandatory downgrade with benefit-gated handoff after decisions settle.
+- Encoded cheap discriminating checks, prerequisite repair and classified capability failure.
+- Removed recursive leaf delegation and any automatic maximum-effort exception.
+- Added manifest-owned install/update/uninstall, explicit verified v0.1 adoption, collision protection,
+  modification detection, retained backups, ordinary-failure rollback and guarded restore.
+- Made doctor explicitly static; added optional exported model/list validation.
+- Added paired-run comparison with unknown measurements and regression handling, not a live benchmark.
+- Expanded regression/safety tests and CI platforms; rewrote install and uninstall commands in both READMEs.
 
-## [Unreleased]
+### Limits
+- Live model execution and coding-quality/token/latency improvements are not established by these offline tests.
+- Multi-file lifecycle operations are not power-loss atomic; retained backups support recovery.
+
+## Historical v0.1.0 refinement - 2026-09-07
 
 ### Changed
 - Replaced technology-keyword Astra triggers with a general reasoning-escalation gate based on reducible uncertainty, failure cost/reversibility, coupling, verifiability, novelty, evidence conflict, and qualified prior failure.

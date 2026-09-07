@@ -1,125 +1,119 @@
-#!/usr/bin/env python3
-"""Reference routing policy used only by tests/docs, not required at runtime.
-
-The Codex Skill makes the live routing decision from current task context. This
-module provides a deterministic approximation so maintainers can regression-test
-policy changes without paying for an LLM router call.
-"""
-
+"""Offline reference rules, NOT a live Codex dispatcher or model-quality benchmark."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Literal
 
 Lane = Literal["local", "luna", "terra", "sol", "astra"]
+LANES = ("local", "luna", "terra", "sol", "astra")
 
 
 @dataclass(frozen=True)
 class TaskSignals:
     mechanical: bool = False
-    uncertainty: int = 1       # 0 known -> 3 highly unresolved
-    risk: int = 1              # 0 trivial -> 3 high consequence/blast radius
-    coupling: int = 1          # 0 isolated -> 3 cross-system/long-horizon
-    verifiability: int = 2     # 0 weak/judgment -> 3 strong deterministic checks
-    irreversibility: int = 0   # 0 easy rollback -> 3 costly/durable commitment
-    novelty: int = 0           # 0 established pattern -> 3 genuinely novel mechanism
+    uncertainty: int = 1
+    risk: int = 1
+    coupling: int = 1
+    verifiability: int = 2
+    irreversibility: int = 0
+    novelty: int = 0
     evidence_conflict: bool = False
     commitment_boundary: bool = False
     capability_failure: bool = False
     spec_complete: bool = True
+    authority_ready: bool = True
     environment_ready: bool = True
     observability_ready: bool = True
+    reasoning_bound: bool = True
+    cheap_check_available: bool = False
     failed_attempts: int = 0
     prior_lane: Lane = "local"
     force_astra: bool = False
     no_subagents: bool = False
 
     def validate(self) -> None:
-        for name in (
-            "uncertainty",
-            "risk",
-            "coupling",
-            "verifiability",
-            "irreversibility",
-            "novelty",
-        ):
-            value = getattr(self, name)
-            if value < 0 or value > 3:
-                raise ValueError(f"{name} must be in [0, 3]")
-        if self.failed_attempts < 0:
-            raise ValueError("failed_attempts must be >= 0")
+        scores = ("uncertainty", "risk", "coupling", "verifiability", "irreversibility", "novelty")
+        for field in fields(self):
+            value = getattr(self, field.name)
+            if field.name in scores:
+                if type(value) is not int or not 0 <= value <= 3:
+                    raise ValueError(f"{field.name} must be an integer in [0, 3]")
+            elif field.name == "failed_attempts":
+                if type(value) is not int or value < 0:
+                    raise ValueError("failed_attempts must be a nonnegative integer")
+            elif field.name == "prior_lane":
+                if value not in LANES:
+                    raise ValueError("unknown prior_lane")
+            elif type(value) is not bool:
+                raise ValueError(f"{field.name} must be boolean")
 
 
 def choose_lane(s: TaskSignals) -> Lane:
+    """Recommend capability independently from whether a host can dispatch it."""
     s.validate()
-
-    if s.no_subagents:
-        return "local"
+    if not (s.spec_complete and s.authority_ready and s.environment_ready and s.observability_ready):
+        return "local"  # Repair a prerequisite; not permission to implement blindly.
     if s.force_astra:
         return "astra"
+    if s.cheap_check_available:
+        return "local"  # The described check must be safe, bounded and discriminating.
 
-    # Missing task packet, broken environment, or missing observability is not a
-    # model-capability problem. Keep control local so the prerequisite is repaired
-    # instead of spending a stronger model on an unanswerable task.
-    if not (s.spec_complete and s.environment_ready and s.observability_ready):
-        return "local"
-
-    # Astra: reasoning must have something useful to resolve. High risk or scary
-    # technology names alone are deliberately insufficient.
-    if (
-        s.prior_lane == "sol"
-        and s.capability_failure
-        and s.failed_attempts >= 1
-        and s.uncertainty >= 1
-    ):
-        return "astra"
-
-    if (
-        s.commitment_boundary
-        and s.uncertainty >= 2
-        and (s.risk >= 2 or s.irreversibility >= 2 or s.coupling >= 2)
-    ):
-        return "astra"
-
-    if (
-        s.evidence_conflict
-        and s.uncertainty >= 2
-        and (s.risk >= 2 or s.coupling >= 2)
-    ):
-        return "astra"
-
-    if s.irreversibility >= 3 and s.uncertainty >= 2:
-        return "astra"
-
-    if (
-        s.novelty >= 3
-        and s.uncertainty >= 2
-        and (s.coupling >= 2 or s.verifiability <= 1)
-    ):
-        return "astra"
-
-    if s.risk >= 3 and s.uncertainty >= 2 and s.verifiability <= 2:
-        return "astra"
-
-    # Sol: normal senior engineering uncertainty, coupling, or risk. Strong
-    # deterministic verification can keep a frozen high-risk implementation below
-    # Astra and sometimes below Sol.
+    if s.reasoning_bound:
+        if s.capability_failure and s.failed_attempts >= 1 and s.prior_lane == "sol" and s.uncertainty >= 1:
+            return "astra"
+        consequential = s.risk >= 2 or s.irreversibility >= 2 or s.coupling >= 2
+        if s.uncertainty >= 2 and (
+            (s.commitment_boundary and consequential)
+            or (s.evidence_conflict and (s.risk >= 2 or s.coupling >= 2))
+            or s.irreversibility == 3
+            or (s.novelty == 3 and (s.coupling >= 2 or s.verifiability <= 1))
+            or (s.risk == 3 and s.verifiability <= 2)
+        ):
+            return "astra"
     if s.uncertainty >= 2 or s.coupling >= 2:
         return "sol"
     if s.risk >= 2 and (s.uncertainty >= 1 or s.verifiability <= 2):
         return "sol"
-    if s.failed_attempts >= 2 and s.uncertainty >= 1:
-        return "sol"
-
-    # Cheapest safe deterministic lane.
-    if (
-        s.mechanical
-        and s.uncertainty == 0
-        and s.risk <= 1
-        and s.verifiability >= 2
-        and s.irreversibility <= 1
-    ):
+    if s.capability_failure and s.failed_attempts >= 1:
+        if s.prior_lane in ("terra", "sol"):
+            return "sol"
+        if s.prior_lane == "luna":
+            return "terra"
+    if (s.mechanical and s.uncertainty == 0 and s.risk <= 1
+            and s.verifiability >= 2 and s.irreversibility <= 1):
         return "luna"
-
-    # Quality-sensitive default implementation lane.
     return "terra"
+
+
+@dataclass(frozen=True)
+class DispatchDecision:
+    recommended_lane: Lane
+    action: Literal["local", "delegate", "blocked", "prerequisite"]
+    reason: str
+
+
+def choose_dispatch(s: TaskSignals, *, current_lane: Lane, current_sufficient: bool,
+                    available_lanes: tuple[str, ...] = (), host_supports_routing: bool = False,
+                    benefit_clear: bool = False, no_escalation: bool = False) -> DispatchDecision:
+    """Reference admission gate. Flags represent observations, never assumed facts."""
+    if current_lane not in LANES or any(lane not in LANES[1:] for lane in available_lanes):
+        raise ValueError("unknown execution lane")
+    if any(type(v) is not bool for v in (current_sufficient, host_supports_routing, benefit_clear, no_escalation)):
+        raise ValueError("execution flags must be boolean")
+    lane = choose_lane(s)
+    def result(action, reason):
+        return DispatchDecision(lane, action, reason)
+    if lane == "local":
+        return result("prerequisite", "repair prerequisites or run the safe discriminating check")
+    forbidden = s.no_subagents or (no_escalation and LANES.index(lane) > LANES.index(current_lane))
+    if forbidden:
+        return result("local" if current_sufficient else "blocked", "user routing constraint; quality floor retained")
+    if current_lane == lane and current_sufficient:
+        return result("local", "current sufficient lane already matches")
+    if current_sufficient and not s.force_astra and not benefit_clear:
+        return result("local", "delegation benefit not established")
+    if host_supports_routing and lane in available_lanes:
+        return result("delegate", "required capability or justified route benefit")
+    if current_sufficient and not s.force_astra:
+        return result("local", "route unavailable; sufficient current agent retained")
+    return result("blocked", "no verified sufficient route; do not silently downgrade")

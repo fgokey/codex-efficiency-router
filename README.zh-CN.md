@@ -1,224 +1,171 @@
-<div align="center">
-
 # Codex Efficiency Router
 
-**面向 OpenAI Codex 的质量门控模型路由 Skill：只有真正需要最高级推理时才使用 GPT‑6 Astra，决策完成后立即降级到 GPT‑5.6 Sol / Terra / Luna 执行。**
+[English](README.md) · [架构设计](docs/ARCHITECTURE.md) · [本次体检报告](docs/AUDIT-2026-09-07.md) · [官方资料与业界经验](docs/PRIOR-ART.md)
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![GPT-6 Astra](https://img.shields.io/badge/GPT--6-Astra-111111)](https://developers.openai.com/api/docs/models/gpt-6-astra)
-[![Codex Skill](https://img.shields.io/badge/Codex-Skill-10a37f)](https://learn.chatgpt.com/zh-Hans/docs/build-skills)
+面向 Codex 的轻量模型路由 Skill：把 GPT-6 Astra 用在真正需要强推理的未决问题上；方案确定后，仅在收益足够时，把有边界的实现交给合适模型。
 
-[English](README.md) · **简体中文**
+**v0.2.0 · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-*把最高级推理花在“不确定性”上，而不是花在机械施工上。*
+这是独立社区项目，并非 OpenAI 官方产品。目标是在保留必要验收的前提下，减少无效 token、交接与等待；不承诺所有任务都省 token、都变快或质量绝对不变。路由回归测试不是实际模型编码能力评测。
 
-</div>
-
----
-
-## 目标
-
-GPT‑6 Astra 适合最困难的端到端工作，但如果一个任务的架构、根因和实施方案已经确定，后续仍然让 Astra 长时间执行批量改代码、编译、测试、迁移和清理，会产生没有必要的高模型 token 与延迟。
-
-反过来，如果为了省 token 把所有任务都丢给低成本模型，也可能因为误判、返工和多轮失败导致**总 token 更高、总时间更长、质量下降**。
-
-这个项目采用的目标是：
-
-> **在“验证后的任务质量不主动下降”这一硬约束下，尽量降低昂贵模型 token 和端到端执行时间。**
-
-路由依据不是“文件多不多、任务长不长”，而是**更强推理的边际价值**：
-
-- 当前不确定性是否能通过更强推理被真正降低；
-- 错误决策的影响面、可逆性和返工成本；
-- 耦合深度和决策影响的时间跨度；
-- 是否能用便宜、确定性的证据直接证伪；
-- 是否属于缺少成熟先例的全新机制；
-- 多组可信证据/分析是否互相冲突；
-- 是否已经出现经过正确分类的 Sol 能力失败。
-
-## 四层模型梯度
-
-| 层级 | 默认配置 | 主要用途 |
-|---|---|---|
-| L0 | GPT‑5.6 Luna / medium | 机械、重复、范围窄、强可验证任务 |
-| L1 | GPT‑5.6 Terra / medium | 默认 Coding Executor，方案已明确的正常实现 |
-| L2 | GPT‑5.6 Sol / medium | 复杂排查、跨模块推理、困难集成/Review |
-| L3 | GPT‑6 Astra / high | 承诺边界、重大歧义、证据仲裁、全新机制、昂贵迁移策略、已证实的 Sol 能力不足 |
-
-**Astra `max` 永不自动触发。**
-
-## 最核心的机制：强制降级
+## 工作方式
 
 ```text
-关键决策仍有实质不确定性
-      │
-      ▼
- Sol / Astra
-      │
-关键决策已经收敛
-      │
-      ▼
-Execution Contract
-      │
-      ▼
-强制降级
-      │
-      ▼
-Terra / Luna
-      │
-编码 / 测试 / 构建 / 批量修改
-      │
-      ▼
-最便宜但足够有效的验证
+当前主控：保留你选定的模型
+  ├─ 当前能力足够、任务很小或主要是工具操作 → 直接完成
+  ├─ 安全、互不依赖的工具操作              → 有界并发
+  └─ 能力确有需要或收益足以覆盖交接成本    → 一个有边界的子 Agent
+       Luna  → 低风险、机械、容易验证的工作
+       Terra → 方案明确后的正常开发
+       Sol   → 复杂集成、未决问题、较难 Review
+       Astra → 极难或高后果的未决推理，只读决策支持
+                    ↓ 决策完成
+           重新判断剩余工作；值得交接才降级，不为短尾任务强行开 Agent
 ```
 
-**Astra 用在“更强推理确实具有高边际价值”的少数关键决策上，不是默认施工队。**
+没有额外 Router 模型调用、常驻服务、每轮强制记账，也没有固定的 Planner→Worker→Reviewer 套娃。不会自动使用 `max`，不会暗中启动第二个 Codex 进程或修改主线程模型。
 
-## 为什么它同时针对 Token、速度和质量
+| 角色 | 模型 | 默认推理档位 |
+| --- | --- | --- |
+| `luna_worker` | `gpt-5.6-luna` | `medium` |
+| `terra_executor` | `gpt-5.6-terra` | `medium` |
+| `sol_engineer` | `gpt-5.6-sol` | `medium` |
+| `astra_architect` | `gpt-6-astra` | `high` |
 
-- **没有额外 Router 模型调用**：当前 coordinator 直接按规则判断，避免先烧一轮 token 才决定用哪个模型。
-- **默认单 Agent**：只有切模型的收益明显大于子 Agent 启动、上下文复制和汇总成本时才 spawn。
-- **先并行 Tool，再并行模型**：独立文件读取、搜索、元数据查询、隔离测试优先直接并行，不复制额外模型上下文。
-- **决策收敛立即降级**：Astra/Sol 不长期承担确定性的 coding。
-- **紧凑 handoff**：只传 Execution Contract / Escalation Packet，不复制完整探索历史。
-- **有界升级**：普通实现错误由执行模型自己修；连续、无法解释的实质性失败才升一级。
-- **证据驱动优化**：性能、内存、稳定性优化必须先测量，不允许凭猜测直接改代码。
-- **验证是质量门**：如果省 token 导致验收失败、返工增加，就不算优化成功。
+模型标识和配置方式已按 **2026-09-07** 的官方资料核对；你的账号目录、Codex 宿主能力、权限和实际执行元数据才决定是否可用。自定义 Agent 文件中的模型及档位可能优先于 spawn 参数，不能把“请求 Astra”当作“实际运行 Astra”。详见[兼容性说明](docs/COMPATIBILITY.md)。
 
-## 快速安装
+## 安装
 
-### 直接让 Codex 安装
+前提：Git、**Python 3.11 或更新版本**，以及支持本地 Skills 和自定义 agents 的 Codex。克隆后安装器不联网、不读取密钥、不改认证。
 
-```text
-从 https://github.com/fgokey/codex-efficiency-router
-安装 `codex-efficiency-router` Skill，并验证安装结果。
-不要覆盖与该 Skill 无关的 Codex 配置。
-```
-
-### Windows PowerShell
+### Windows / PowerShell
 
 ```powershell
 git clone https://github.com/fgokey/codex-efficiency-router.git
 cd codex-efficiency-router
-.\install.ps1 --scope user
-python .\scripts\doctor.py --scope user
+py -3 scripts/install.py --scope user --dry-run
+py -3 scripts/install.py --scope user
+py -3 scripts/doctor.py --scope user
+```
+
+使用 `python` 命令管理 Python 3.11+ 的环境，可把 `py -3` 换成 `python`。直接运行 Python 不需要修改 PowerShell 执行策略。
+
+### macOS / Linux
+
+```sh
+git clone https://github.com/fgokey/codex-efficiency-router.git
+cd codex-efficiency-router
+python3 scripts/install.py --scope user --dry-run
+python3 scripts/install.py --scope user
+python3 scripts/doctor.py --scope user
+```
+
+也可使用 `sh install.sh --scope user`；不依赖脚本预先带有可执行权限。
+
+### 仅安装到某个项目
+
+建议用户级和项目级**二选一**，避免同时加载同名 Skill。从本仓库目录运行，并替换为实际存在的项目目录：
+
+```powershell
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
+py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
+```
+
+macOS/Linux 把 `py -3` 换成 `python3`，并使用实际绝对路径。项目配置是否加载仍受 Codex 信任与管理员策略约束。
+
+| 范围 | Skill 路径 | 四个 Agent 配置 | 备份 |
+| --- | --- | --- | --- |
+| 用户级 | `~/.agents/skills/codex-efficiency-router/` | `$CODEX_HOME/agents/`，未设置时为 `~/.codex/agents/` | `$CODEX_HOME/backups/codex-efficiency-router/` |
+| 项目级 | `<项目>/.agents/skills/codex-efficiency-router/` | `<项目>/.codex/agents/` | `<项目>/.codex-router-local/backups/` |
+
+安装器不修改 `config.toml`、`AGENTS.md`、MCP、provider、权限和其他 Skill/Agent。遇到不属于本项目的同名文件会拒绝覆盖；安装清单记录受管理文件的哈希，升级和卸载先检查用户改动。
+
+`doctor` 的 **STATIC PASS** 仅代表静态检查通过，同时会显示 **live model execution: NOT VERIFIED**，不会偷偷调用模型。新 Skill 或角色没有出现时，重新加载或重启 Codex。只让其他 Skill 安装器复制 `SKILL.md` 不会部署四个角色，完整安装应使用本仓库脚本。
+
+## 使用
+
+```text
+$codex-efficiency-router
+完成当前任务，保留必要验收与已有设计约束。
+普通实现使用足够的模型，重大未决推理才升级 Astra，避免无收益的子 Agent 和重复验证。
+```
+
+已启用相关工程任务的隐式触发，但显式写 `$codex-efficiency-router` 更直接。可明确要求“不要子 Agent”“不要升级”“本次禁用路由”；这些约束不等于当前模型一定够用。不要在同一任务叠加多个 Router。
+
+首次使用可安排一个小型**只读**子任务，通过宿主或会话元数据检查实际角色、模型、推理档位与结果。模型自述不是验证证据。安装成功、目录检查成功，也不代表实际多模型委派已经成功。
+
+## 更新及 v0.1.0 迁移
+
+```powershell
+git pull --ff-only
+# 已有 v0.2+ 安装清单：
+py -3 scripts/install.py --scope user --dry-run
+py -3 scripts/install.py --scope user
+# 仅限原始 v0.1.0、尚无安装清单的旧安装：
+py -3 scripts/install.py --scope user --adopt-v01 --dry-run
+py -3 scripts/install.py --scope user --adopt-v01
+```
+
+两组是不同升级路径，不需要全执行。macOS/Linux 使用 `python3`；项目级安装沿用原来的 `--scope project --project-root ...`。
+
+旧版迁移只认已发布 v0.1.0 的已知内容，兼容 CRLF 换行。未知或已修改的旧文件会保留，需先人工核对。`--force` 也不能把无关同名文件强行认领。相同版本未发生变化时，重装不重复写入或制造备份。
+
+## 卸载
+
+在保留的本仓库克隆目录中执行，**scope、项目路径及 CODEX_HOME 必须与安装时一致**。不要用旧 v0.1.0 的卸载器处理定制过的配置。
+
+### Windows / PowerShell
+
+```powershell
+py -3 scripts/uninstall.py --scope user --dry-run
+py -3 scripts/uninstall.py --scope user
+# 项目级安装则改用：
+py -3 scripts/uninstall.py --scope project --project-root "C:/Work/my-project"
 ```
 
 ### macOS / Linux
 
-```bash
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-./install.sh --scope user
-python3 scripts/doctor.py --scope user
+```sh
+python3 scripts/uninstall.py --scope user --dry-run
+python3 scripts/uninstall.py --scope user
+# 项目级安装则改用：
+python3 scripts/uninstall.py --scope project --project-root "/path/to/my-project"
 ```
 
-默认安装器**不会修改 `config.toml`**。
+只删除安装清单确认属于本项目的文件。保留其他 Skill/Agent、现有配置、未跟踪文件及备份；发现用户修改过的受管理文件时，默认停止。确认内容并保留需要的定制后，可追加 `--force`：先备份，再删除受管理文件，不进行全目录清理。旧版安装须先通过 `--adopt-v01` 迁移。
 
-项目级安装、dry-run、可选默认 subagent 配置和卸载方式见 [docs/INSTALL.md](docs/INSTALL.md)。
+卸载后重新加载 Codex；当前已加载的对话仍可能带有旧指令。备份可能含私人配置，确认不再需要后再自行清理，不要公开上传。
 
-## 使用
+### 回滚安装或恢复卸载
 
-显式调用：
+使用脚本实际打印的备份目录，不要照抄一个不存在的时间戳：
 
-```text
-$codex-efficiency-router 完整分析并实现这个任务
+```powershell
+py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP" --dry-run
+py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP"
 ```
 
-典型流程：
+macOS/Linux 改用 `python3` 和实际备份路径；项目级补上原安装范围。恢复会检查原目标、备份完整性和之后发生的本地改动，避免回滚覆盖新工作。恢复操作自身也保留备份。
 
-```text
-任务：重新设计一个长期公共契约，并完成最终实现
+用户手工合并到 `config.toml` 的[可选默认值](config/optional-defaults.toml)不会自动移除，卸载后需按实际需要自行保留或删除。[完整安装与恢复说明](docs/INSTALL.md)包含故障处理和安全边界。
 
-1. Sol 先整理需求、约束、兼容性义务和已有证据。
-2. 仍存在多个可行方案，而且这是一个昂贵、难回滚的承诺边界。
-3. 升级 Astra/high，只负责比较方案并冻结关键决策。
-4. Astra 输出紧凑 Execution Contract 后停止。
-5. Terra 按冻结方案实现。
-6. 机械迁移、固定检查矩阵等工作交给 Luna。
-7. 验证通过后结束，不把 Astra 当作仪式性的 Final Reviewer。
+## 验证与效果评估
+
+```sh
+python3 -m unittest discover -s tests -v
+python3 scripts/doctor.py --source-tree .
+python3 -m compileall -q scripts tests
+# 可选：比较自己采集的完整任务配对数据，不调用 API
+python3 scripts/compare_runs.py runs.json
 ```
 
-常用覆盖指令：
+测试覆盖路由边界、真正委派的准入条件、安装/升级/卸载/恢复、包完整性及统计结果的诚实表达。CI 配置包含 Windows、macOS、Linux，哪些平台实际通过应以对应提交的 Actions 结果为准。
 
-```text
-$codex-efficiency-router 自动路由这个任务
-$codex-efficiency-router 尽量省 token，但不能降低质量门槛
-$codex-efficiency-router 不要使用 subagent
-$codex-efficiency-router 架构决策使用 Astra，确定后降级执行
-```
+v0.2.0 通过按需加载参考资料缩小核心 Skill，而不是删除验收规则。体检报告中的压缩量是**指令字节数**，不是实测任务总 token 节省率。目前不声称已完成 Astra/Terra/Sol/Luna 实际编码质量、token 或耗时对照实验。[评估方案](docs/BENCHMARKING.md)说明了如何进行同任务、多次试验、全链路计费和耗时比较。
 
-## 项目结构
+## 项目资料
 
-```text
-codex-efficiency-router/
-├── skills/codex-efficiency-router/SKILL.md
-├── agents/
-│   ├── astra-architect.toml
-│   ├── sol-engineer.toml
-│   ├── terra-executor.toml
-│   └── luna-worker.toml
-├── policy/routing-policy.json
-├── scripts/
-├── tests/
-├── config/optional-defaults.toml
-├── docs/
-└── .github/
-```
+[架构](docs/ARCHITECTURE.md) · [路由](docs/ROUTING.md) · [Astra 升级](docs/ASTRA-ESCALATION.md) · [Token 与耗时](docs/TOKEN-EFFICIENCY.md) · [质量门](docs/QUALITY-GATES.md) · [兼容性](docs/COMPATIBILITY.md) · [体检报告](docs/AUDIT-2026-09-07.md) · [参考资料](docs/PRIOR-ART.md)
 
-## 设计文档
-
-- [架构设计](docs/ARCHITECTURE.md)
-- [路由决策树](docs/ROUTING.md)
-- [Token 与延迟优化](docs/TOKEN-EFFICIENCY.md)
-- [质量门控](docs/QUALITY-GATES.md)
-- [Benchmark 方法](docs/BENCHMARKING.md)
-- [兼容性](docs/COMPATIBILITY.md)
-- [安装方式](docs/INSTALL.md)
-
-## 兼容性
-
-v0.1.0 于 **2026-09-07** 按 OpenAI 当前公开文档核对：
-
-- `gpt-6-astra`
-- `gpt-5.6-sol`
-- `gpt-5.6-terra`
-- `gpt-5.6-luna`
-
-OpenAI 当前文档将 GPT‑6 Astra 定位为最困难端到端任务的最高能力模型，并支持 `low / medium / high / xhigh / max` reasoning effort；Codex 自定义 agent 支持独立设置 `model` 和 `model_reasoning_effort`。来源见 [docs/COMPATIBILITY.md](docs/COMPATIBILITY.md)。
-
-> 本项目是独立社区项目，与 OpenAI 无隶属、合作或官方背书关系。
-
-## 安装安全性
-
-默认安装器只会：
-
-- 安装本项目 Skill；
-- 安装 4 个本项目具名 agent；
-- 更新前备份本项目已有安装文件；
-- 保留其他自定义 Agent 和 Skill；
-- 不修改 `config.toml`；
-- 不读取 API Key / Token；
-- 不改 Git remote；
-- 不自动 commit / push / deploy / upload。
-
-可以先执行 `--dry-run`。
-
-## 开发与验证
-
-仅要求 Python 3.11+，无第三方运行时依赖：
-
-```bash
-python -m unittest discover -s tests -v
-python scripts/doctor.py --source-tree .
-```
-
-`tests/cases.json` 是路由规则回归用例，不代表模型质量 Benchmark。
-
-## 贡献
-
-见 [CONTRIBUTING.md](CONTRIBUTING.md)。涉及模型选择、token/延迟优化的修改，建议提供可复现数据或至少补充 routing regression case。
-
-## License
-
-MIT，见 [LICENSE](LICENSE)。
+[贡献指南](CONTRIBUTING.md) · [安全](SECURITY.md) · [支持](SUPPORT.md) · [行为准则](CODE_OF_CONDUCT.md) · [更新记录](CHANGELOG.md) · [MIT 许可](LICENSE)
