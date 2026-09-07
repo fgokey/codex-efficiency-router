@@ -1,0 +1,31 @@
+name: quality-token-audit
+on:
+  push:
+    branches: [evaluation/quality-token-20260907]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned offline text tokenizer
+        run: python -m pip install tiktoken==0.11.0
+      - name: Regression, mutation, holdout and text-token evaluation
+        run: python evaluation/quality_token_audit.py
+      - name: Retain results including failing holdouts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-token-audit
+          path: evaluation-results/
+          retention-days: 14
+          if-no-files-found: error
