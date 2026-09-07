@@ -1,5 +1,5 @@
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "checked_against_openai_docs": "2026-09-07",
   "models": {
     "luna": {
@@ -35,7 +35,12 @@
     "stop_after_required_final_state_verification",
     "same_lane_requires_contextual_reason_and_benefit",
     "no_downgrade_of_unresolved_insufficiency",
-    "full_reference_load_budget_not_core_only"
+    "full_reference_load_budget_not_core_only",
+    "requirement_to_current_evidence_before_pass",
+    "handoff_conflicts_block_affected_scope",
+    "attempts_follow_task_not_worker",
+    "reconcile_before_replay",
+    "codex_only_no_foreign_runtime"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -67,7 +72,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.2.1",
+  "version": "0.3.0",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 6500,
@@ -81,5 +86,16 @@
     "context_recovery",
     "independent_review",
     "scope_isolation"
-  ]
+  ],
+  "quality": {
+    "completion_statuses": [
+      "PASS",
+      "PARTIAL",
+      "BLOCKED"
+    ],
+    "default_implementation_attempts_per_failure_signature": 2,
+    "attempt_budget_scope": "task/unit/canonical failure across workers and compaction",
+    "runtime_enforcement": "instruction policy only; offline helpers do not enforce host behavior",
+    "checkpoint": "one task-scoped record only when needed and permitted"
+  }
 }

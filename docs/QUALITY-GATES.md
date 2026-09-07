@@ -23,3 +23,7 @@ If the actual host cannot supply sufficient capability, report the limitation an
 ## What the repository tests prove
 
 Unit/property/scenario tests check the offline policy and lifecycle implementation. They cannot establish actual Skill trigger accuracy, live model routing, reasoning quality, or equivalence on arbitrary repositories. [Paired model evaluations](BENCHMARKING.md) are a separate acceptance layer.
+
+## v0.3 closure rules
+
+A required outcome needs current check/review evidence tied to contract and relevant final state; disclosure never waives it. PASS/PARTIAL/BLOCKED are completion statuses, not inferred from model confidence. Handoff receivers check plan/spec conflicts and state before edits. Attempts and failed approaches follow the task across agents/compaction, with explicit bounded parent extensions only. Recovery reconciles active workers and uncertain side effects before replay. These instructions and their offline examples are not host enforcement. [Detailed protocol](QUALITY-PROTOCOL.md).

@@ -5,47 +5,49 @@ description: Quality-gated model routing for substantial Codex engineering tasks
 
 # Codex Efficiency Router
 
-Optimize verified completion, total tokens and elapsed time. Quality and authorization are constraints. This Skill recommends native delegation; it cannot switch the parent model. No extra LLM classifier, per-turn script or mandatory ledger.
+Codex only. Optimize verified completion, tokens and time; preserve quality and authorization. Native delegation cannot switch the parent model. No extra LLM classifier, per-turn script, mandatory ledger or third-party runtime.
 
 ## Route once per meaningful decision
 
-Identify acceptance criteria and the smallest unresolved question from available evidence. Reclassify after phase changes, classified failures or contrary evidence, not every tool call. Missing requirements, authority, environment or observability require prerequisite repair, not a more expensive guess. Prefer a safe cheap discriminating check when it can settle the question.
+Identify the unresolved question and required outcomes. For substantial work use stable task/unit IDs and a contract revision; map requirements to checks/review. Reclassify on phase changes, failures or contrary evidence, not each tool. Repair missing requirements, authority, environment or observability first; prefer safe cheap discriminating checks.
 
 | Role | Model / effort | Work |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` / medium | Low-risk mechanical changes with explicit scope and strong checks |
-| `terra_executor` | `gpt-5.6-terra` / medium | Settled design, bounded implementation, ordinary local judgment |
-| `sol_engineer` | `gpt-5.6-sol` / medium | Material uncertainty, coupled behavior, difficult integration or review |
+| `luna_worker` | `gpt-5.6-luna` / medium | Low-risk mechanical changes, explicit scope, strong checks |
+| `terra_executor` | `gpt-5.6-terra` / medium | Settled design, bounded implementation |
+| `sol_engineer` | `gpt-5.6-sol` / medium | Material uncertainty, coupling, difficult integration or review |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional unresolved reasoning; read-only decisions |
 
-Automatic Astra requires all three: stronger reasoning can help now; the decision is consequential or exceptionally difficult; cheap safe falsification is insufficient. Technology keywords, file count and slow builds are not triggers. Consult [routing.md](references/routing.md) only for ambiguous boundaries. These are four conservative presets, not proven optima or a compulsory ladder. Never auto-select `max` or Ultra; explicit effort overrides require actual host support and cannot override a pinned role by assertion.
+Automatic Astra needs all three: stronger reasoning helps now; the decision is consequential or exceptionally difficult; cheap safe falsification is insufficient. Keywords, file count and slow builds are not triggers. Read [routing.md](references/routing.md) for ambiguity only. Four conservative presets, not a compulsory ladder. Never auto-select `max` or Ultra; effort overrides require actual support.
 
 ## Decide whether delegation is worth it
 
-Keep sufficient, tiny or tool-bound work local. Prefer independent safe tool concurrency over extra model contexts. Delegate for necessary capability or a clear benefit after startup, duplicated context, handoff, verification and likely rework.
+Keep sufficient tiny/tool-bound work local; prefer safe independent tool concurrency. Delegate for needed capability or clear benefit after startup, copied context, handoff, verification and rework.
 
-Same-model delegation needs a concrete reason (context recovery, independent review or scope isolation) AND a net benefit. Insufficiency alone does not justify another copy of the same model. An insufficient current agent must not downgrade the same unresolved task; first resolve or re-scope it. Do not exhaust cheap tiers before an obviously difficult decision.
+Same-model delegation needs a contextual reason AND a net benefit, not insufficiency alone. Do not downgrade an unresolved task while current capability is insufficient; resolve/re-scope first. Skip futile weak attempts.
 
-Default to one leaf, at most two concurrent leaves unless justified. Require independent acceptance, disjoint write ownership, safe resources and observed capacity. No agent per file, recursive delegation or mandatory reviewer chain. Never parallelize conflicting writes, shared build state, devices, credentials, deployments or external side effects.
+Default one leaf, at most two concurrent unless justified. Require independent acceptance, disjoint write ownership, safe resources and observed capacity. No agent per file, recursive delegation or mandatory reviewer chain. Never parallelize conflicting writes, shared builds/devices/credentials or external side effects.
 
-Before first dispatch read [dispatch.md](references/dispatch.md) once. Use only discovered roles and the actual host schema. Distinguish recommended, requested and runtime-observed models; self-identification is not evidence. Do not edit global configuration or start hidden nested `codex exec`/API sessions. On unavailable routing, stay local only if sufficient; otherwise report the blocker and stop risky writes. Never bypass permissions.
+Read [dispatch.md](references/dispatch.md) once before delegation. Use discovered roles and actual schemas; separate requested from observed model/effort. No config rewriting, hidden `codex exec`/API fallback or permission bypass. Unavailable route: stay local only if sufficient; otherwise stop risky writes and disclose the blocker.
 
 ## Handoff without losing the decision
 
-Pass: goal; revision/dirty state and relevant paths; facts versus assumptions with evidence pointers; decisions/invariants; allowed writes/non-goals; acceptance checks; stop/escalation conditions. Keep critical edge cases even when longer context is needed. Do not copy transcripts or secrets. Contrary evidence or new user requirements reopen a contract.
+Pass IDs, contract revision, required outcomes; revision/dirty state and paths; facts versus assumptions/evidence; decisions/invariants; allowed writes/non-goals; checks and remaining attempts. Preserve critical edge cases, not transcripts or secrets.
 
-Once decisions settle, reassess remaining work for Terra/Luna; hand off only when worthwhile, not for a tiny tail or unresolved implementation reasoning. Astra stays read-only even if the host grants broader permissions. Leaves report changed paths, checks actually run, outcomes and risks, then stop. Parent verifies integration on the current workspace.
+Before edits the receiver checks completeness, consequential assumptions, requirement/plan conflicts and current state. A strong model's plan cannot override requirements. Block the affected scope on conflict and return it to the parent, not redesign everything. Contrary evidence/new requirements reopen the contract.
+
+After decisions settle reassess Terra/Luna; no spawn for tiny tails or unresolved reasoning. Astra stays read-only even with broader permissions. Leaves report unit evidence, not parent completion. Parent verifies current-workspace integration.
 
 ## Failure, validation, and stopping
 
-Classify specification/authority, environment/tooling, observability, implementation and capability failures. Repair prerequisites first. Allow one targeted same-lane repair of an implementation mistake; repeated unexplained failure stops patching for diagnosis. Contract invalidation warrants immediate escalation. Retry count alone never justifies Astra; send attempts, evidence and the exact question, not private reasoning transcripts.
+Classify specification/authority, environment/tooling, observability, implementation and capability failures. One targeted repair after initial failure, across ALL workers on the unit/failure signature. Model changes/compaction never reset attempts. At exhaustion stop patching: choose a discriminating experiment or escalate. Only explicit parent reassessment extends the budget, retaining history. New error text or retry count is not capability evidence.
 
-Honor repository-required checks. Reproduce a defect or establish a valid before/after test; preserve unrelated behavior. Newly generated tests are not independent proof. Do not weaken assertions, delete relevant tests or rewrite acceptance to get green. Risky changes need appropriate integration/adversarial checks; fresh review is for residual judgment risk, not ritual Astra approval.
+Review coverage (missing/extra/misread behavior) and correctness in one bounded pass. Honor repository-required checks; reproduce defects or establish before/after evidence. New tests are not independent proof. Do not weaken assertions, delete relevant tests or rewrite acceptance to get green. Independent review is for residual judgment risk, not ritual Astra approval.
 
-Stop when required checks pass on the final state and residual risks are resolved or disclosed. Repeat checks only for relevant changes, failures or unresolved concerns. Unrun checks are UNKNOWN, not PASS. Speculative optimizations remain analysis/measurement plans until supported by evidence.
+Bind evidence to contract and relevant final-state fingerprint: code/diff, checks, dependencies/environment, not HEAD alone. Reuse unaffected evidence; invalidate changed parts. Unrun checks are UNKNOWN, not PASS. Final PASS needs every required outcome evidenced and no blocking finding; else PARTIAL/BLOCKED with gaps. Disclosure never waives requirements. Stop after required checks; speculative optimization stays a measurement plan.
 
 ## Context and reporting
 
-Read narrowly with available native tools; retain key errors and full-log paths. Do not preload all references, history or logs. Keep stable instructions stable; do not promise cross-model cache reuse or unsupported compaction controls. Retain one compact checkpoint only when needed, including workspace state and unresolved risks.
+Read narrowly; keep key errors/full-log paths, not all history/references. For long work/recovery use one permitted task-scoped checkpoint: IDs, contract, completed scopes/evidence, state, active workers, failed approaches and remaining budget. Update on transitions only. Reconcile files/workers before resuming; never replay completed work or uncertain side effects blindly. Read [quality.md](references/quality.md) only for disputed completion/recovery.
 
-Honor disable/no-subagent/no-escalation requests; they never certify insufficient capability. Explicit Astra changes cost preference, not prerequisites or authority. Return results, observed checks and blockers; mention routing only for material changes. Never invent savings, speedups or actual model identity. Collect required leaves and stop only this request's superseded work with supported lifecycle tools; do not claim unobserved cleanup.
+Honor disable/no-subagent/no-escalation; explicit Astra overrides cost, not prerequisites. Report results/evidence/gaps briefly, no invented identity, savings or speedups. Preserve stable context without claiming unsupported cache/compaction controls. Collect required leaves; stop only this request's superseded work with available tools; no unobserved cleanup claims.

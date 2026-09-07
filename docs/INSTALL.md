@@ -4,7 +4,7 @@ Copyable commands for Windows and macOS/Linux are in [README](../README.md#insta
 
 ## What is installed
 
-The complete Skill directory, including two progressive references and UI metadata, plus the four named role TOMLs. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
+The complete Skill directory, including three progressive references and UI metadata, plus the four named role TOMLs. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
 
 Select either user scope or one explicit existing project root. Keep the repository clone to update/uninstall. `$CODEX_HOME` changes user agent and backup locations, not `~/.agents/skills`. Use the same scope, project and environment for subsequent operations. A project-root flag without project scope is rejected.
 

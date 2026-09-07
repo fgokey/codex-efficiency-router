@@ -26,3 +26,7 @@ The model's self-description is not runtime evidence. Where available, account f
 ## Release versus host acceptance
 
 v0.2.1 ships the same four model/effort pairs; no additional Sol/high preset, automatic xhigh/max step or automatic model switch is introduced. An account catalog can confirm availability at export time, not actual dispatch. Installation/doctor never authenticates, reads private sessions or probes models. Follow [user-run acceptance](ACCEPTANCE.md) and preserve UNKNOWN where runtime metadata is absent.
+
+## v0.3 acceptance additions
+
+Codex-only operation and four presets remain unchanged. Three on-demand references cover routing, dispatch and quality/recovery. Required-outcome statuses and checkpoints are instruction-level conventions, not new Codex APIs or guaranteed enforcement. The pure offline helpers are not installed runtime code. See [quality protocol](QUALITY-PROTOCOL.md).

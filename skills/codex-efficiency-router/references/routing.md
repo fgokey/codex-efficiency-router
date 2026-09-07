@@ -1,21 +1,19 @@
-# Boundary examples
+# Ambiguous routing boundaries
 
-Read only when the core's three Astra gates leave a material judgment unresolved. A phase name or technology is not a model selection rule.
+Apply the three Astra gates, not keywords.
 
-| Unresolved question with strong-model value | Settled/lower-cost counterexample |
+| Unresolved strong-reasoning question | Cheaper settled work |
 | --- | --- |
-| Durable public API, persistent format, ownership or compatibility tradeoffs with costly reversal | Implement the accepted contract |
-| Ambiguous trust, data-integrity, billing or production invariant | Apply an explicit, strongly checked rule |
-| Credible conflicting evidence or surviving causal hypotheses | Execute the known discriminating test |
-| Migration coexistence, partial failure, ordering, rollback and recovery strategy | Perform authorized migration steps on verified fixtures |
-| Novel algorithm, protocol, state or scheduling mechanism without adequate precedent | Adapt an established documented pattern |
-| Independent arbitration of consequential disagreement not settled by tests | Repeat an already sufficient routine review |
-| Scoped Sol reasoning fails despite adequate requirements, tools and evidence | Repair a missing dependency or network failure |
+| Durable API, persistent format, ownership or compatibility tradeoffs | Implement an approved contract |
+| Ambiguous trust, data-integrity, billing or production invariant | Apply an explicit checked rule |
+| Credible conflicting evidence or surviving causal hypotheses | Run the discriminating test |
+| Migration coexistence, ordering, partial failure and recovery | Execute authorized fixture migration |
+| Novel algorithm, protocol, state or scheduling mechanism | Adapt a documented pattern |
+| Consequential disagreement not settled by checks | Routine review already supported by evidence |
+| Scoped Sol reasoning fails with adequate inputs and tools | Missing dependency, permission or network |
 
-An observability gap can contain an answerable instrumentation-design problem: isolate that subtask rather than claim an unseen root cause. A “cheap experiment” must also be safe and authorized; never substitute a destructive production trial. Frozen migration design does not authorize a live migration.
+An observability gap can contain an answerable instrumentation-design question: isolate it rather than claiming an unseen root cause. A cheap experiment must be safe and authorized; approved migration design does not authorize live migration.
 
-Treat a changed error as progress only when it narrows the problem. Separate an actual capability gap from context pollution or correlated self-review. Same-lane recovery needs evidence that fresh context, independent judgment or narrower ownership addresses the blocker; generic “try again” and low price are not reasons. Bound the attempt and reassess on failure. Never promote because a retry counter crossed a threshold.
+Same-lane recovery needs evidence that fresh context, independent judgment or scope isolation addresses the blocker. A reason label proves nothing; never hide another blind patch as diagnosis.
 
-EXPLORE/DECIDE can be cheap checks; EXECUTE/VERIFY can expose deep uncertainty. Reopen decisions when requirements, relevant code, dependencies or evidence change. Do not force every intermediate model, automatically add Sol/high as a fifth preset, or interpret a user opt-out as permission to guess.
-
-`policy_reference.py` is an offline approximation. Its prerequisite result means repair/observe first, not proceed blindly. It cannot prove that live models follow these instructions.
+EXPLORE can be cheap; EXECUTE/VERIFY can need deep reasoning. No compulsory ladder or fifth Sol/high preset. Offline rules test supplied signals, not live inference.

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.3.0] - 2026-09-07
+
+- Codex-only adaptation of mature decision/editor, requirement review and compact recovery patterns; no foreign runtime or extra model tier.
+- Current-evidence completion gates (PASS/PARTIAL/BLOCKED), receiver conflict checks and shared task-level retry history.
+- One optional task checkpoint for long work/recovery; reconcile active workers and uncertain side effects before replay.
+- Added pure offline quality references, selected quality mutations and 20 user-run natural-language acceptance cases (not live-scored).
+- Paired comparison can no longer exit successfully when Router acceptance is incomplete, even if both variants fail.
+- Three on-demand references; unchanged core/full byte budgets plus v0.2.1-relative core/full/per-role text-token regression gates.
+- Four models/efforts, config ownership, install/uninstall/restore semantics unchanged. Real quality and usage remain user acceptance.
+
 ## [0.2.1] - 2026-09-07
 
 ### Fixed

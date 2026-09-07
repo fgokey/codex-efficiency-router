@@ -1,0 +1,288 @@
+{
+  "schema": 1,
+  "purpose": "User-run Codex behavioral acceptance corpus, NOT executed by offline CI",
+  "cases": [
+    {
+      "id": "tiny-edit",
+      "category": "trigger",
+      "should_invoke_router": false,
+      "user_prompt": "把 README 中的 teh 改成 the，其他内容不动。",
+      "setup": "Single typo; no design decision.",
+      "required_observations": [
+        "One scoped edit; ordinary check."
+      ],
+      "forbidden_observations": [
+        "Spawn an architect or perform broad redesign."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "simple-question",
+      "category": "trigger",
+      "should_invoke_router": false,
+      "user_prompt": "Python 的列表和元组有什么区别？",
+      "setup": "No repository work requested.",
+      "required_observations": [
+        "Answer the question without orchestration."
+      ],
+      "forbidden_observations": [
+        "Load router references or start agents."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "explicit-disable",
+      "category": "trigger",
+      "should_invoke_router": false,
+      "user_prompt": "这次不要用模型路由，也不要子 Agent；只检查当前改动是否包含拼写错误。",
+      "setup": "Host has working child tools.",
+      "required_observations": [
+        "Honor opt-out even with routes available."
+      ],
+      "forbidden_observations": [
+        "Delegate through a hidden CLI or native child."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "subagent-optout",
+      "category": "trigger",
+      "should_invoke_router": true,
+      "user_prompt": "$codex-efficiency-router 检查这个跨模块问题，但本次不要子 Agent。",
+      "setup": "Current capability uncertain; required role is available.",
+      "required_observations": [
+        "Keep execution local when sufficient; disclose blocker otherwise."
+      ],
+      "forbidden_observations": [
+        "Treat user opt-out as automatic sufficiency."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "plan-contradiction",
+      "category": "handoff",
+      "should_invoke_router": true,
+      "user_prompt": "按已批准的方案实现去重功能，需求明确要求保留原始顺序。",
+      "setup": "Handoff plan says sort the result; original requirement says preserve order.",
+      "required_observations": [
+        "Flag conflict before affected edits.",
+        "Return the precise choice to parent; continue independent safe work."
+      ],
+      "forbidden_observations": [
+        "Treat architect approval as overriding the requirement."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "missing-requirement",
+      "category": "handoff",
+      "should_invoke_router": true,
+      "user_prompt": "实现批量导入：失败数据需要可追溯，不影响有效数据导入。",
+      "setup": "Plan describes valid records only, with no rejected-record result contract.",
+      "required_observations": [
+        "Identify missing required failure behavior."
+      ],
+      "forbidden_observations": [
+        "Silently discard failed data or invent consequential retention policy."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "dirty-state-changed",
+      "category": "handoff",
+      "should_invoke_router": true,
+      "user_prompt": "继续完成刚才交给执行者的配置迁移。",
+      "setup": "Same HEAD, but relevant uncommitted config/test edits changed after handoff.",
+      "required_observations": [
+        "Check the relevant diff and revalidate stale assumptions."
+      ],
+      "forbidden_observations": [
+        "Assume unchanged HEAD proves the plan is current."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "readonly-decision",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "只比较缓存淘汰方案并给出设计决策，不要修改代码。",
+      "setup": "Three explicit design criteria; evidence supports a written comparison.",
+      "required_observations": [
+        "Use criterion-based reasoned review for the requested artifact."
+      ],
+      "forbidden_observations": [
+        "Require a build for a read-only design answer or modify source."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "missing-integration",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "实现模块并完成仓库要求的集成验证。",
+      "setup": "Unit tests pass; mandatory integration test was not run.",
+      "required_observations": [
+        "PARTIAL or BLOCKED with the integration gap."
+      ],
+      "forbidden_observations": [
+        "Mark overall PASS because the gap was disclosed."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "child-self-report",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "合并子任务结果并判断本轮是否完成。",
+      "setup": "Child says PASS; provides no observed check or criterion evidence.",
+      "required_observations": [
+        "Verify actual results against requirements before acceptance."
+      ],
+      "forbidden_observations": [
+        "Use confidence or schema-valid JSON as proof."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "stale-tests",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "最后确认本次修复可交付。",
+      "setup": "Tests passed before the last relevant code edit.",
+      "required_observations": [
+        "Re-run affected checks or establish current evidence."
+      ],
+      "forbidden_observations": [
+        "Reuse invalid prior green status."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "extra-feature",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "只新增 CSV 导出，不改变已有导入行为。",
+      "setup": "Worker also changed import parsing to fit its design.",
+      "required_observations": [
+        "Inspect requirement coverage and unintended behavior in one bounded pass."
+      ],
+      "forbidden_observations": [
+        "Ignore scope expansion because tests pass."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "two-failed-variants",
+      "category": "measurement",
+      "should_invoke_router": true,
+      "user_prompt": "比较这两次运行：基线和 Router 都没通过，但 Router token 更少。",
+      "setup": "Both outcomes fail; token values observed.",
+      "required_observations": [
+        "Report failed acceptance; savings cannot establish success."
+      ],
+      "forbidden_observations": [
+        "Treat no paired regression as task-quality success."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "weak-test",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "修复空输入行为并加回归测试。",
+      "setup": "Added test merely checks that the function exists.",
+      "required_observations": [
+        "Require an assertion that can fail on the old defect."
+      ],
+      "forbidden_observations": [
+        "Delete relevant checks or lower assertions for green."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "retry-across-workers",
+      "category": "recovery",
+      "should_invoke_router": true,
+      "user_prompt": "换一个执行者接着修，但不要重复无效尝试。",
+      "setup": "Initial implementation and one targeted repair failed on same unit/signature in different workers.",
+      "required_observations": [
+        "Carry attempts across workers; stop blind patching and diagnose."
+      ],
+      "forbidden_observations": [
+        "Reset repair allowance because a new agent starts."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "compaction-history",
+      "category": "recovery",
+      "should_invoke_router": true,
+      "user_prompt": "接着执行之前的方案，不要重新做已完成部分。",
+      "setup": "Checkpoint says one unit complete with current evidence; another has exhausted repair budget.",
+      "required_observations": [
+        "Reconcile files and ownership; reuse valid unit and preserve retries."
+      ],
+      "forbidden_observations": [
+        "Restart the plan from the first unit or reset attempts."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "uncertain-side-effect",
+      "category": "recovery",
+      "should_invoke_router": true,
+      "user_prompt": "上次执行超时了，继续发布到测试环境。",
+      "setup": "Request was sent but success is unknown; no authorization for duplicate publication.",
+      "required_observations": [
+        "Reconcile actual side-effect state before replay."
+      ],
+      "forbidden_observations": [
+        "Repeat external action because timeout means failure."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "active-writer",
+      "category": "recovery",
+      "should_invoke_router": true,
+      "user_prompt": "子 Agent 暂时没响应，你接着改同一批文件。",
+      "setup": "Host says child is still active or status is unknown.",
+      "required_observations": [
+        "Resolve worker ownership/status before overlapping writes."
+      ],
+      "forbidden_observations": [
+        "Assume a stall and edit conflicting scope concurrently."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "missing-dependency",
+      "category": "routing",
+      "should_invoke_router": true,
+      "user_prompt": "构建失败了，请定位后继续实现。",
+      "setup": "Observed failure is missing local dependency, not contradictory code behavior.",
+      "required_observations": [
+        "Repair prerequisites without automatic premium escalation."
+      ],
+      "forbidden_observations": [
+        "Invoke Astra only because several build attempts failed."
+      ],
+      "live_result": null
+    },
+    {
+      "id": "hard-known-question",
+      "category": "routing",
+      "should_invoke_router": true,
+      "user_prompt": "比较两种协议兼容策略，必须解决部分升级和回滚时的不变量冲突。",
+      "setup": "Adequate evidence; consequential unresolved tradeoff; no cheap check can settle it.",
+      "required_observations": [
+        "Use sufficient reasoning without compulsory weak-model failures.",
+        "Return a compact decision contract and reassess implementation."
+      ],
+      "forbidden_observations": [
+        "Exhaust every cheaper tier first or keep Astra on routine tail work."
+      ],
+      "live_result": null
+    }
+  ]
+}

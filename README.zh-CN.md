@@ -1,29 +1,14 @@
 # Codex Efficiency Router
 
-[English](README.md) · [架构设计](docs/ARCHITECTURE.md) · [本次修复与验证](docs/VALIDATION-v0.2.1.md) · [官方资料与业界经验](docs/PRIOR-ART.md)
+[English](README.md) · [架构](docs/ARCHITECTURE.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-面向 Codex 的轻量模型路由 Skill：把 GPT-6 Astra 用在真正需要强推理的未决问题上；方案确定后，仅在收益足够时，把有边界的实现交给合适模型。
+**v0.3.0 · 仅面向 Codex 的 Skill · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-**v0.2.1 · MIT · Python 3.11+ · Windows / macOS / Linux**
+强模型解决关键未决问题，明确施工交给足够的模型，只有收益值得才委派。质量和授权是约束。本项目不是 OpenAI 官方产品，不承诺任意任务都质量不变、token 更少或速度更快。
 
-这是独立社区项目，并非 OpenAI 官方产品。目标是在保留必要验收的前提下，减少无效 token、交接与等待；不承诺所有任务都省 token、都变快或质量绝对不变。路由回归测试不是实际模型编码能力评测。
+## Codex 内如何工作
 
-## 工作方式
-
-```text
-当前主控：保留你选定的模型
-  ├─ 当前能力足够、任务很小或主要是工具操作 → 直接完成
-  ├─ 安全、互不依赖的工具操作              → 有界并发
-  └─ 能力确有需要或收益足以覆盖交接成本    → 一个有边界的子 Agent
-       Luna  → 低风险、机械、容易验证的工作
-       Terra → 方案明确后的正常开发
-       Sol   → 复杂集成、未决问题、较难 Review
-       Astra → 极难或高后果的未决推理，只读决策支持
-                    ↓ 决策完成
-           重新判断剩余工作；值得交接才降级，不为短尾任务强行开 Agent
-```
-
-没有额外 Router 模型调用、常驻服务、每轮强制记账，也没有固定的 Planner→Worker→Reviewer 套娃。不会自动使用 `max`，不会暗中启动第二个 Codex 进程或修改主线程模型。
+当前主控读取精简 Skill，使用 Codex 原生子 Agent。不会切换主线程模型，不启动第二个 CLI/API 会话，不安装其他 Agent 平台，不额外调用分类模型。小任务直接做；先使用安全独立的工具并发，再考虑新模型上下文。默认一个执行者，多人并行需要独立验收、不冲突的写入范围和明确收益。
 
 | 角色 | 模型 | 默认推理档位 |
 | --- | --- | --- |
@@ -32,19 +17,21 @@
 | `sol_engineer` | `gpt-5.6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-模型标识和配置方式已按 **2026-09-07** 的官方资料核对；你的账号目录、Codex 宿主能力、权限和实际执行元数据才决定是否可用。自定义 Agent 文件中的模型及档位可能优先于 spawn 参数，不能把“请求 Astra”当作“实际运行 Astra”。详见[兼容性说明](docs/COMPATIBILITY.md)。
+只有四个预设，不强制逐档尝试，不自动 `max`。Astra 提供只读决策支持；结论确定后重新评估剩余工作，不为短尾工作机械创建 Agent。同档委派必须有具体上下文价值和净收益。需求、权限、环境和证据缺失，先补前置条件。
 
-## v0.2.1 修复状态与说明更正
+实际可用性由 Codex 宿主和账号决定。角色文件固定的模型/档位可能优先于 spawn 参数；请求身份不等于实际身份，无运行时证据则为 UNKNOWN。[兼容性说明](docs/COMPATIBILITY.md)。
 
-已修复同档无收益重复委派：必须说明新上下文、独立审核或范围隔离的具体价值，并证明交接收益；当前能力不足不能靠把同一未决任务降到更低模型解决。“禁止子 Agent”现在有宿主能力和模型均可用的正反对照测试，故意删除开关时测试必须失败。
+## v0.3 质量改进
 
-实际仍为**四个角色预设**，Sol 默认 `medium`，没有第五个 Sol/high 角色，也不强制逐档尝试。安装器不会替换主线程模型。**默认卸载只移除受管理文件，不自动恢复旧版本**；恢复单独使用 `install.py --restore`。没有 `--no-restore` 参数。以 Python `--help` 和下方命令为准；PowerShell 包装脚本透传的是 `--scope`、`--dry-run`，不是 `-Scope`、`-DryRun` 别名。
+执行者动手前检查需求完整性、方案冲突、关键假设和当前状态；高级模型的方案也不能覆盖用户要求。完成时逐项对应要求与当前证据，返回 **PASS / PARTIAL / BLOCKED**；披露遗漏不等于豁免要求。需求符合性和实现质量在一次有边界的检查中处理，不固定增加审核 Agent。
 
-[修复与离线复测记录](docs/VALIDATION-v0.2.1.md)保留历史失败证据。实际角色发现、模型/档位生效、编码质量、完整 token 与耗时由使用者实装验收，不冒充已完成。[实装验收清单](docs/ACCEPTANCE.md)提供静态检查及可选的小型只读验证。安装器、单元测试和变异测试均不调用 Codex；分词 CI 仅运行普通 Python，不发起模型推理。
+重试历史属于任务/工作单元/失败特征，跨模型、跨执行者、上下文压缩后仍保留。仅长任务或恢复时使用一个允许写入的任务级检查点；续接先核对文件、活跃执行者和可能发生过的副作用，不能重做已完成工作。三份短参考按需读取，整体文本预算包括全部参考和单个角色指令。
+
+Python 质量辅助函数与验收用例是**离线开发工具**，不安装进运行时 Skill、不每轮执行，也不是强制执行器、安全边界或模型质量证明。[设计与借鉴来源](docs/QUALITY-PROTOCOL.md) · [本次验证](docs/VALIDATION-v0.3.0.md)。
 
 ## 安装
 
-前提：Git、**Python 3.11 或更新版本**，以及支持本地 Skills 和自定义 agents 的 Codex。克隆后安装器不联网、不读取密钥、不改认证。
+需要 Git、**Python 3.11+**。克隆后安装离线执行，不改 `config.toml`、`AGENTS.md`、认证、provider、权限或其他 Skill/Agent。先审查文件，保留克隆目录用于更新卸载。
 
 ### Windows / PowerShell
 
@@ -56,7 +43,7 @@ py -3 scripts/install.py --scope user
 py -3 scripts/doctor.py --scope user
 ```
 
-使用 `python` 命令管理 Python 3.11+ 的环境，可把 `py -3` 换成 `python`。直接运行 Python 不需要修改 PowerShell 执行策略。
+环境使用 `python` 时可替换 `py -3`，确保版本正确。直接 Python 不需要修改 PowerShell 执行策略。PowerShell 包装脚本透传 `--scope`、`--dry-run`，不是 `-Scope`、`-DryRun` 别名。
 
 ### macOS / Linux
 
@@ -68,11 +55,11 @@ python3 scripts/install.py --scope user
 python3 scripts/doctor.py --scope user
 ```
 
-也可使用 `sh install.sh --scope user`；不依赖脚本预先带有可执行权限。
+也可使用 `sh install.sh --scope user` 或 `sh uninstall.sh --scope user`，不依赖可执行位。
 
-### 仅安装到某个项目
+### 仅安装到项目
 
-建议用户级和项目级**二选一**，避免同时加载同名 Skill。从本仓库目录运行，并替换为实际存在的项目目录：
+用户级/项目级二选一，避免同名 Skill 重复。替换为实际存在的项目路径：
 
 ```powershell
 py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
@@ -80,100 +67,88 @@ py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
 py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
 ```
 
-macOS/Linux 把 `py -3` 换成 `python3`，并使用实际绝对路径。项目配置是否加载仍受 Codex 信任与管理员策略约束。
+macOS/Linux 用 `python3` 和实际绝对路径。项目配置仍受 Codex 信任与管理员策略限制。
 
-| 范围 | Skill 路径 | 四个 Agent 配置 | 备份 |
+| 范围 | Skill | 四个角色文件 | 备份 |
 | --- | --- | --- | --- |
-| 用户级 | `~/.agents/skills/codex-efficiency-router/` | `$CODEX_HOME/agents/`，未设置时为 `~/.codex/agents/` | `$CODEX_HOME/backups/codex-efficiency-router/` |
+| 用户级 | `~/.agents/skills/codex-efficiency-router/` | `$CODEX_HOME/agents/`，默认 `~/.codex/agents/` | `$CODEX_HOME/backups/codex-efficiency-router/` |
 | 项目级 | `<项目>/.agents/skills/codex-efficiency-router/` | `<项目>/.codex/agents/` | `<项目>/.codex-router-local/backups/` |
 
-安装器不修改 `config.toml`、`AGENTS.md`、MCP、provider、权限和其他 Skill/Agent。遇到不属于本项目的同名文件会拒绝覆盖；安装清单记录受管理文件的哈希，升级和卸载先检查用户改动。
-
-`doctor` 的 **STATIC PASS** 仅代表静态检查通过，同时会显示 **live model execution: NOT VERIFIED**，不会偷偷调用模型。新 Skill 或角色没有出现时，重新加载或重启 Codex。只让其他 Skill 安装器复制 `SKILL.md` 不会部署四个角色，完整安装应使用本仓库脚本。
+安装清单只管理本项目文件。无关同名文件拒绝覆盖；本地定制文件先核对，不直接 `--force`。仅复制 Skill 的第三方安装器不会部署四个角色，完整使用应运行本仓库安装器。`doctor: STATIC PASS` 不代表实际模型路由成功。加载未刷新时重新加载 Codex，已有长对话可能仍含旧指令。
 
 ## 使用
 
 ```text
 $codex-efficiency-router
-完成当前任务，保留必要验收与已有设计约束。
-普通实现使用足够的模型，重大未决推理才升级 Astra，避免无收益的子 Agent 和重复验证。
+完成当前任务并保留必要验收。关键未决问题使用足够的推理能力，
+避免无收益委派；逐项核对需求与实际证据，诚实报告未完成和阻塞项。
 ```
 
-已启用相关工程任务的隐式触发，但显式写 `$codex-efficiency-router` 更直接。可明确要求“不要子 Agent”“不要升级”“本次禁用路由”；这些约束不等于当前模型一定够用。不要在同一任务叠加多个 Router。
+相关复杂工程任务支持隐式触发，显式调用更清楚。“禁用路由”“不要子 Agent”“不要升级”优先，但不代表当前能力一定足够。不要叠加多个 Router。主线程仍是你选择的模型。
 
-首次使用可安排一个小型**只读**子任务，通过宿主或会话元数据检查实际角色、模型、推理档位与结果。模型自述不是验证证据。安装成功、目录检查成功，也不代表实际多模型委派已经成功。
+## 更新
 
-## 更新及 v0.1.0 迁移
+已有带安装清单的 v0.2+：
 
 ```powershell
 git pull --ff-only
-# 已有 v0.2+ 安装清单：
 py -3 scripts/install.py --scope user --dry-run
 py -3 scripts/install.py --scope user
-# 仅限原始 v0.1.0、尚无安装清单的旧安装：
-py -3 scripts/install.py --scope user --adopt-v01 --dry-run
-py -3 scripts/install.py --scope user --adopt-v01
+py -3 scripts/doctor.py --scope user
 ```
 
-两组是不同升级路径，不需要全执行。macOS/Linux 使用 `python3`；项目级安装沿用原来的 `--scope project --project-root ...`。
-
-旧版迁移只认已发布 v0.1.0 的已知内容，兼容 CRLF 换行。未知或已修改的旧文件会保留，需先人工核对。`--force` 也不能把无关同名文件强行认领。相同版本未发生变化时，重装不重复写入或制造备份。
+macOS/Linux 用 `python3`；项目级沿用原来的 scope/root。**只有原始 v0.1 无清单安装**需要为安装命令追加 `--adopt-v01`。迁移只认已知旧版内容及等价 CRLF，不认领任意定制文件。相同内容重装不重复写入。发现冲突先核对。
 
 ## 卸载
 
-在保留的本仓库克隆目录中执行，**scope、项目路径及 CODEX_HOME 必须与安装时一致**。不要用旧 v0.1.0 的卸载器处理定制过的配置。
-
-### Windows / PowerShell
+使用安装时相同的 scope、项目和 `CODEX_HOME`。不要用最初 v0.1 卸载器处理定制文件。
 
 ```powershell
+# Windows 用户级
 py -3 scripts/uninstall.py --scope user --dry-run
 py -3 scripts/uninstall.py --scope user
-# 项目级安装则改用：
+# 项目级则改用
 py -3 scripts/uninstall.py --scope project --project-root "C:/Work/my-project"
 ```
 
-### macOS / Linux
-
 ```sh
+# macOS/Linux 用户级
 python3 scripts/uninstall.py --scope user --dry-run
 python3 scripts/uninstall.py --scope user
-# 项目级安装则改用：
+# 项目级则改用
 python3 scripts/uninstall.py --scope project --project-root "/path/to/my-project"
 ```
 
-只删除安装清单确认属于本项目的文件。保留其他 Skill/Agent、现有配置、未跟踪文件及备份；发现用户修改过的受管理文件时，默认停止。确认内容并保留需要的定制后，可追加 `--force`：先备份，再删除受管理文件，不进行全目录清理。旧版安装须先通过 `--adopt-v01` 迁移。
+只删除清单管理的文件。保留未跟踪文件、其他配置/Agent 和备份。本地修改默认阻止删除，确认后 `--force` 也只会先备份再处理受管理文件。旧版先迁移。默认卸载**不自动恢复旧版本**，没有 `--no-restore` 参数。
 
-卸载后重新加载 Codex；当前已加载的对话仍可能带有旧指令。备份可能含私人配置，确认不再需要后再自行清理，不要公开上传。
+### 显式恢复
 
-### 回滚安装或恢复卸载
-
-使用脚本实际打印的备份目录，不要照抄一个不存在的时间戳：
+使用操作实际打印的备份目录：
 
 ```powershell
-py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP" --dry-run
-py -3 scripts/install.py --scope user --restore "C:/Users/you/.codex/backups/codex-efficiency-router/ACTUAL-BACKUP"
+py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
+py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
-macOS/Linux 改用 `python3` 和实际备份路径；项目级补上原安装范围。恢复会检查原目标、备份完整性和之后发生的本地改动，避免回滚覆盖新工作。恢复操作自身也保留备份。
+macOS/Linux 用 `python3`；项目级补原来的范围。恢复校验原目标和校验和，默认拒绝覆盖之后的本地改动；恢复操作自身也备份。手动合并到 `config.toml` 的可选默认值不归安装器管理，不自动撤销。备份可能含私人指令，不要上传。[生命周期与恢复说明](docs/INSTALL.md)。
 
-用户手工合并到 `config.toml` 的[可选默认值](config/optional-defaults.toml)不会自动移除，卸载后需按实际需要自行保留或删除。[完整安装与恢复说明](docs/INSTALL.md)包含故障处理和安全边界。
-
-## 验证与效果评估
+## 验证与效果边界
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 scripts/doctor.py --source-tree .
-python3 -m compileall -q scripts tests
-# 可选：比较自己采集的完整任务配对数据，不调用 API
-python3 scripts/compare_runs.py runs.json
+python3 -m compileall -q scripts tests evaluation
+python3 evaluation/offline_audit.py --without-tokenizer
 ```
 
-测试覆盖路由边界、真正委派的准入条件、安装/升级/卸载/恢复、包完整性及统计结果的诚实表达。CI 配置包含 Windows、macOS、Linux，哪些平台实际通过应以对应提交的 Actions 结果为准。
+可选文本审计需要完整 Git 历史和 `tiktoken==0.11.0`，运行 `python3 evaluation/offline_audit.py`。初次依赖/词表下载联网，但不调用模型。CI 包含普通 Python 测试、选定的路由/质量变异，以及参考编码文本预算；通过情况以对应提交的结果为准。保留历史失败证据。
 
-v0.2.1 同时控制核心 Skill 和全部参考文件的指令体积，而不是只缩短入口文件；必要验收规则继续保留。体检报告中的压缩量是**指令字节数**，不是实测任务总 token 节省率。目前不声称已完成 Astra/Terra/Sol/Luna 实际编码质量、token 或耗时对照实验。[评估方案](docs/BENCHMARKING.md)说明了如何进行同任务、多次试验、全链路计费和耗时比较。
+[20 个真实提示词验收场景](evaluation/behavior_cases.json)已准备，**CI 不执行模型任务**。结构检查不是实际回复评分。你实装时核对真实模型身份、需求覆盖、交接/恢复，以及父子线程与返工合计用量。[验收清单](docs/ACCEPTANCE.md) · [评估方法](docs/BENCHMARKING.md)。
 
-## 项目资料
+`scripts/compare_runs.py runs.json` 比较配对数据；即使两组都失败而没有相对退化，Router 验收未完成也不能成功退出。缺失数据保持未知。退出码为零或文本变短，都不是质量无损或实际省额度证明。安装和 CI 不触发付费模型测试。
 
-[架构](docs/ARCHITECTURE.md) · [路由](docs/ROUTING.md) · [Astra 升级](docs/ASTRA-ESCALATION.md) · [Token 与耗时](docs/TOKEN-EFFICIENCY.md) · [质量门](docs/QUALITY-GATES.md) · [兼容性](docs/COMPATIBILITY.md) · [本次验证](docs/VALIDATION-v0.2.1.md) · [参考资料](docs/PRIOR-ART.md)
+## 开源资料
 
-[贡献指南](CONTRIBUTING.md) · [安全](SECURITY.md) · [支持](SUPPORT.md) · [行为准则](CODE_OF_CONDUCT.md) · [更新记录](CHANGELOG.md) · [MIT 许可](LICENSE)
+[架构](docs/ARCHITECTURE.md) · [路由](docs/ROUTING.md) · [质量门](docs/QUALITY-GATES.md) · [Token](docs/TOKEN-EFFICIENCY.md) · [参考来源](docs/PRIOR-ART.md) · [更新记录](CHANGELOG.md)
+
+[贡献指南](CONTRIBUTING.md) · [安全](SECURITY.md) · [支持](SUPPORT.md) · [行为准则](CODE_OF_CONDUCT.md) · [MIT 许可](LICENSE)

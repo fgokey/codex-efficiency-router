@@ -14,6 +14,7 @@ import tomllib
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+V021_TREE = 'ed032b3554f768398dbb14795e633b5c2cead54f'  # verified remote v0.2.1 tree
 PREVIOUS = '7111d7d2b83f330c9f0e693a74fe97c5ea4dec1b'
 BASE = 'e92d89a79c05985980420a0bfd6a51baec93ba81'
 OUT = ROOT / 'evaluation-results'
@@ -58,11 +59,14 @@ def token_measurements() -> dict:
             'current_full': core + ''.join('\n' + reference for reference in references)}
     def description(s):
         return s.split('description: ', 1)[1].split('\n', 1)[0]
+    text['v021_core'] = text_at(V021_TREE, SKILL)
+    text['v021_full'] = text['v021_core'] + '\n' + text_at(V021_TREE, prefix + 'references/dispatch.md') + '\n' + text_at(V021_TREE, prefix + 'references/routing.md')
     text['v01_description'] = description(old)
     text['current_description'] = description(core)
     for stem in ['luna-worker', 'terra-executor', 'sol-engineer', 'astra-architect']:
         data = tomllib.loads((ROOT / f'agents/{stem}.toml').read_text(encoding='utf-8'))
         text[f'current_{stem}_instructions'] = data['developer_instructions']
+        text[f'v021_{stem}_instructions'] = tomllib.loads(text_at(V021_TREE, f'agents/{stem}.toml'))['developer_instructions']
     measurements = {}
     for encoding in ['o200k_base', 'cl100k_base']:
         enc = tiktoken.get_encoding(encoding)
@@ -76,7 +80,11 @@ def token_measurements() -> dict:
             mappings[model] = 'UNKNOWN_IN_PINNED_TIKTOKEN'
     return {'tiktoken_version': importlib.metadata.version('tiktoken'), 'model_mappings': mappings,
             'counts': measurements,
-            'budget_pass': all(v['current_full']['tokens'] <= v['v01_core']['tokens']
+            'budget_pass': all(v['current_core']['tokens'] <= v['v021_core']['tokens']
+                               and v['current_full']['tokens'] <= v['v021_full']['tokens']
+                               and all(v['current_full']['tokens'] + v[f'current_{role}_instructions']['tokens']
+                                       <= v['v021_full']['tokens'] + v[f'v021_{role}_instructions']['tokens']
+                                       for role in ('luna-worker', 'terra-executor', 'sol-engineer', 'astra-architect'))
                                for v in measurements.values()),
             'scope': 'Exact raw-text counts for named reference encodings; NOT live model billing or full host context.',
             'live_total_tokens': None, 'live_expensive_model_tokens': None, 'live_task_elapsed_seconds': None}
@@ -154,6 +162,48 @@ sys.exit(0 if result.wasSuccessful() else 1)
     return output
 
 
+
+def quality_mutation_checks() -> list[dict]:
+    """Deliberately break one quality boundary; only assertion failures count."""
+    source = (ROOT / 'scripts/quality_reference.py').read_text(encoding='utf-8')
+    mutations = [
+        ('false_completion', "return Completion('PARTIAL' if gaps else 'PASS', tuple(gaps))", "return Completion('PASS', tuple(gaps))"),
+        ('ignore_missing_outcome', "gaps.append(f'{required}: missing evidence')", 'pass'),
+        ('trust_self_claim', "elif item.kind == 'claim':", 'elif False:'),
+        ('ignore_final_state', "elif item.contract_revision != contract.revision or item.state != contract.state:", 'elif False:'),
+        ('ignore_blocker', '    if blocked:', '    if False:'),
+        ('ignore_plan_conflict', 'if not complete or not aligned or not authorized:', 'if not complete or not authorized:'),
+        ('reset_cross_worker_history', 'if attempt.key == key:', "if attempt.key == key and attempt.worker == 'new-worker-only':"),
+        ('unknown_history_is_zero', 'if not history_known:', 'if False:'),
+        ('ignore_exhaustion', 'if len(relevant) >= 2 + extension:', 'if False:'),
+        ('blind_repeat_approach', 'if any(item.approach == next_approach for item in relevant) and not new_evidence.strip():', 'if False:'),
+        ('replay_active_worker', "if worker_state == 'active':", 'if False:'),
+        ('replay_unknown_effect', "if worker_state == 'unknown' or side_effect_state == 'unknown':", "if worker_state == 'unknown':"),
+    ]
+    harness = """import sys, types, unittest
+m = types.ModuleType('quality_reference')
+sys.modules[m.__name__] = m
+exec(compile(sys.stdin.read(), '<quality-mutation>', 'exec'), m.__dict__)
+r = unittest.TextTestRunner(verbosity=0).run(unittest.defaultTestLoader.discover('tests', pattern='test_quality_protocol.py'))
+sys.exit(2 if r.errors else 0 if r.wasSuccessful() else 1)
+"""
+    output = []
+    for name, old, new in mutations:
+        if source.count(old) != 1:
+            output.append({'name': name, 'outcome': 'INVALID_MUTATION'})
+            continue
+        try:
+            result = subprocess.run([sys.executable, '-c', harness], cwd=ROOT,
+                                    input=source.replace(old, new, 1), text=True, encoding='utf-8',
+                                    capture_output=True, timeout=30)
+            (OUT / f'quality-mutation-{name}.log').write_text(result.stdout + result.stderr, encoding='utf-8')
+            status = {0: 'SURVIVED', 1: 'KILLED', 2: 'TEST_ERROR'}.get(result.returncode, 'RUNNER_ERROR')
+        except subprocess.TimeoutExpired:
+            status = 'TIMEOUT'
+        output.append({'name': name, 'outcome': status})
+    return output
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--without-tokenizer', action='store_true',
@@ -164,7 +214,9 @@ def main() -> int:
               'evaluation_commit': git('rev-parse', 'HEAD').strip(),
               'live_model_evaluation': 'NOT RUN: this workflow requests no model credentials or API calls',
               'unit_suite': unit_suite(), 'holdout_checks': holdout_checks(),
-              'mutations': mutation_checks(), 'text_token_measurements': ({'status': 'NOT RUN', 'budget_pass': None} if args.without_tokenizer else token_measurements()),
+              'mutations': mutation_checks(), 'quality_mutations': quality_mutation_checks(),
+              'behavioral_acceptance': {'prepared_cases': len(json.loads((ROOT / 'evaluation/behavior_cases.json').read_text(encoding='utf-8'))['cases']), 'live_runs': 0, 'status': 'NOT RUN; structure checked only'},
+              'text_token_measurements': ({'status': 'NOT RUN', 'budget_pass': None} if args.without_tokenizer else token_measurements()),
               'worktree_dirty': bool(git('status', '--porcelain').strip()),
               'source_sha256': {p.relative_to(ROOT).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
                                for folder in ('scripts', 'tests', 'skills', 'agents', 'policy', 'evaluation')
@@ -180,6 +232,8 @@ def main() -> int:
     if any(not check['passed'] for check in report['holdout_checks']):
         return 1
     if any(m['outcome'] != 'KILLED' for m in report['mutations']):
+        return 1
+    if any(m['outcome'] != 'KILLED' for m in report['quality_mutations']):
         return 1
     if report['text_token_measurements']['budget_pass'] is False:
         return 1

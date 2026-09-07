@@ -76,6 +76,35 @@ class ComparisonTests(unittest.TestCase):
         self.assertEqual(result["quality_status"], "no_observed_regression")
         self.assertIn("not proof", result["limitation"])
 
+    def test_incomplete_acceptance_is_not_efficiency_success(self):
+        rows = self.rows()
+        rows[0]['outcome'] = rows[1]['outcome'] = 'fail'
+        result = compare(rows)
+        self.assertEqual(result['quality_status'], 'no_observed_regression')
+        self.assertEqual(result['router_acceptance'], 'incomplete')
+        self.assertFalse(result['efficiency_claim_eligible'])
+
+    def test_missing_usage_does_not_authorize_savings_claim(self):
+        rows = self.rows()
+        del rows[1]['total_tokens']
+        result = compare(rows)
+        self.assertEqual(result['router_acceptance'], 'pass')
+        self.assertFalse(result['efficiency_claim_eligible'])
+
+    def test_cli_rejects_both_fail_even_without_paired_regression(self):
+        import json
+        import subprocess
+        import tempfile
+        rows = self.rows()
+        for row in rows:
+            row['outcome'] = 'fail'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'runs.json'
+            path.write_text(json.dumps(rows), encoding='utf-8')
+            script = Path(__file__).resolve().parents[1] / 'scripts/compare_runs.py'
+            run = subprocess.run([sys.executable, str(script), str(path)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(run.returncode, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

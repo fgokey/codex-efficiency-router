@@ -35,8 +35,12 @@ Use `outcome` = `pass`, `fail` or `unknown`. Omitted/null metrics mean unknown, 
 
 The report identifies baseline-pass/router-fail regressions, unknown outcomes, both pass counts, and sums of comparable metrics. If any value of a metric is missing, its aggregate is unknown. Zero baseline has no percentage reduction. `no_observed_regression` means only that this sample showed no paired pass-to-fail case: **both variants could still have failed**. Check pass counts and failure severity before interpreting it.
 
-CLI exit: 0 for no observed regression, 1 for a regression or unknown outcome, 2 for invalid input. Exit 0 is not a production rollout certificate. Samples are not automatically accumulated, used to tune thresholds, or uploaded.
+CLI exit: 0 only for no observed regression AND every Router outcome passing; 1 for any incomplete Router acceptance, regression or unknown outcome; 2 for invalid input. `router_acceptance` distinguishes completion from relative regression. `efficiency_claim_eligible` requires both variants passing all paired tasks and all three metrics measured; it does not assert savings or statistical significance. Exit 0 is not a production rollout certificate. Samples are not automatically accumulated, used to tune thresholds, or uploaded.
 
 ## Release acceptance
 
 Offline tests guard shipped policy, packaging, install/uninstall/restore and measurement semantics. Live model suitability, actual dispatch and verified task outcomes need a separate user-host evaluation. Only after those trials can real token or latency improvements be reported. See [evaluation sources](PRIOR-ART.md).
+
+## v0.3 behavioral acceptance
+
+The [20-case corpus](../evaluation/behavior_cases.json) includes natural user prompts, fixture setup, required observations and forbidden behavior. CI checks its shape only; all live results remain null. A human constructs isolated fixtures and presents prompt/setup without exposing grader answers. Grade actual changes, traces and requirement evidence; do not infer triggering or correctness by scanning output for model names. Completion, handoff and recovery helpers test declared conditions, not natural-language inference. No online calibrator or automatic model trial is included. [Protocol](QUALITY-PROTOCOL.md).
