@@ -1,6 +1,6 @@
 {
-  "schema_version": 5,
-  "checked_against_openai_docs": "2026-09-07",
+  "schema_version": 6,
+  "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
       "model": "gpt-5.6-luna",
@@ -40,7 +40,11 @@
     "handoff_conflicts_block_affected_scope",
     "attempts_follow_task_not_worker",
     "reconcile_before_replay",
-    "codex_only_no_foreign_runtime"
+    "codex_only_no_foreign_runtime",
+    "joint_model_effort_selection",
+    "explicit_adaptive_effort_no_inheritance_guess",
+    "effort_change_preserves_task_retry_budget",
+    "no_silent_unsupported_effort_mapping"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -72,7 +76,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.3.0",
+  "version": "0.4.0",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 6500,
@@ -97,5 +101,30 @@
     "attempt_budget_scope": "task/unit/canonical failure across workers and compaction",
     "runtime_enforcement": "instruction policy only; offline helpers do not enforce host behavior",
     "checkpoint": "one task-scoped record only when needed and permitted"
+  },
+  "effort_policy": {
+    "installation_default": "fixed",
+    "upgrade_default": "preserve_installed_profile",
+    "modes": [
+      "fixed",
+      "adaptive"
+    ],
+    "adaptive_default": "medium",
+    "astra_default": "high",
+    "automatic_efforts": [
+      "medium",
+      "high"
+    ],
+    "automatic_low": "opt_in_strict_mechanical_luna_only",
+    "explicit_only": [
+      "xhigh",
+      "max"
+    ],
+    "no_escalation_axes": [
+      "model",
+      "effort"
+    ],
+    "role_file_precedence": true,
+    "hot_switch": false
   }
 }

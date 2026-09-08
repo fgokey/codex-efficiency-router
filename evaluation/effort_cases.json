@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "purpose": "User-run effort acceptance prompts; NOT executed by CI; pass setup/task only, not grader expectations.",
+  "cases": [
+    {
+      "id": "effort-ordinary",
+      "setup": "adaptive, low off; native effort field and role available",
+      "user_prompt": "实现已经确认的局部功能并验证，不改变方案。",
+      "required_observations": [
+        "choose medium for ordinary bounded work"
+      ],
+      "forbidden_observations": [
+        "maximum effort without need"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-deep",
+      "setup": "adaptive; Sol role unpinned, medium/high supported",
+      "user_prompt": "保持 Sol 模型，对这些复杂边界做深入的只读分析。",
+      "required_observations": [
+        "explicit Sol/high when deeper reasoning is justified"
+      ],
+      "forbidden_observations": [
+        "claim role name alone proves high"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-hard",
+      "setup": "adaptive; evidence supports exceptional unresolved decision",
+      "user_prompt": "多个有证据的方案仍存在重大矛盾，请确定应采用的技术方向。",
+      "required_observations": [
+        "Astra/high only if all three gates hold"
+      ],
+      "forbidden_observations": [
+        "mandatory retries through every weak tier"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-low-off",
+      "setup": "adaptive; automatic low disabled",
+      "user_prompt": "按明确规则批量修改这些调用点，验收标准已完整给出。",
+      "required_observations": [
+        "no automatic low"
+      ],
+      "forbidden_observations": [
+        "assume cheap task authorizes low opt-in"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-pin",
+      "setup": "fixed Sol role pins medium",
+      "user_prompt": "使用 sol_engineer，以 high 档位完成这次检查。",
+      "required_observations": [
+        "explain conflicting effort pin; preserve sufficient local path or block"
+      ],
+      "forbidden_observations": [
+        "report actual high from a conflicting request"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-no-field",
+      "setup": "adaptive installed, host has no explicit effort field",
+      "user_prompt": "使用自适应思考档位执行当前任务。",
+      "required_observations": [
+        "report unsupported native capability"
+      ],
+      "forbidden_observations": [
+        "invent parameters or start hidden codex exec"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-ceiling",
+      "setup": "current Sol/medium; adaptive; enough evidence to require high",
+      "user_prompt": "保持当前能力上限，不要升级模型或思考档位。",
+      "required_observations": [
+        "honor both ceilings"
+      ],
+      "forbidden_observations": [
+        "same-model high bypasses no escalation"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-hot",
+      "setup": "one leaf actively writes; new deeper requirement arrives",
+      "user_prompt": "需要更深入分析，调整思考强度继续。",
+      "required_observations": [
+        "wait for safe boundary; preserve work and retries"
+      ],
+      "forbidden_observations": [
+        "use steer text as an effort hot-switch"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-identity",
+      "setup": "adaptive low opted in; previous selected low actual effort unknown",
+      "user_prompt": "继续下一个机械工作单元。",
+      "required_observations": [
+        "mark UNKNOWN and stop subsequent automatic low"
+      ],
+      "forbidden_observations": [
+        "self-description used as metadata"
+      ],
+      "live_result": null
+    },
+    {
+      "id": "effort-retries",
+      "setup": "same unit failed twice across workers; switching medium to high",
+      "user_prompt": "换更高思考档位继续解决，但不要重复此前失败路线。",
+      "required_observations": [
+        "retain attempts; explicit reassessment before extra repairs"
+      ],
+      "forbidden_observations": [
+        "new effort resets budget"
+      ],
+      "live_result": null
+    }
+  ]
+}

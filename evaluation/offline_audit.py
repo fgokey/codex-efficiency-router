@@ -13,6 +13,8 @@ import time
 import tomllib
 import unittest
 
+from effort_mutations import run_mutations
+
 ROOT = Path(__file__).resolve().parents[1]
 V021_TREE = 'ed032b3554f768398dbb14795e633b5c2cead54f'  # verified remote v0.2.1 tree
 PREVIOUS = '7111d7d2b83f330c9f0e693a74fe97c5ea4dec1b'
@@ -57,6 +59,9 @@ def token_measurements() -> dict:
                         + '\n' + text_at(PREVIOUS, prefix + 'references/dispatch.md'),
             'current_core_plus_dispatch': core + '\n' + dispatch,
             'current_full': core + ''.join('\n' + reference for reference in references)}
+    from profiles import MARKER, Profile
+    text['adaptive_core'] = MARKER.sub(Profile('adaptive').marker, core)
+    text['adaptive_full'] = text['adaptive_core'] + ''.join('\n' + reference for reference in references)
     def description(s):
         return s.split('description: ', 1)[1].split('\n', 1)[0]
     text['v021_core'] = text_at(V021_TREE, SKILL)
@@ -80,9 +85,9 @@ def token_measurements() -> dict:
             mappings[model] = 'UNKNOWN_IN_PINNED_TIKTOKEN'
     return {'tiktoken_version': importlib.metadata.version('tiktoken'), 'model_mappings': mappings,
             'counts': measurements,
-            'budget_pass': all(v['current_core']['tokens'] <= v['v021_core']['tokens']
-                               and v['current_full']['tokens'] <= v['v021_full']['tokens']
-                               and all(v['current_full']['tokens'] + v[f'current_{role}_instructions']['tokens']
+            'budget_pass': all(max(v['current_core']['tokens'], v['adaptive_core']['tokens']) <= v['v021_core']['tokens']
+                               and max(v['current_full']['tokens'], v['adaptive_full']['tokens']) <= v['v021_full']['tokens']
+                               and all(max(v['current_full']['tokens'], v['adaptive_full']['tokens']) + v[f'current_{role}_instructions']['tokens']
                                        <= v['v021_full']['tokens'] + v[f'v021_{role}_instructions']['tokens']
                                        for role in ('luna-worker', 'terra-executor', 'sol-engineer', 'astra-architect'))
                                for v in measurements.values()),
@@ -215,6 +220,7 @@ def main() -> int:
               'live_model_evaluation': 'NOT RUN: this workflow requests no model credentials or API calls',
               'unit_suite': unit_suite(), 'holdout_checks': holdout_checks(),
               'mutations': mutation_checks(), 'quality_mutations': quality_mutation_checks(),
+              'effort_mutations': run_mutations(ROOT, OUT),
               'behavioral_acceptance': {'prepared_cases': len(json.loads((ROOT / 'evaluation/behavior_cases.json').read_text(encoding='utf-8'))['cases']), 'live_runs': 0, 'status': 'NOT RUN; structure checked only'},
               'text_token_measurements': ({'status': 'NOT RUN', 'budget_pass': None} if args.without_tokenizer else token_measurements()),
               'worktree_dirty': bool(git('status', '--porcelain').strip()),
@@ -234,6 +240,8 @@ def main() -> int:
     if any(m['outcome'] != 'KILLED' for m in report['mutations']):
         return 1
     if any(m['outcome'] != 'KILLED' for m in report['quality_mutations']):
+        return 1
+    if any(m['outcome'] != 'KILLED' for m in report['effort_mutations']):
         return 1
     if report['text_token_measurements']['budget_pass'] is False:
         return 1

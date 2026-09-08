@@ -1,32 +1,26 @@
 # Compatibility and verification levels
 
-Documentation review date: **2026-09-07**. See [primary references](PRIOR-ART.md).
+Documentation review: **2026-09-08**. [Primary references](PRIOR-ART.md) · [Effort design](ADAPTIVE-EFFORT.md).
 
-## Supported package layout
+## Layout and modes
 
-User Skills install under `~/.agents/skills`; project Skills under `.agents/skills`. Agents use `$CODEX_HOME/agents` (normally `~/.codex/agents`) or `.codex/agents`. The optional `agents/openai.yaml` inside the Skill contains UI metadata and implicit-invocation policy, not the four model roles. Duplicate Skill names are not merged; prefer one installation scope.
+User Skills live in `~/.agents/skills`; project Skills in `.agents/skills`. Roles live in `$CODEX_HOME/agents` (normally `~/.codex/agents`) or project `.codex/agents`. The Skill's `agents/openai.yaml` is discovery/UI metadata, not the four model roles. Prefer one scope to avoid duplicate names.
 
-Standalone role TOML requires `name`, `description` and `developer_instructions`. The four shipped roles additionally pin model and reasoning effort. Official documentation gives custom-file model/effort priority over spawn-time choices; do not claim a contradictory spawn override changed the role. The fallback precedence described by the host is spawn parameters, configured defaults, then inherited parent values when not pinned by the role.
+Role TOML supplies name, description, developer instructions and model. Canonical/fixed files also pin effort; generated adaptive files do not. File values override contradictory spawn requests. Omission is not adaptive selection: host defaults/inheritance can resolve effort before a model-only role is applied. Adaptive must use actual explicit model/effort tool fields. No unsupported configuration keys are inserted.
 
-## Execution is host dependent
+The four models remain `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `gpt-6-astra`. Fixed efforts are medium/medium/medium/high. Adaptive uses medium/high, with separately opted-in mechanical Luna/low; xhigh/max are explicit only. These are policy choices, not a guarantee every account exposes them.
 
-A Skill cannot switch its parent model. Use only the actual exposed collaboration schema and discovered role names; do not invent fields or start hidden nested CLI processes. The host's live permission/sandbox rules may supersede role defaults, so Astra's instructions independently retain a read-only boundary. No provider, sandbox, authentication or feature flag is changed by installation.
+## Host boundary
 
-Model catalog entries checked in documentation: `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol`, `gpt-6-astra`. Availability varies; the project does not assume that your account exposes them. Effort remains medium for the first three and high for Astra. `max` is never automatically selected.
+A Skill cannot change its parent model or obtain unavailable tools. Use discovered roles and the actual schema. App Server next-turn overrides are not automatically callable by an ordinary Skill; steer input is not a running-turn effort setter. Only exposed compatible idle-turn controls may reuse a child. Do not create a hidden CLI/API session or change global defaults to obtain routing.
 
-## Four distinct checks
+Parent/runtime permissions may override sandbox defaults, so Astra remains read-only in instructions too; instructions are not an OS security boundary. Installation does not change authentication, providers, network permissions, trust or features.
 
-1. `doctor --source-tree .`: local package structure, references and shipped presets.
-2. `doctor --scope ...`: installed structure plus manifest hashes; custom edits are reported, not rewritten.
-3. `doctor --catalog FILE`: optional offline validation of a supplied, fully paginated Codex App Server `model/list` response. Supports a `result` wrapper or its raw object, a `data` array, `model`, `supportedReasoningEfforts[].reasoningEffort`, and `nextCursor`. A non-null cursor is incomplete. A saved export is not a live availability guarantee.
-4. Live read-only smoke task: observe actual model, effort, role, permission behavior, and completion from host/session metadata. This is not performed by the installer or static doctor.
+## Separate validation levels
 
-The model's self-description is not runtime evidence. Where available, account for `model/rerouted` events instead of assuming requested configuration was honored. No live Codex installation was available in the audit environment, so the audit does not claim live execution validation.
+1. `doctor --source-tree .` validates canonical fixed source, metadata, references, budgets and four presets.
+2. `doctor --scope ...` validates the installed profile/marker, fixed pins or adaptive absence, plus manifest hashes. Local edits are reported, not repaired.
+3. Optional `doctor --catalog FILE` parses a supplied complete `model/list` export (raw result or result wrapper). It requires `data`, valid model/effort strings, unique models and explicit `nextCursor=null`. Fixed checks four pinned pairs; adaptive checks medium/high on lower roles and high on Astra, plus opted-in Luna/low. Runtime only needs the selected pair; a saved export is not proof of current access or dispatch.
+4. User-run read-only smoke work checks actual role, model, effort and permissions from host metadata. A model's self-description is not evidence. Missing fields are UNKNOWN, contradictory fields MISMATCH; either suspends subsequent automatic low for the task.
 
-## Release versus host acceptance
-
-v0.2.1 ships the same four model/effort pairs; no additional Sol/high preset, automatic xhigh/max step or automatic model switch is introduced. An account catalog can confirm availability at export time, not actual dispatch. Installation/doctor never authenticates, reads private sessions or probes models. Follow [user-run acceptance](ACCEPTANCE.md) and preserve UNKNOWN where runtime metadata is absent.
-
-## v0.3 acceptance additions
-
-Codex-only operation and four presets remain unchanged. Three on-demand references cover routing, dispatch and quality/recovery. Required-outcome statuses and checkpoints are instruction-level conventions, not new Codex APIs or guaranteed enforcement. The pure offline helpers are not installed runtime code. See [quality protocol](QUALITY-PROTOCOL.md).
+No installer, doctor or CI calls models. Live identity, actual handoffs, acceptance and whole-task usage remain [user acceptance](ACCEPTANCE.md).

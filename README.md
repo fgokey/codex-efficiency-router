@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Design](docs/ARCHITECTURE.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [User acceptance](docs/ACCEPTANCE.md)
 
-**v0.3.0 · Codex-only Skill · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.4.0 · Codex-only Skill · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Use strong reasoning for unresolved decisions and sufficient cheaper execution when delegation pays. Quality and authorization remain constraints. This independent community project does not guarantee unchanged model quality, savings or speedups on every task.
 
@@ -17,7 +17,7 @@ The current coordinator applies a compact Skill and uses native Codex child role
 | `sol_engineer` | `gpt-5.6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-Four presets, no compulsory escalation ladder or automatic `max`. Astra is read-only decision support. After a decision settles, reassess remaining work; do not spawn for a tiny tail. Same-lane delegation needs a concrete contextual reason AND net benefit. Missing prerequisites are not expensive-model triggers.
+Four presets, no compulsory escalation ladder or automatic `max`. Astra is read-only decision support. After a decision settles, reassess remaining work; do not spawn for a tiny tail. Identical model/effort delegation needs a concrete contextual reason AND net benefit. Missing prerequisites are not expensive-model triggers.
 
 Actual availability and role/model/effort selection depend on your Codex host/account. Pinned role settings can override spawn values. Requested identity is not observed identity; missing runtime evidence stays UNKNOWN. [Compatibility](docs/COMPATIBILITY.md).
 
@@ -25,9 +25,37 @@ Actual availability and role/model/effort selection depend on your Codex host/ac
 
 Before editing, the receiver checks requirements, plan conflicts, material assumptions and state. A strong model's plan cannot override requirements. Final acceptance maps required outcomes to current evidence: **PASS**, **PARTIAL**, or **BLOCKED**. Disclosure does not waive missing work. Review coverage and correctness together; no mandatory extra reviewer.
 
-Attempts belong to the task/unit/failure signature across workers and compaction, not each agent. For long work/recovery only, reuse one permitted task-scoped checkpoint and reconcile actual files, workers and prior side effects. Do not repeat completed work blindly. Three short references load only as needed; full-load and per-role text budgets are measured separately from live task usage.
+Attempts belong to the task/unit/failure signature across workers and compaction, not each agent. For long work/recovery only, reuse one permitted task-scoped checkpoint and reconcile actual files, workers and prior side effects. Do not repeat completed work blindly. Four short references load only as needed; full-load and per-role text budgets are measured separately from live task usage.
 
-The Python quality helpers and evaluation corpus are **offline development aids**, not a runtime dispatcher, security boundary or model-quality certificate. They are not installed into the Skill payload or called every turn. [Protocol and sources](docs/QUALITY-PROTOCOL.md) · [Release validation](docs/VALIDATION-v0.3.0.md).
+The Python quality helpers and evaluation corpus are **offline development aids**, not a runtime dispatcher, security boundary or model-quality certificate. They are not installed into the Skill payload or called every turn. [Protocol and sources](docs/QUALITY-PROTOCOL.md) · [Release validation](docs/VALIDATION-v0.4.0.md).
+
+## Adaptive reasoning effort (v0.4)
+
+Four roles remain; the parent now selects **model + effort** at meaningful task boundaries. New installs default to **fixed** for compatibility. Updates preserve the installed mode and low opt-in; no implicit migration. In **adaptive**, role models and permission instructions stay unchanged, but effort is unpinned and must be explicitly supplied by the parent through an actual native tool parameter. This is not guaranteed on every Codex host.
+
+From the retained clone, enable adaptive mode deliberately:
+
+```powershell
+git pull --ff-only
+py -3 scripts/install.py --scope user --mode adaptive --dry-run
+py -3 scripts/install.py --scope user --mode adaptive
+py -3 scripts/doctor.py --scope user
+```
+
+On macOS/Linux use `python3`; project scope keeps `--scope project --project-root ...`. Restart/reload Codex. No account, config, authentication or main-thread model change is made. Exactly one four-role set is installed. Do not mix old role files or an old loaded Skill with the new profile.
+
+Ordinary implementation: medium. Deep logic/assumptions/edges: high in a suitable model, or a stronger model when needed. Automatic Astra: high. Automatic low: **off**, optionally enabled only for strictly checked mechanical Luna tasks. xhigh/max: explicit user request only, subject to actual support and quality/user limits. “No escalation” prohibits increases in either model or effort. Model-only locks can allow effort changes. No in-flight hot switching, hidden CLI/API fallback or retry-budget reset.
+
+```powershell
+# Optional, conservative auto-low opt-in; keep disabled during initial validation:
+py -3 scripts/install.py --scope user --mode adaptive --allow-low
+# Disable low while retaining adaptive:
+py -3 scripts/install.py --scope user --no-allow-low
+# Return to fixed compatibility mode:
+py -3 scripts/install.py --scope user --mode fixed
+```
+
+Fixed files override conflicting requests; adaptive requires both an unpinned loaded role and an exposed effort field. Unsupported/mismatched settings are not silently downgraded. Requested values are not observed values: UNKNOWN/MISMATCH disables subsequent automatic low. Static doctor checks package/profile integrity, not live execution. [Design, precedence and constraints](docs/ADAPTIVE-EFFORT.md) · [User acceptance](docs/ACCEPTANCE.md).
 
 ## Install
 

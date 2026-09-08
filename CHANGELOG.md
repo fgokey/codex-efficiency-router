@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0] - 2026-09-08
+
+- Added explicit fixed/adaptive installation profiles, generated from the same four
+  role sources. Updates preserve the mode and low opt-in; restore preserves both.
+- Parent policy jointly selects model/effort: medium/high by default, conservative
+  automatic Astra high, opt-in strictly mechanical Luna low, explicit-only xhigh/max.
+- Added native-field, role-pin and supported-pair checks; no silent effort fallback.
+- Distinguished identical-pair recovery from same-model deeper reasoning. No-escalation
+  controls both axes; safe boundaries and task-wide retry history remain mandatory.
+- Added offline joint-policy/lifecycle/catalog tests and effort mutation checks.
+- Documented actual tool exposure and runtime identity as user acceptance, not a
+  guaranteed hot-switch API. No model inference is performed by installation/CI.
+
 ## [0.3.0] - 2026-09-07
 
 - Codex-only adaptation of mature decision/editor, requirement review and compact recovery patterns; no foreign runtime or extra model tier.

@@ -2,7 +2,7 @@ name: validate
 
 on:
   push:
-    branches: [main, fix/offline-hardening-v021, quality/codex-v030]
+    branches: [main, fix/offline-hardening-v021, quality/codex-v030, feature/adaptive-effort-v040]
   pull_request:
   workflow_dispatch:
 

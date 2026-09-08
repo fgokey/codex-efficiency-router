@@ -23,5 +23,17 @@ class BehaviorCorpusTests(unittest.TestCase):
                 self.assertIsNone(item['live_result'])
 
 
+    def test_effort_corpus_is_separate_and_unrun(self):
+        root = Path(__file__).resolve().parents[1]
+        data = json.loads((root / 'evaluation/effort_cases.json').read_text(encoding='utf-8'))
+        self.assertIn('NOT executed', data['purpose'])
+        self.assertEqual(len(data['cases']), 10)
+        self.assertEqual(len({c['id'] for c in data['cases']}), 10)
+        for case in data['cases']:
+            self.assertTrue(case['setup'] and case['user_prompt'])
+            self.assertTrue(case['required_observations'] and case['forbidden_observations'])
+            self.assertIsNone(case['live_result'])
+
+
 if __name__ == '__main__':
     unittest.main()

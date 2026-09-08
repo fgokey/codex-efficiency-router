@@ -42,3 +42,7 @@ The official Skills and Subagents pages and all four model pages were rechecked 
 ## v0.3 Codex-only adaptation
 
 [Quality protocol](QUALITY-PROTOCOL.md) maps current primary-source designs to concrete completion, handoff and recovery rules. Sources rechecked on 2026-09-07 include official Codex Skills/Subagents/evals, Aider Architect/Editor, Superpowers task review/progress, and Anthropic context engineering/skill-creator. Only ideas are adopted: no third-party runtime, Claude CLI, compulsory review chain, hidden model call or additional model tier. The natural-language corpus is prepared, not live-tested.
+
+## v0.4 documentation recheck — 2026-09-08
+
+OpenAI Subagents, Skills and App Server documentation were rechecked for role-file precedence, explicit effort, catalog support and next-turn versus steer behavior. Native capability exposure is not assumed from a documentation API alone. The [adaptive-effort design](ADAPTIVE-EFFORT.md) records what is implemented and what requires user-host acceptance; no learned classifier, foreign runtime or benchmark percentage is imported.

@@ -38,3 +38,7 @@ The Python reference is an offline approximation for boundary tests, not the Ski
 A same-lane child is not a capability upgrade. `choose_dispatch` now requires both `same_lane_reason` (`context_recovery`, `independent_review`, or `scope_isolation`) and `benefit_clear=True`. The caller must have task evidence for those values; labels are not proof. Without them, a sufficient current agent stays local and an insufficient one is blocked. A justified fresh independent review may be useful even when the current agent is otherwise sufficient.
 
 Opt-outs are evaluated first; neither contextual recovery nor forced Astra bypasses them. A currently insufficient agent cannot hand the same unresolved task to a cheaper lane. First resolve/re-scope it and reassess sufficiency. Host availability still gates every child. These are offline reference semantics; the Skill applies the same rule in prose without running Python per turn.
+
+## v0.4 pair-aware extension
+
+For adaptive effort use the joint reference, not the legacy lane-only helper: same model and same effort require contextual recovery value; a justified medium→high adjustment is different. No-escalation covers both axes. The fixed/adaptive profile never changes the parent model or retry history. Unsupported settings stay unavailable rather than mapping to cheaper values. [Selection, precedence and safe boundaries](ADAPTIVE-EFFORT.md).

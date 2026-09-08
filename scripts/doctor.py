@@ -17,20 +17,26 @@ except ImportError as exc:
     raise SystemExit("Python 3.11+ is required") from exc
 
 from package import EXPECTED, INSTRUCTION_BUDGETS, MANIFEST, PROJECT, resolve_targets
+from profiles import Profile, MARKER
+from catalog import parse_catalog
 
 HEADINGS = ("Route once per meaningful decision", "Decide whether delegation is worth it",
             "Handoff without losing the decision", "Failure, validation, and stopping", "Context and reporting")
 
 
-def validate_agent(path: Path, expected: tuple[str, str, str]) -> list[str]:
+def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile = Profile()) -> list[str]:
     try:
         data = tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         return [f"invalid or missing agent {path}: {exc}"]
     errors = []
-    for key, value in zip(("name", "model", "model_reasoning_effort"), expected):
+    for key, value in zip(("name", "model"), expected[:2]):
         if data.get(key) != value:
             errors.append(f"{path}: shipped preset expects {key}={value!r}")
+    if profile.mode == "fixed" and data.get("model_reasoning_effort") != expected[2]:
+        errors.append(f"{path}: fixed preset expects model_reasoning_effort={expected[2]!r}")
+    if profile.mode == "adaptive" and "model_reasoning_effort" in data:
+        errors.append(f"{path}: adaptive role must not pin model_reasoning_effort")
     for key in ("description", "developer_instructions"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             errors.append(f"{path}: nonempty {key} is required")
@@ -39,7 +45,7 @@ def validate_agent(path: Path, expected: tuple[str, str, str]) -> list[str]:
     return errors
 
 
-def validate_tree(skill_file: Path, agent_dir: Path) -> list[str]:
+def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile()) -> list[str]:
     errors = []
     try:
         text = skill_file.read_text(encoding="utf-8")
@@ -66,6 +72,9 @@ def validate_tree(skill_file: Path, agent_dir: Path) -> list[str]:
             errors.append("Skill name/description are missing or invalid")
         if len(meta.get("description", "")) > INSTRUCTION_BUDGETS["discovery_description_characters"]:
             errors.append("Skill description exceeds the project discovery budget")
+    expected_marker = (profile.mode, "enabled" if profile.allow_low else "disabled")
+    if MARKER.findall(text) != [expected_marker]:
+        errors.append("Skill installation marker does not match manifest/source profile")
     core_bytes = len(text.encode("utf-8"))
     if core_bytes > INSTRUCTION_BUDGETS["core_skill_bytes"]:
         errors.append("Skill exceeds the project core instruction budget")
@@ -91,27 +100,26 @@ def validate_tree(skill_file: Path, agent_dir: Path) -> list[str]:
     if not metadata.is_file():
         errors.append("missing UI/invocation metadata")
     for filename, expected in EXPECTED.items():
-        errors.extend(validate_agent(agent_dir / filename, expected))
+        errors.extend(validate_agent(agent_dir / filename, expected, profile))
     return errors
 
 
-def validate_catalog(data: dict) -> list[str]:
-    if not isinstance(data, dict):
-        return ["expected a model/list JSON object"]
-    payload = data.get("result", data)
-    if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
-        return ["expected exported Codex model/list JSON object with a data array"]
-    if payload.get("nextCursor") is not None:
-        return ["catalog export is incomplete: follow pagination before assessing availability"]
-    found = {}
-    for entry in payload["data"]:
-        if not isinstance(entry, dict) or not isinstance(entry.get("supportedReasoningEfforts"), list):
-            return ["invalid model catalog entry"]
-        if not isinstance(entry.get("model"), str):
-            return ["catalog model must be a string"]
-        found[entry["model"]] = {e.get("reasoningEffort") for e in entry["supportedReasoningEfforts"] if isinstance(e, dict)}
-    return [f"catalog does not confirm {model}/{effort}"
-            for _, model, effort in EXPECTED.values() if effort not in found.get(model, set())]
+def validate_catalog(data: object, profile: Profile = Profile()) -> list[str]:
+    try:
+        found = parse_catalog(data)
+    except ValueError as exc:
+        return [str(exc)]
+    errors = []
+    for role, model, effort in EXPECTED.values():
+        required = {effort}
+        if profile.mode == "adaptive" and role != "astra_architect":
+            required = {"medium", "high"}
+        if profile.allow_low and role == "luna_worker":
+            required.add("low")
+        for value in sorted(required):
+            if value not in found.get(model, frozenset()):
+                errors.append(f"catalog does not confirm {model}/{value} for {profile.mode}")
+    return errors
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -127,13 +135,16 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        profile = Profile()
         if args.source_tree:
             root = args.source_tree.resolve()
             skill, agents = root / "skills" / PROJECT / "SKILL.md", root / "agents"
         else:
             skill_dir, agents, _ = resolve_targets(args.scope, args.project_root)
             skill = skill_dir / "SKILL.md"
-        errors = validate_tree(skill, agents)
+            from manage import installed_profile
+            profile = installed_profile(skill_dir, agents)
+        errors = validate_tree(skill, agents, profile)
         if not args.source_tree:
             from manage import digest, load_manifest, read_bytes, target
             if not (skill.parent / MANIFEST).exists():
@@ -143,9 +154,10 @@ def main() -> int:
                     if digest(read_bytes(target(key, skill.parent, agents))) != expected:
                         errors.append(f"installed file missing or modified: {key}")
         if args.catalog:
-            errors.extend(validate_catalog(json.loads(args.catalog.read_text(encoding="utf-8"))))
+            errors.extend(validate_catalog(json.loads(args.catalog.read_text(encoding="utf-8")), profile))
         for error in errors:
             print(f"- {error}")
+        print(f"profile: {profile.mode}; automatic low: {profile.allow_low}")
         print("doctor: STATIC FAIL" if errors else "doctor: STATIC PASS")
         print("live Codex discovery/model execution: NOT VERIFIED")
         print("catalog: checked supplied export only" if args.catalog else "catalog: NOT CHECKED")

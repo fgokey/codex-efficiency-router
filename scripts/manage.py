@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from package import AGENT_FILES, MANIFEST, PROJECT, resolve_targets
+from profiles import Profile, from_manifest, render_payload, select_profile
 
 # Exact text blobs from the published v0.1.0 tree. Adoption is always explicit.
 LEGACY = {
@@ -71,12 +72,19 @@ def load_manifest(skill: Path, agents: Path) -> dict[str, str]:
     data = json.loads(raw)
     if not isinstance(data, dict) or data.get("owner") != PROJECT or data.get("schema") != 1 or not isinstance(data.get("files"), dict):
         raise ValueError("invalid ownership manifest")
+    from_manifest(data)  # Validate persisted mode before any lifecycle operation.
     for key, value in data["files"].items():
         target(key, skill, agents)
         if key == f"skill/{MANIFEST}" or not isinstance(value, str) or len(value) != 64:
             raise ValueError("invalid manifest entry")
         int(value, 16)
     return data["files"]
+
+
+def installed_profile(skill: Path, agents: Path) -> Profile:
+    load_manifest(skill, agents)
+    raw = read_bytes(skill / MANIFEST)
+    return from_manifest(json.loads(raw)) if raw is not None else Profile()
 
 
 def source_files(root: Path) -> dict[str, bytes]:
@@ -189,14 +197,18 @@ def apply(changes: dict[str, bytes | None], skill: Path, agents: Path, backup_ro
 
 
 def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = False,
-            force: bool = False, adopt_v01: bool = False) -> int:
+            force: bool = False, adopt_v01: bool = False, *,
+            mode: str | None = None, allow_low: bool | None = None) -> int:
     skill, agents, backup_root = resolve_targets(scope, project_root)
-    payload = source_files(root)
+    canonical = source_files(root)
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
 
     def operation():
         manifest_exists = (skill / MANIFEST).exists()
         owned = load_manifest(skill, agents)
+        profile = select_profile(installed_profile(skill, agents), mode, allow_low)
+        payload = render_payload(canonical, profile)
+        print(f"profile: {profile.mode}; automatic low: {profile.allow_low}; no live capability probe")
         if adopt_v01 and not manifest_exists:
             owned = legacy_files(skill, agents)
         for key in set(owned) | set(payload):
@@ -209,6 +221,7 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
         changes = {key: None for key in owned if key not in payload}
         changes.update(payload)
         manifest = {"schema": 1, "owner": PROJECT, "version": version,
+                    "mode": profile.mode, "allow_low": profile.allow_low,
                     "files": {key: digest(value) for key, value in sorted(payload.items())}}
         changes[f"skill/{MANIFEST}"] = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
         apply(changes, skill, agents, backup_root, dry_run)

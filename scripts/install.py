@@ -15,8 +15,10 @@ def source_root() -> Path:
 
 
 def install(scope: str, project_root: Path | None, dry_run: bool, *,
-            force: bool = False, adopt_v01: bool = False) -> int:
-    return manage.install(source_root(), scope, project_root, dry_run, force, adopt_v01)
+            force: bool = False, adopt_v01: bool = False,
+            mode: str | None = None, allow_low: bool | None = None) -> int:
+    return manage.install(source_root(), scope, project_root, dry_run, force, adopt_v01,
+                          mode=mode, allow_low=allow_low)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +29,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--force", action="store_true", help="back up and replace locally edited OWNED files")
     parser.add_argument("--adopt-v01", action="store_true", help="adopt only exact known legacy file contents")
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
+    parser.add_argument("--mode", choices=("fixed", "adaptive"), default=None,
+                        help="explicit profile switch; omitted preserves installed mode (new install: fixed)")
+    low = parser.add_mutually_exclusive_group()
+    low.add_argument("--allow-low", dest="allow_low", action="store_true", default=None,
+                     help="opt in to tightly gated automatic low in adaptive mode")
+    low.add_argument("--no-allow-low", dest="allow_low", action="store_false",
+                     help="disable automatic low; omitted preserves installed setting")
     return parser
 
 
@@ -35,10 +44,11 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.restore:
-            if args.adopt_v01:
-                parser.error("--restore and --adopt-v01 cannot be combined")
+            if args.adopt_v01 or args.mode is not None or args.allow_low is not None:
+                parser.error("--restore cannot be combined with --adopt-v01, --mode or low switches")
             return manage.restore(args.restore, args.scope, args.project_root, args.dry_run, args.force)
-        return install(args.scope, args.project_root, args.dry_run, force=args.force, adopt_v01=args.adopt_v01)
+        return install(args.scope, args.project_root, args.dry_run, force=args.force, adopt_v01=args.adopt_v01,
+                       mode=args.mode, allow_low=args.allow_low)
     except (OSError, ValueError) as exc:
         print(f"install: FAILED: {exc}", file=sys.stderr)
         return 2

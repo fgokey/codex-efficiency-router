@@ -15,7 +15,7 @@ py -3 scripts/doctor.py --scope user
 
 macOS/Linux 把 `py -3` 换成 `python3`。项目级沿用原来的 `--scope project --project-root ...`；仅原始 v0.1 安装需要 `--adopt-v01`。定制文件冲突先核对，不要直接追加 `--force`。
 
-静态通过条件：doctor 为 STATIC PASS；现有配置未被替换；仅安装本 Skill 和四个角色。预设为 Luna/Terra/Sol 的 medium、Astra 的 high，没有独立第五层。STATIC PASS 不证明运行时模型可用。重启或重新加载 Codex，避免用已载入旧指令的长对话验收新版。
+静态通过条件：doctor 为 STATIC PASS；现有配置未被替换；仅安装本 Skill 和四个角色。固定模式为 Luna/Terra/Sol 的 medium、Astra 的 high，没有独立第五层；自适应模式的档位由父代理显式选择。STATIC PASS 不证明运行时模型可用。重启或重新加载 Codex，避免用已载入旧指令的长对话验收新版。
 
 ## 2. 先验收开关，不要求四模型全部启动
 
@@ -71,3 +71,21 @@ py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH"
 重点观察：高级模型的方案与要求冲突时是否先停受影响范围；子任务自称成功或关键检查未执行时是否避免整体 PASS；相同 HEAD 下测试/依赖/脏文件变化是否触发适当重验；换执行者是否保留原失败次数；恢复时是否复用已验证工作并核对活跃写入者和未知副作用。只读设计可用基于明确标准的审查，不强制跑无关构建。
 
 最终 PASS 要求必需项都有当前证据，披露遗漏不等于允许遗漏。PARTIAL/BLOCKED 保留有用成果并写清差距。手工实装过程会按实际 Codex 执行计量；项目不自动运行这些任务。
+
+## 7. v0.4 模型＋档位自适应验收
+
+以下静态操作不调用模型；实际 Codex 冒烟由你自行执行。
+
+```powershell
+py -3 scripts/install.py --scope user --mode adaptive --dry-run
+py -3 scripts/install.py --scope user --mode adaptive
+py -3 scripts/doctor.py --scope user
+```
+
+期望：四个角色保留模型、职责和权限，只有 `model_reasoning_effort` 不再固定；Skill 和清单都显示 adaptive；low 默认关闭。重新加载 Codex 后，再验证工具是否提供真实的档位参数。没有参数时报告限制，不暗中改全局配置或执行 `codex exec`。
+
+在一次本就需要的只读复杂分析中，明确要求“模型固定 Sol，思考档位 high，最多一个子任务，不改文件、不自动重试”。检查原生创建请求是否确实指定 high，以及宿主实际元数据能否确认。只说“已采用 high”不能算通过。实际数据缺失标记 UNKNOWN；反映 medium 则为 MISMATCH。此时不继续自动 low 或完整批量测试。
+
+对照：切回 fixed 后相同 Sol 角色应恢复 medium；请求 high 不应被虚报为成功。普通任务仍默认 medium；无新证据不反复改档。`不要升级`应同时禁止模型和档位上调；`模型固定，允许调档`与它不同。运行中不能通过追加提示词伪装热改档；安全边界上的新执行保留原有失败和剩余尝试次数。
+
+最后测试 fixed↔adaptive、关闭 low、重复安装以及显式备份恢复，确认没有覆盖定制配置。只有初步验收后才考虑 `--allow-low`；它仅放开强可验证的机械 Luna 任务，不是所有编码降档。新验收提示词另存于 `evaluation/effort_cases.json`，尚未运行模型，不要把 grader 预期发给被测代理。

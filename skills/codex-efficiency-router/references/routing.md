@@ -1,19 +1,15 @@
-# Ambiguous routing boundaries
+# Astra boundary examples
 
-Apply the three Astra gates, not keywords.
+Apply all three core gates, not keywords or a mandatory ladder.
 
-| Unresolved strong-reasoning question | Cheaper settled work |
+| Unresolved judgment | Settled counterexample |
 | --- | --- |
-| Durable API, persistent format, ownership or compatibility tradeoffs | Implement an approved contract |
-| Ambiguous trust, data-integrity, billing or production invariant | Apply an explicit checked rule |
-| Credible conflicting evidence or surviving causal hypotheses | Run the discriminating test |
-| Migration coexistence, ordering, partial failure and recovery | Execute authorized fixture migration |
-| Novel algorithm, protocol, state or scheduling mechanism | Adapt a documented pattern |
-| Consequential disagreement not settled by checks | Routine review already supported by evidence |
-| Scoped Sol reasoning fails with adequate inputs and tools | Missing dependency, permission or network |
+| Durable API/format/ownership/compatibility tradeoffs | Implement accepted contract |
+| Ambiguous trust/data/billing/production invariant | Apply a specified checked rule |
+| Credible conflict or surviving causal hypotheses | Run discriminating check |
+| Migration coexistence/ordering/rollback/recovery | Authorized steps on fixtures |
+| Novel algorithm/protocol/state/scheduling | Adapt documented pattern |
+| Consequential independent arbitration | Repeat sufficient routine review |
+| Qualified Sol reasoning failure | Fix missing dependency |
 
-An observability gap can contain an answerable instrumentation-design question: isolate it rather than claiming an unseen root cause. A cheap experiment must be safe and authorized; approved migration design does not authorize live migration.
-
-Same-lane recovery needs evidence that fresh context, independent judgment or scope isolation addresses the blocker. A reason label proves nothing; never hide another blind patch as diagnosis.
-
-EXPLORE can be cheap; EXECUTE/VERIFY can need deep reasoning. No compulsory ladder or fifth Sol/high preset. Offline rules test supplied signals, not live inference.
+Isolate answerable instrumentation design from an unobservable root cause. Cheap experiments must be safe/authorized; frozen migration strategy does not authorize live rollout. New requirements/code/dependencies/evidence can reopen decisions. Changed errors count as progress only if they narrow the problem. More effort is not always better than another model. Offline helpers are policy approximations, not execution or quality proof.
