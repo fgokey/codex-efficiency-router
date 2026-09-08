@@ -1,36 +1,36 @@
 ---
 name: codex-efficiency-router
-description: Quality-gated model and reasoning-effort routing for substantial Codex engineering tasks; reserve Astra for exceptional decisions and cheaper executors for settled work. Use for coding, diagnosis, design or review; not tiny edits, simple questions, or alongside another router.
+description: Quality-gated model and effort routing for substantial Codex tasks; reserve Astra for exceptional decisions and use sufficient cheaper models for coding, diagnosis, design or review. Not for tiny edits, simple questions or concurrent routers.
 ---
 
 # Codex Efficiency Router
 
-Codex only. Optimize quality, tokens/time within authorization. Never change the parent model. No extra LLM classifier, per-turn script, ledger or foreign runtime.
+Codex only. Preserve quality/authorization; reduce token and time waste. Keep the parent model. No extra LLM classifier, per-turn scripts, ledger or foreign runtime.
 
 Installation: fixed; automatic low: disabled.
 
 ## Route once per meaningful decision
 
-Map required outcomes to checks/review; identify the unresolved question. Use task/unit IDs and contract revision for substantial work. Reassess on phases, contrary evidence, classified failures or user requests, not each tool. Repair missing requirements, authority, environment or observations first; prefer safe cheap discriminating checks.
+Map requirements to checks/review and identify uncertainty. Use task/unit IDs and contract revisions. Reassess on phases, contrary evidence, classified failures or user requests, not each tool. Repair missing requirements, authority, environment or observations first; prefer safe cheap discriminating checks.
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` / medium | Mechanical, low risk, explicit scope, strong checks |
-| `terra_executor` | `gpt-5.6-terra` / medium | Settled design, bounded implementation |
+| `luna_worker` | `gpt-5.6-luna` / medium | Explicit, mechanical, low-risk, verifiable work |
+| `terra_executor` | `gpt-5.6-terra` / medium | Bounded implementation of settled design |
 | `sol_engineer` | `gpt-5.6-sol` / medium | Uncertainty, coupling, integration/review |
-| `astra_architect` | `gpt-6-astra` / high | Exceptional reasoning; read-only decisions |
+| `astra_architect` | `gpt-6-astra` / high | Exceptional judgment; read-only |
 
-Choose model AND effort. Fixed mode pins defaults; adaptive explicitly passes effort through a supported native field. Normally medium; high for deep logic/assumptions/edges; Astra defaults high. Auto-low needs installation opt-in and the strict mechanical-work gate in [effort.md](references/effort.md); read it before first adaptive use/override. Unsupported settings never silently downgrade.
+Choose model AND effort: fixed pins defaults; adaptive must explicitly pass effort. Use medium normally, high for deeper logic/assumptions/edges; automatic Astra stays high. Read [effort.md](references/effort.md) before adaptive dispatch or overrides. Auto-low needs opt-in and its strict mechanical-work gate. Unsupported settings never silently downgrade.
 
-Automatic Astra requires useful stronger reasoning, consequential/exceptionally difficult judgment and insufficient cheap falsification. Keywords, size and slow builds are not triggers. Consult [routing.md](references/routing.md) for ambiguity. No compulsory ladder; Never auto-select `max` or xhigh. Ultra is outside this policy. Explicit preferences never waive quality/prerequisites.
+Automatic Astra needs useful stronger reasoning, consequential/exceptionally hard judgment and insufficient cheap falsification. Size, keywords and slow builds are not triggers. Consult [routing.md](references/routing.md) for ambiguity. No compulsory ladder; Never auto-select `max` or xhigh. Ultra is outside this policy. Explicit preferences never waive quality/prerequisites.
 
 ## Decide whether delegation is worth it
 
-Keep sufficient tiny/tool-bound work local; prefer safe tool concurrency. Delegate for necessary capability or benefit after startup, copied context, handoff, verification and rework. Same-model delegation at IDENTICAL effort needs contextual value AND a net benefit. Higher effort needs reasoning evidence, not renewed retries. Never downgrade unresolved insufficiency; resolve/re-scope first. Skip futile weak attempts.
+Keep sufficient tiny/tool-bound work local; prefer safe tool concurrency. Delegate for necessary capability or benefit after startup, copied context, handoff, verification and rework. Same-model delegation at IDENTICAL effort needs contextual value AND a net benefit. Higher effort needs reasoning evidence, not renewed retries. Never downgrade unresolved insufficiency; resolve/re-scope first.
 
 Default one leaf, at most two concurrent unless justified. Require independent acceptance, disjoint writes, safe resources and capacity. No agent per file, recursive delegation or mandatory reviewer chain. Never parallelize conflicting writes, shared builds/devices/credentials or external side effects.
 
-Read [dispatch.md](references/dispatch.md) before dispatch. Use discovered roles/actual schemas; distinguish recommended/requested/observed pairs. No config rewriting, hidden `codex exec`/API fallback or permission bypass. Unavailable route: stay local only if sufficient; otherwise stop risky writes and report the blocker. Change effort at safe boundaries, never by steering an active turn. Reuse idle threads only with exposed compatible next-turn controls.
+Read [dispatch.md](references/dispatch.md) before dispatch. Use discovered roles/actual schemas; distinguish recommended/requested/observed pairs. No config rewriting, hidden `codex exec`/API fallback or permission bypass. Unavailable route: stay local only if sufficient; otherwise stop risky writes and report the blocker. Change effort at safe boundaries, never by steering an active turn.
 
 ## Handoff without losing the decision
 

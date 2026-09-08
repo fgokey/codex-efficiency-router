@@ -167,7 +167,7 @@ class ProfileLifecycleTests(unittest.TestCase):
         self.install(); self.assert_installed(Profile())
 
     def test_user_scope_honors_codex_home_without_touching_config(self):
-        home = Path(self.tmp.name) / 'home'; home.mkdir()
+        home = Path(self.tmp.name).resolve() / 'home'; home.mkdir()
         codex = home / 'custom_codex'; codex.mkdir()
         conf = codex / 'config.toml'; conf.write_bytes(b'model = "custom"\r\n')
         with patch.object(Path, 'home', return_value=home), patch.dict(os.environ, {'CODEX_HOME': str(codex)}):
