@@ -24,7 +24,17 @@ def run_mutations(root: Path, output: Path) -> list[dict]:
         ('ignore_quality_floor', 'if EFFORTS.index(candidate.effort) < EFFORTS.index(minimum):', 'if False:'),
         ('allow_per_tool_churn', 'if context.change_event == "none":', 'if False:'),
         ('ignore_unknown_low_stop', 'allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH")', 'allow_low=profile.allow_low'),
-        ('ignore_role_model', 'if binding is None or binding.model != candidate.model:', 'if binding is None:'),
+        ('ignore_role_model', 'if candidate.role in context.unavailable_roles or binding is None or binding.model != candidate.model:', 'if candidate.role in context.unavailable_roles or binding is None:'),
+        ('auto_ignores_effort_field', 'context.host_can_set_effort and alias not in context.unavailable_roles', 'alias not in context.unavailable_roles'),
+        ('auto_reprobes_failed_alias', 'alias not in context.unavailable_roles', 'True'),
+        ('auto_ignores_alias_pin', 'binding.model == candidate.model and binding.effort is None', 'binding.model == candidate.model'),
+        ('auto_ignores_alias_model', 'binding.model == candidate.model and binding.effort is None', 'binding.effort is None'),
+        ('auto_ignores_fixed_pin', 'or binding.model != candidate.model or binding.effort != candidate.effort):', 'or binding.model != candidate.model):'),
+        ('auto_ignores_fixed_model', 'or binding.model != candidate.model or binding.effort != candidate.effort):', 'or binding.effort != candidate.effort):'),
+        ('auto_ignores_catalog', 'if candidate.effort not in supported:', 'if False:'),
+        ('auto_uses_wrong_alias', 'role, kind = alias, "adaptive"', 'role, kind = candidate.role, "adaptive"'),
+        ('auto_ignores_failed_fixed', 'if (candidate.role in context.unavailable_roles or binding is None', 'if (binding is None'),
+
     ]
     harness = '''import sys, types, unittest
 sys.path.insert(0, 'scripts')

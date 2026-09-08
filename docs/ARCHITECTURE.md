@@ -1,11 +1,11 @@
-# Architecture — v0.4
+# Architecture — v0.5
 
-One Codex-only Skill with four native roles and offline maintenance tools. Preserve required correctness and authorization while reducing avoidable reasoning, context and coordination. Monetary cost, tokens and elapsed time are separate; no universal savings or quality guarantee.
+One Codex-only Skill with four role responsibilities and generated native bindings and offline maintenance tools. Preserve required correctness and authorization while reducing avoidable reasoning, context and coordination. Monetary cost, tokens and elapsed time are separate; no universal savings or quality guarantee.
 
 ## Layers
 
 1. The current coordinator reads the compact Skill and only needed references: routing, dispatch, effort, quality. No classifier inference, per-turn script or mandatory ledger.
-2. Four native roles keep their names, model identities and permissions. Astra is read-only. Fixed installs pin effort; adaptive installs require parent-selected explicit effort. Parent owns requirements, integration and acceptance; leaves cannot recursively delegate or publish.
+2. Four canonical roles retain models, policy and permissions. Auto also generates four unpinned aliases; native capabilities choose one binding per child. No runtime file switch or duplicate workers. Parent owns requirements/integration; leaves cannot recursively delegate or publish. Astra stays read-only.
 3. Offline tools generate/install profiles, validate structure, compare supplied runs and test reference rules. They are not a live dispatcher or enforcement layer and are not installed as runtime scripts.
 
 ## Joint selection and acceptance
@@ -18,7 +18,7 @@ Only long tasks/recovery need one permitted task checkpoint. Keep failed approac
 
 ## Generation and ownership
 
-Canonical `agents/*.toml` is fixed. `profiles.py` generates exactly four role files for either mode; adaptive removes only effort pins. The installed core marker and hash manifest carry mode/low policy. New installs and legacy manifests default fixed; upgrades preserve profile unless explicitly changed.
+Canonical `agents/*.toml` is fixed. Auto derives unpinned aliases and installs eight bindings from four definitions. The parent picks the alias when native explicit effort works or the exact fixed pair otherwise. New and legacy ordinary installs use auto; v0.5+ explicit overrides survive updates. Manifest/backup ownership covers aliases and original files; no credentials or runtime probes.
 
 Hash ownership, collision checks, local-edit detection, backups and ordinary-failure rollback remain. Uninstall removes only owned files; restore is explicit. Per-file atomic replacement is not multi-directory power-loss atomicity. [Lifecycle](INSTALL.md) · [Security](../SECURITY.md).
 

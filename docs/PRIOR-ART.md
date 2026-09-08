@@ -46,3 +46,7 @@ The official Skills and Subagents pages and all four model pages were rechecked 
 ## v0.4 documentation recheck — 2026-09-08
 
 OpenAI Subagents, Skills and App Server documentation were rechecked for role-file precedence, explicit effort, catalog support and next-turn versus steer behavior. Native capability exposure is not assumed from a documentation API alone. The [adaptive-effort design](ADAPTIVE-EFFORT.md) records what is implemented and what requires user-host acceptance; no learned classifier, foreign runtime or benchmark percentage is imported.
+
+## v0.5 capability-adaptive installation
+
+Reviewed 2026-09-08. [Superpowers Codex tooling](https://github.com/obra/superpowers/blob/main/skills/using-superpowers/references/codex-tools.md) trusts actual schemas/allowlists and explicit model+effort, rather than hardcoded assumptions. [Anthropic skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) adapts available workflow mechanics without asserting missing capabilities. Combined with [OpenAI role-file precedence](https://developers.openai.com/codex/subagents), these motivate one ordinary installation and native binding selection. We do not copy their runtime, obsolete feature flags, wait constants or benchmark claims. The exact dual-binding mechanism is this project's design, not an upstream product claim. [Details](ADAPTIVE-EFFORT.md).

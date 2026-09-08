@@ -1,65 +1,37 @@
 # Codex Efficiency Router
 
-[简体中文](README.zh-CN.md) · [Design](docs/ARCHITECTURE.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [User acceptance](docs/ACCEPTANCE.md)
+[简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.4.0 · Codex-only Skill · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.5.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-Use strong reasoning for unresolved decisions and sufficient cheaper execution when delegation pays. Quality and authorization remain constraints. This independent community project does not guarantee unchanged model quality, savings or speedups on every task.
+Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
-## What runs in Codex
+## One install, capability-aware execution
 
-The current coordinator applies a compact Skill and uses native Codex child roles. It does not switch its own model, launch a second CLI/API session, install another agent platform or call a classifier model. Simple work stays local; safe tools run concurrently before adding model contexts. One leaf is the default; more need independent acceptance, disjoint ownership and a benefit.
+After deciding capability and delegation benefit, the parent uses actual native schemas, loaded roles and supported model/effort pairs:
 
-| Custom role | Model preset | Reasoning |
+| Available capability | Action |
+| --- | --- |
+| Explicit effort field and correctly loaded unpinned alias | Request the selected pair using that alias |
+| Otherwise, a fixed role matches the exact same pair | Use the compatibility binding, without reinstalling |
+| Neither route meets the requirement | Keep a sufficient parent, or report BLOCKED; never silently weaken effort |
+
+Only one binding is selected per child. No model calls just to probe capability, no runtime configuration rewrites, hidden sessions or replay while another writer's state is uncertain. A compatibility route is not dynamic-effort success; missing runtime identity remains UNKNOWN.
+
+| Responsibility | Model | Fixed compatibility effort |
 | --- | --- | --- |
 | `luna_worker` | `gpt-5.6-luna` | `medium` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
 | `sol_engineer` | `gpt-5.6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-Four presets, no compulsory escalation ladder or automatic `max`. Astra is read-only decision support. After a decision settles, reassess remaining work; do not spawn for a tiny tail. Identical model/effort delegation needs a concrete contextual reason AND net benefit. Missing prerequisites are not expensive-model triggers.
+Auto generates four `cer_auto_<role>` unpinned aliases alongside the four fixed bindings: **eight small TOML files, four responsibilities**, not eight running agents or extra capability tiers. Generated aliases change only name and effort pin; model, instructions and permissions remain identical. Additional discovery descriptions can add host context; the text audit reports their separate footprint rather than claiming zero overhead.
 
-Actual availability and role/model/effort selection depend on your Codex host/account. Pinned role settings can override spawn values. Requested identity is not observed identity; missing runtime evidence stays UNKNOWN. [Compatibility](docs/COMPATIBILITY.md).
+Ordinary implementation normally uses medium; deeper reasoning may use high; automatic Astra remains high. Automatic low is off by default and retains explicit prior choice. xhigh/max require explicit intent and support. No mandatory weak-model ladder. A host lacking Sol/high does not make Sol/medium an acceptable substitute.
 
-## v0.3 quality changes
+## Install and update
 
-Before editing, the receiver checks requirements, plan conflicts, material assumptions and state. A strong model's plan cannot override requirements. Final acceptance maps required outcomes to current evidence: **PASS**, **PARTIAL**, or **BLOCKED**. Disclosure does not waive missing work. Review coverage and correctness together; no mandatory extra reviewer.
-
-Attempts belong to the task/unit/failure signature across workers and compaction, not each agent. For long work/recovery only, reuse one permitted task-scoped checkpoint and reconcile actual files, workers and prior side effects. Do not repeat completed work blindly. Four short references load only as needed; full-load and per-role text budgets are measured separately from live task usage.
-
-The Python quality helpers and evaluation corpus are **offline development aids**, not a runtime dispatcher, security boundary or model-quality certificate. They are not installed into the Skill payload or called every turn. [Protocol and sources](docs/QUALITY-PROTOCOL.md) · [Release validation](docs/VALIDATION-v0.4.0.md).
-
-## Adaptive reasoning effort (v0.4)
-
-Four roles remain; the parent now selects **model + effort** at meaningful task boundaries. New installs default to **fixed** for compatibility. Updates preserve the installed mode and low opt-in; no implicit migration. In **adaptive**, role models and permission instructions stay unchanged, but effort is unpinned and must be explicitly supplied by the parent through an actual native tool parameter. This is not guaranteed on every Codex host.
-
-From the retained clone, enable adaptive mode deliberately:
-
-```powershell
-git pull --ff-only
-py -3 scripts/install.py --scope user --mode adaptive --dry-run
-py -3 scripts/install.py --scope user --mode adaptive
-py -3 scripts/doctor.py --scope user
-```
-
-On macOS/Linux use `python3`; project scope keeps `--scope project --project-root ...`. Restart/reload Codex. No account, config, authentication or main-thread model change is made. Exactly one four-role set is installed. Do not mix old role files or an old loaded Skill with the new profile.
-
-Ordinary implementation: medium. Deep logic/assumptions/edges: high in a suitable model, or a stronger model when needed. Automatic Astra: high. Automatic low: **off**, optionally enabled only for strictly checked mechanical Luna tasks. xhigh/max: explicit user request only, subject to actual support and quality/user limits. “No escalation” prohibits increases in either model or effort. Model-only locks can allow effort changes. No in-flight hot switching, hidden CLI/API fallback or retry-budget reset.
-
-```powershell
-# Optional, conservative auto-low opt-in; keep disabled during initial validation:
-py -3 scripts/install.py --scope user --mode adaptive --allow-low
-# Disable low while retaining adaptive:
-py -3 scripts/install.py --scope user --no-allow-low
-# Return to fixed compatibility mode:
-py -3 scripts/install.py --scope user --mode fixed
-```
-
-Fixed files override conflicting requests; adaptive requires both an unpinned loaded role and an exposed effort field. Unsupported/mismatched settings are not silently downgraded. Requested values are not observed values: UNKNOWN/MISMATCH disables subsequent automatic low. Static doctor checks package/profile integrity, not live execution. [Design, precedence and constraints](docs/ADAPTIVE-EFFORT.md) · [User acceptance](docs/ACCEPTANCE.md).
-
-## Install
-
-Use Git and Python **3.11+**. After cloning, installation is offline and never edits `config.toml`, `AGENTS.md`, authentication, providers, permissions or unrelated agents/Skills. Review files before running. Keep the clone for updates and removal.
+Review source first. Installation only manages owned files; it does not edit global config, authentication, permissions, AGENTS.md or unrelated Skills/agents. Keep the clone for lifecycle commands. Choose one installation scope.
 
 ### Windows / PowerShell
 
@@ -71,8 +43,6 @@ py -3 scripts/install.py --scope user
 py -3 scripts/doctor.py --scope user
 ```
 
-Use `python` in place of `py -3` when it is your Python 3.11+ interpreter. Direct Python needs no PowerShell execution-policy change. PowerShell wrappers forward Python-style `--scope`/`--dry-run`, not `-Scope`/`-DryRun` aliases.
-
 ### macOS / Linux
 
 ```sh
@@ -83,40 +53,7 @@ python3 scripts/install.py --scope user
 python3 scripts/doctor.py --scope user
 ```
 
-Shell wrappers also work as `sh install.sh --scope user` and `sh uninstall.sh --scope user`.
-
-### Project scope instead
-
-Choose one scope to avoid duplicate Skill names. Substitute the actual existing project path:
-
-```powershell
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
-py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
-```
-
-On macOS/Linux use `python3` and an absolute project path. Project configuration remains subject to Codex trust/admin policy.
-
-| Scope | Skill | Four role files | Backups |
-| --- | --- | --- | --- |
-| User | `~/.agents/skills/codex-efficiency-router/` | `$CODEX_HOME/agents/` (default `~/.codex/agents/`) | `$CODEX_HOME/backups/codex-efficiency-router/` |
-| Project | `<project>/.agents/skills/codex-efficiency-router/` | `<project>/.codex/agents/` | `<project>/.codex-router-local/backups/` |
-
-A manifest owns only installed payload files. Unowned collisions are refused; locally changed owned files need review before `--force`. Source-only Skill installers do not install the four role presets; use the full package installer. `doctor: STATIC PASS` does not confirm live model execution. Reload Codex when discovery is stale; already-loaded conversations can retain old instructions.
-
-## Use
-
-```text
-$codex-efficiency-router
-Complete this task with its required checks. Resolve important uncertainty with
-sufficient reasoning, avoid unnecessary delegation, and report remaining gaps honestly.
-```
-
-Relevant substantial tasks can invoke the Skill implicitly; explicit invocation is clearer. Honor disable/no-subagent/no-escalation requests without pretending an insufficient current model is sufficient. Do not stack routers. The parent retains your selected model.
-
-## Update
-
-For a managed v0.2+ installation:
+### Existing installation
 
 ```powershell
 git pull --ff-only
@@ -125,58 +62,62 @@ py -3 scripts/install.py --scope user
 py -3 scripts/doctor.py --scope user
 ```
 
-On macOS/Linux substitute `python3`. For project scope reuse the original scope/root. **Only** original v0.1 installs without manifests need `--adopt-v01` added to install commands. Adoption accepts exact known legacy content (including CRLF-equivalent copies), not arbitrary local edits. An unchanged reinstall is a no-op. Review conflicts instead of immediately forcing.
+Use `python3` on macOS/Linux. **No `--mode adaptive` is needed.** Ordinary updates migrate pre-v0.5 manifests to auto with a printed notice and backup, preserving the low choice. Old manifests did not record whether fixed/adaptive was deliberate or default; advanced users needing a previous policy can explicitly retain it. Later v0.5+ explicit overrides survive ordinary updates. Original unmanifested v0.1 installations still require safe `--adopt-v01` adoption. See [migration details](docs/INSTALL.md).
 
-## Uninstall
+Review customization/collision errors instead of blindly adding `--force`. STATIC PASS is installation integrity, not live model proof. Reload Codex after updates; an old conversation can retain old instructions. A Skill-only copy does not deploy the role bindings: use the full installer.
 
-Use the same scope, project and `CODEX_HOME` as installation. Do not use the original v0.1 uninstaller on customized files.
+### Project scope
 
 ```powershell
-# Windows user scope
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
+py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
+py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
+```
+
+On macOS/Linux substitute `python3` and a real absolute project path. User Skills go to `~/.agents/skills/codex-efficiency-router`; bindings to `$CODEX_HOME/agents` or `~/.codex/agents`. Project scope uses `.agents/skills` and `.codex/agents`. The installer prints actual backup paths.
+
+## Use
+
+```text
+$codex-efficiency-router
+Complete this task using suitable model/effort choices and the required acceptance checks.
+```
+
+Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple work stays local; do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
+
+## Uninstall and restore
+
+Use the same scope, project root and CODEX_HOME as installation.
+
+```powershell
 py -3 scripts/uninstall.py --scope user --dry-run
 py -3 scripts/uninstall.py --scope user
-# Project scope instead
-py -3 scripts/uninstall.py --scope project --project-root "C:/Work/my-project"
 ```
 
 ```sh
-# macOS/Linux user scope
 python3 scripts/uninstall.py --scope user --dry-run
 python3 scripts/uninstall.py --scope user
-# Project scope instead
-python3 scripts/uninstall.py --scope project --project-root "/path/to/my-project"
 ```
 
-Only manifest-owned files are removed. Untracked user files, unrelated config/agents and backups survive. Modified owned files block removal by default; reviewed `--force` backs them up and removes only owned files. Legacy installs need adoption first. Default uninstall **does not restore an old version** and has no `--no-restore` flag.
-
-### Explicit recovery
-
-Use the actual backup directory printed by the operation:
+For project scope use `--scope project --project-root ...`. Only manifest-owned files are removed; untracked files, configuration and backups survive. Local modifications block removal by default. Uninstall does not automatically restore an old version; there is no `--no-restore` option. Restore explicitly from the printed backup directory:
 
 ```powershell
 py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
 py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
-Use `python3` on macOS/Linux and original project-scope flags when applicable. Restore verifies target paths/checksums and refuses intervening edits by default; it retains its own backup. Optional defaults manually merged into `config.toml` are not owned or undone automatically. Backups may contain private instructions; keep them out of Git. [Lifecycle safety and recovery](docs/INSTALL.md).
+Restore preserves the original selection without migrating it to auto. Reload Codex after uninstall; keep private customization backups out of public reports. [Full lifecycle and recovery](docs/INSTALL.md).
 
-## Validation versus actual effectiveness
+## Validation and limits
 
 ```sh
 python3 -m unittest discover -s tests -v
 python3 scripts/doctor.py --source-tree .
-python3 -m compileall -q scripts tests evaluation
 python3 evaluation/offline_audit.py --without-tokenizer
 ```
 
-Optional raw-text audit requires a full Git clone and `tiktoken==0.11.0`; run `python3 evaluation/offline_audit.py`. Initial package/vocabulary downloads use network, not model inference. CI runs standard Python checks, selected deliberate policy/quality mutations and named-encoding token budgets; results are scoped to the checked commit. Historical failing reports remain available.
+No model calls. CI also measures named reference token encodings. Pure helpers test declared conditions, not live enforcement. Actual binding/model/effort, task quality, all parent/child usage and elapsed time remain [user acceptance](docs/ACCEPTANCE.md). Historical failures are retained; do not equate static PASS with proven savings. [Benchmark method](docs/BENCHMARKING.md).
 
-The 20 prompts in [behavioral acceptance cases](evaluation/behavior_cases.json) are prepared **but not executed by CI**. Corpus structure checks are not model-response grades. User-run acceptance should observe real role/model identity, requirement coverage, handoff/recovery and whole-task parent/child/retry usage. [Acceptance](docs/ACCEPTANCE.md) · [Benchmark method](docs/BENCHMARKING.md).
+[Architecture](docs/ARCHITECTURE.md) · [Sources](docs/PRIOR-ART.md) · [Changes](CHANGELOG.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)
 
-The optional `scripts/compare_runs.py runs.json` describes paired data; incomplete Router acceptance cannot exit successfully even when both variants fail. Missing metrics remain unknown. Neither a zero exit code nor text-token reduction proves live non-inferiority or savings. No paid model test is triggered by installation or CI.
-
-## Open-source project
-
-[Architecture](docs/ARCHITECTURE.md) · [Routing](docs/ROUTING.md) · [Quality gates](docs/QUALITY-GATES.md) · [Token efficiency](docs/TOKEN-EFFICIENCY.md) · [Prior art](docs/PRIOR-ART.md) · [Changelog](CHANGELOG.md)
-
-[Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Support](SUPPORT.md) · [Code of Conduct](CODE_OF_CONDUCT.md) · [MIT License](LICENSE)
+[Validation v0.5.0](docs/VALIDATION-v0.5.0.md)

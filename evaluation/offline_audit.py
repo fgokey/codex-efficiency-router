@@ -62,6 +62,14 @@ def token_measurements() -> dict:
     from profiles import MARKER, Profile
     text['adaptive_core'] = MARKER.sub(Profile('adaptive').marker, core)
     text['adaptive_full'] = text['adaptive_core'] + ''.join('\n' + reference for reference in references)
+    text['auto_core'] = MARKER.sub(Profile('auto').marker, core)
+    text['auto_full'] = text['auto_core'] + ''.join('\n' + reference for reference in references)
+    # A declared rendering for relative metadata accounting, not exact host framing.
+    aliases = []
+    for source in sorted((ROOT / 'agents').glob('*.toml')):
+        definition = tomllib.loads(source.read_text(encoding='utf-8'))
+        aliases.append('cer_auto_' + definition['name'] + ': ' + definition['description'])
+    text['auto_extra_discovery_text'] = '\n'.join(aliases)
     def description(s):
         return s.split('description: ', 1)[1].split('\n', 1)[0]
     text['v021_core'] = text_at(V021_TREE, SKILL)
@@ -85,12 +93,15 @@ def token_measurements() -> dict:
             mappings[model] = 'UNKNOWN_IN_PINNED_TIKTOKEN'
     return {'tiktoken_version': importlib.metadata.version('tiktoken'), 'model_mappings': mappings,
             'counts': measurements,
-            'budget_pass': all(max(v['current_core']['tokens'], v['adaptive_core']['tokens']) <= v['v021_core']['tokens']
-                               and max(v['current_full']['tokens'], v['adaptive_full']['tokens']) <= v['v021_full']['tokens']
-                               and all(max(v['current_full']['tokens'], v['adaptive_full']['tokens']) + v[f'current_{role}_instructions']['tokens']
+            'budget_pass': all(max(v['current_core']['tokens'], v['adaptive_core']['tokens'], v['auto_core']['tokens']) <= v['v021_core']['tokens']
+                               and max(v['current_full']['tokens'], v['adaptive_full']['tokens'], v['auto_full']['tokens']) <= v['v021_full']['tokens']
+                               and all(max(v['current_full']['tokens'], v['adaptive_full']['tokens'], v['auto_full']['tokens']) + v[f'current_{role}_instructions']['tokens']
                                        <= v['v021_full']['tokens'] + v[f'v021_{role}_instructions']['tokens']
                                        for role in ('luna-worker', 'terra-executor', 'sol-engineer', 'astra-architect'))
                                for v in measurements.values()),
+            'auto_with_discovery_budget_pass': all(
+                v['auto_full']['tokens'] + v['auto_extra_discovery_text']['tokens'] <= v['v021_full']['tokens']
+                for v in measurements.values()),
             'scope': 'Exact raw-text counts for named reference encodings; NOT live model billing or full host context.',
             'live_total_tokens': None, 'live_expensive_model_tokens': None, 'live_task_elapsed_seconds': None}
 
@@ -244,6 +255,8 @@ def main() -> int:
     if any(m['outcome'] != 'KILLED' for m in report['effort_mutations']):
         return 1
     if report['text_token_measurements']['budget_pass'] is False:
+        return 1
+    if report['text_token_measurements'].get('auto_with_discovery_budget_pass') is False:
         return 1
     return 0
 

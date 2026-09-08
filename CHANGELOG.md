@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0] - 2026-09-08
+
+- Ordinary install/update now uses automatic native capability adaptation, without routine mode flags.
+- Generate four unpinned aliases alongside four fixed roles; use one exact supported binding per child, not extra workers.
+- Retain safe quality/effort gates, opt-outs, attempt history and unavailable-role memory. No hidden probes, config rewriting or silent effort remapping.
+- Migrate legacy manifests with a printed notice/backup; preserve subsequent explicit overrides and local modification protection.
+- Extend generation, migration, collision, restore, capability and mutation coverage; measure alias metadata separately.
+- Native execution and whole-task quality/cost remain user acceptance, not offline guarantees.
+
 ## [0.4.0] - 2026-09-08
 
 - Added explicit fixed/adaptive installation profiles, generated from the same four

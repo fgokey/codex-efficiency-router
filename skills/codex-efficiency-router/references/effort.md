@@ -1,9 +1,11 @@
-# Effort admission
+# Effort and bindings
 
-Installation marker is package policy, not a Codex config key. Fixed files pin model/effort. Adaptive files pin only model; explicitly pass BOTH through actual spawn fields. Omission inherits/defaults, not intelligent selection. File values override requests. A pinned adaptive role or absent effort field blocks that route; only the user-run installer changes modes.
+Auto supplies fixed roles and unpinned `cer_auto_<role>` aliases; choose ONE, not two children. Explicit fixed/adaptive markers override this policy. File pins win; omission inherits/defaults, never certifies intelligent selection.
 
-Medium is ordinary implementation; high is deeper reasoning in a suitable model, not an environment repair. Auto-Astra stays high. No universal Sol/high vs Astra/medium ranking or numeric token cap. Auto-low is opt-in, Luna-only: mechanical, settled, low risk/reversibility/coupling, strong checks, no novelty/conflict or failed attempts. Explicit low still needs that safe shape; Astra medium is explicit-only when high judgment is unnecessary. xhigh/max require explicit user choice and actual support; no restriction bypass.
+Inspect actual fields, loaded roles and selected-pair support once; reuse until invalidated. Prefer a matching unpinned alias with explicit native effort. Otherwise require the original fixed role to match BOTH values exactly. Never ignore pins, downgrade high to medium, choose a different model for compatibility, rewrite files or ask for routine mode switching. Insufficient routes retain an adequate parent or BLOCKED.
 
-Check selected pair against current model catalog, role pins and tool fields once; recheck only if invalidated. Record recommended/requested/observed separately. Host metadata, never self-identification, verifies settings. Missing metadata is UNKNOWN; contradiction is MISMATCH. Both disable auto-low for this task; reassess safety without replaying valid completed work just to fix identity.
+Remember confirmed failed bindings for this task. Reconcile worker/effect state before fallback; timeout is not safe replay. Only exposed idle-turn overrides may reuse a child; no hot-switch through steer/input. Every binding shares ownership, acceptance and remaining attempts.
 
-Reconfigure only at meaningful safe boundaries. Native idle next-turn override may reuse context if exposed; otherwise a new leaf needs justified handoff. Never hot-switch via steer/input. Keep attempts and failed methods across both paths. No-escalation applies to BOTH axes even when one decreases. Model-only locks are separate; unknown current settings cannot prove an increase is allowed.
+Auto-low needs opt-in and mechanical Luna work: settled, low consequence/reversibility/coupling, strong checks, no novelty/conflict/prior failure. Explicit low obeys that floor. Astra medium is explicit-only when high judgment is unnecessary. xhigh/max require intent and support. No-escalation limits both axes; unknown current settings cannot certify compliance.
+
+Distinguish recommendation, submitted binding/pair and host-observed identity, not self-description. UNKNOWN/MISMATCH suspend auto-low for the task; don't replay valid work for identity proof. Effort is not a token cap or quality guarantee.

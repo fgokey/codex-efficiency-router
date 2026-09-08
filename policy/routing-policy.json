@@ -1,5 +1,5 @@
 {
-  "schema_version": 6,
+  "schema_version": 7,
   "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
@@ -76,7 +76,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.4.0",
+  "version": "0.5.0",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 6500,
@@ -103,9 +103,10 @@
     "checkpoint": "one task-scoped record only when needed and permitted"
   },
   "effort_policy": {
-    "installation_default": "fixed",
-    "upgrade_default": "preserve_installed_profile",
+    "installation_default": "auto",
+    "upgrade_default": "migrate_legacy_to_auto_preserve_profile_schema_2_overrides",
     "modes": [
+      "auto",
       "fixed",
       "adaptive"
     ],
@@ -126,5 +127,14 @@
     ],
     "role_file_precedence": true,
     "hot_switch": false
+  },
+  "automatic_bindings": {
+    "default_install": "auto",
+    "generation": "four fixed roles and four unpinned cer_auto aliases from one canonical set",
+    "selection": "native effort plus valid unpinned alias first; otherwise exact fixed pair; otherwise sufficient parent or blocked",
+    "legacy_upgrade": "ordinary update backs up and migrates pre-profile_schema=2 installs; later explicit overrides preserved",
+    "no_probe_calls": true,
+    "no_runtime_config_writes": true,
+    "automatic_low_default": false
   }
 }

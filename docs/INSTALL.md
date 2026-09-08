@@ -1,10 +1,10 @@
 # Install, update, uninstall and restore
 
-Copyable commands for Windows and macOS/Linux are in [README](../README.md#install) and [中文 README](../README.zh-CN.md#安装). Use Python 3.11+, no third-party Python packages. Installation never calls an LLM or edits `config.toml`.
+Copyable commands for Windows and macOS/Linux are in [README](../README.md#install-and-update) and [中文 README](../README.zh-CN.md#安装与更新). Use Python 3.11+, no third-party Python packages. Installation never calls an LLM or edits `config.toml`.
 
 ## What is installed
 
-The complete Skill directory, including four progressive references and UI metadata, plus the four named role TOMLs. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
+The complete Skill directory, including four progressive references and UI metadata, plus four canonical roles and, in default auto, four generated native aliases. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
 
 Select either user scope or one explicit existing project root. Keep the repository clone to update/uninstall. `$CODEX_HOME` changes user agent and backup locations, not `~/.agents/skills`. Use the same scope, project and environment for subsequent operations. A project-root flag without project scope is rejected.
 
@@ -30,16 +30,12 @@ Uninstall reads the manifest, checks modifications, backs up affected bytes, rem
 - Restart/reload Codex if roles/Skills are stale. Uninstalling cannot erase text already loaded into an existing conversation. Duplicate user/project installs can leave another copy visible.
 - Manually merged optional config defaults are not owned by the installer and are not automatically undone. Remove those specific user-added keys manually only when appropriate; never replace the entire config from an old backup.
 
-## v0.2.1 command contract
+## Automatic default and advanced compatibility
 
-There are four role files, not five. Both PowerShell wrappers forward Python CLI flags unchanged: use `--scope`, `--project-root`, `--dry-run`, and `--force` as documented, not PowerShell-style aliases. Direct Python remains the canonical cross-platform entry point. `--help` lists accepted parameters.
+Ordinary `install.py` needs no mode flag. Auto installs four pinned roles and four generated unpinned aliases; parent selection uses only one per child. Pre-v0.5 manifests migrate to auto with a printed notice; backups preserve the old mode and user edits still stop replacement. Old manifests cannot identify deliberate mode preference. A v0.5+ explicit override is persisted with profile schema 2 and respected on updates.
 
-Default uninstall removes owned files and preserves backups; it does not automatically restore an older installation. There is no `--no-restore` option. To restore, use `scripts/install.py --restore BACKUP` with the original scope and target. Explicit restore is already supported; this release does not change its semantics. Read [acceptance](ACCEPTANCE.md) after updating.
+Advanced compatibility only (not required for normal use): `--mode fixed`, `--mode adaptive` or `--mode auto`. Existing fixed/adaptive automation remains supported. `--allow-low` is optional and separately gated; `--no-allow-low` disables it. Fixed cannot enable low. These options do not inspect credentials or prove native host capability.
 
-## v0.4 profiles
+Explicit restore retains the original mode/bytes, including legacy manifests; it does not migrate them. Auto uninstall removes all eight owned bindings, not unrelated aliases or user files. Switching an advanced override removes obsolete owned aliases safely. A collision on any generated filename blocks before writes, even with force.
 
-`--mode fixed|adaptive` explicitly changes the installation profile; omitted mode preserves the installed value, or defaults to fixed for a new/legacy installation. Source roles are fixed; the installer derives the adaptive version by removing only effort pins. `--allow-low` and `--no-allow-low` are mutually exclusive; omitted preserves the setting. Fixed mode cannot enable automatic low. Mode/low settings are in the owned manifest and rendered Skill, never in global Codex config.
-
-Use `python3 scripts/install.py --scope user --mode adaptive --dry-run` to preview, then remove `--dry-run` to apply. Role model and instructions/permissions remain unchanged, four role files only. Restart Codex; do not use an old loaded thread as proof of the new mode. Unknown hosts are not automatically detected or contacted; adaptive dispatch needs native explicit-effort support.
-
-Uninstall has no mode flag; it uses ownership from the actual installation. Restore restores both profile and files; it cannot be combined with `--mode`, low switches or legacy adoption. Backups and local customization protection apply to profile transitions. An interrupted lifecycle operation still needs inspection and guarded restore, not a live automatic fallback. [Full profile design](ADAPTIVE-EFFORT.md).
+Python CLI flags are canonical. PowerShell wrappers forward `--scope`, `--dry-run`, etc., not PowerShell-style aliases. There is no `--no-restore`; restoration is `install.py --restore`. Actual dynamic-vs-compatibility selection needs no configuration change. See [acceptance](ACCEPTANCE.md).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or restore this Skill and four roles; never edit config.toml."""
+"""Install or restore this Skill and native role bindings; never edit config.toml."""
 from __future__ import annotations
 
 import argparse
@@ -29,11 +29,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--force", action="store_true", help="back up and replace locally edited OWNED files")
     parser.add_argument("--adopt-v01", action="store_true", help="adopt only exact known legacy file contents")
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
-    parser.add_argument("--mode", choices=("fixed", "adaptive"), default=None,
-                        help="explicit profile switch; omitted preserves installed mode (new install: fixed)")
+    parser.add_argument("--mode", choices=("auto", "fixed", "adaptive"), default=None,
+                        help="advanced override; ordinary install/update uses auto (explicit v0.5+ overrides are preserved)")
     low = parser.add_mutually_exclusive_group()
     low.add_argument("--allow-low", dest="allow_low", action="store_true", default=None,
-                     help="opt in to tightly gated automatic low in adaptive mode")
+                     help="opt in to tightly gated automatic low (off by default)")
     low.add_argument("--no-allow-low", dest="allow_low", action="store_false",
                      help="disable automatic low; omitted preserves installed setting")
     return parser

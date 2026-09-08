@@ -31,3 +31,9 @@ and retention of exhausted repair budgets. The original routing and quality
 mutations remain. Corpus `effort_cases.json` adds 10 user-run prompts; none is
 live-scored by CI. Both fixed and generated adaptive instruction paths are counted,
 without claiming parent/child runtime usage or exact model tokenization.
+
+## v0.5 automatic binding coverage
+
+The ordinary installation is auto; runtime tests supply observed capabilities without running a model. Added cases cover native alias preference, missing effort fields, exact fixed compatibility, bad pins/models, task-local failed bindings and uncertain active writers. Migration tests cover old fixed/adaptive installs, alias collisions, rollback, and exact backup restore. Nine added effort mutations test the new admission gates; assertions, not crashes, must detect them.
+
+The tokenizer audit also counts auto core/full text and a declared rendering of the four extra alias name/description strings. Extra discovery text is not free. The auto-full-plus-extra-discovery comparison is separately gated against the historical full reference baseline. This is an illustrative text rendering, not a host metadata schema or whole-task billing. All existing core/full/role gates remain unchanged.

@@ -18,7 +18,12 @@ EXPECTED = {
     "sol-engineer.toml": ("sol_engineer", "gpt-5.6-sol", "medium"),
     "astra-architect.toml": ("astra_architect", "gpt-6-astra", "high"),
 }
-AGENT_FILES = list(EXPECTED)
+AGENT_FILES = list(EXPECTED)  # Canonical source remains four role definitions.
+AUTO_EXPECTED = {
+    "cer-auto-" + filename: ("cer_auto_" + role, model, effort)
+    for filename, (role, model, effort) in EXPECTED.items()
+}
+MANAGED_AGENT_FILES = AGENT_FILES + list(AUTO_EXPECTED)
 
 
 def resolve_targets(scope: str, project_root: Path | None) -> tuple[Path, Path, Path]:

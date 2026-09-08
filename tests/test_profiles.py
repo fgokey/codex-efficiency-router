@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 import manage
 import doctor
-from package import EXPECTED, MANIFEST, PROJECT, resolve_targets
+from package import EXPECTED, AUTO_EXPECTED, MANIFEST, PROJECT, resolve_targets
 from profiles import Profile, render_payload, select_profile, from_manifest
 from catalog import parse_catalog
 
@@ -54,11 +54,12 @@ class ProfileLifecycleTests(unittest.TestCase):
                 self.assertNotIn('model_reasoning_effort', config)
             else:
                 self.assertEqual(config['model_reasoning_effort'], effort)
-        self.assertEqual(set(p.name for p in self.agents.glob('*.toml')), set(EXPECTED))
+        self.assertEqual(set(p.name for p in self.agents.glob('*.toml')),
+                         set(EXPECTED) | (set(AUTO_EXPECTED) if profile.mode == 'auto' else set()))
         self.assertIn(profile.marker, (self.skill / 'SKILL.md').read_text())
 
-    def test_new_default_fixed(self):
-        self.install(); self.assert_installed(Profile())
+    def test_new_default_auto(self):
+        self.install(); self.assert_installed(Profile('auto'))
 
     def test_explicit_adaptive_renders_four_unpinned_roles(self):
         self.install(mode='adaptive'); self.assert_installed(Profile('adaptive'))
@@ -93,7 +94,7 @@ class ProfileLifecycleTests(unittest.TestCase):
         self.assert_installed(Profile('adaptive'))
 
     def test_low_invalid_in_fixed_even_with_force(self):
-        self.install(); before = self.files()
+        self.install(mode='fixed'); before = self.files()
         with self.assertRaises(ValueError): self.install(allow_low=True, force=True)
         self.assertEqual(self.files(), before)
 
@@ -132,7 +133,7 @@ class ProfileLifecycleTests(unittest.TestCase):
             return original(a, b)
         with patch.object(manage.os, 'replace', side_effect=fail_once), self.assertRaises(OSError):
             self.install(mode='adaptive')
-        self.assertEqual(self.files(), before); self.assert_installed(Profile())
+        self.assertEqual(self.files(), before); self.assert_installed(Profile('auto'))
 
     def test_adaptive_uninstall_and_explicit_restore(self):
         self.install(mode='adaptive', allow_low=True)
@@ -160,11 +161,11 @@ class ProfileLifecycleTests(unittest.TestCase):
             with self.assertRaises(ValueError): manage.uninstall('project', self.project, force=True)
             self.assertEqual(self.files(), before)
 
-    def test_legacy_manifest_without_profile_upgrades_to_fixed(self):
+    def test_legacy_manifest_without_profile_upgrades_to_auto(self):
         self.install()
-        data = self.manifests(); del data['mode']; del data['allow_low']; data['version'] = '0.3.0'
+        data = self.manifests(); del data['mode']; del data['allow_low']; del data['profile_schema']; data['version'] = '0.3.0'
         (self.skill / MANIFEST).write_text(json.dumps(data))
-        self.install(); self.assert_installed(Profile())
+        self.install(); self.assert_installed(Profile('auto'))
 
     def test_user_scope_honors_codex_home_without_touching_config(self):
         home = Path(self.tmp.name).resolve() / 'home'; home.mkdir()

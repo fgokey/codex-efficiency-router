@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is still one Codex Skill, four native role presets and offline maintenance tools. No Claude/Roo/Cline runtime, foreign configuration, proxy, model classifier, mandatory reviewer agent or online calibration is added. Model/effort presets and parent selection are unchanged. The installer remains offline and does not edit global config. Source instruction budgets remain 6,500 core / 12,000 full-reference UTF-8 bytes, not platform limits.
+This is still one Codex Skill, four role responsibilities (auto supplies two native bindings each) and offline maintenance tools. No Claude/Roo/Cline runtime, foreign configuration, proxy, model classifier, mandatory reviewer agent or online calibration is added. Model/effort presets and parent selection are unchanged. The installer remains offline and does not edit global config. Source instruction budgets remain 6,500 core / 12,000 full-reference UTF-8 bytes, not platform limits.
 
 ## Contract before execution
 

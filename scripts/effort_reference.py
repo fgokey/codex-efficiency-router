@@ -68,6 +68,7 @@ class Context:
     automatic_low_suspended: bool = False  # Sticky for this task after unknown/mismatched identity.
     diagnosis_only: bool = False
     repair_extension_reason: str | None = None
+    unavailable_roles: frozenset[str] = frozenset()  # Task-local confirmed failures; never probe in a loop.
 
     def validate(self) -> None:
         for name in ("current_sufficient", "host_supports_routing", "host_can_set_effort",
@@ -86,6 +87,9 @@ class Context:
             raise ValueError("invalid observed configuration status")
         if not isinstance(self.roles, Mapping) or not isinstance(self.catalog, Mapping):
             raise ValueError("roles and catalog must be mappings")
+        if not isinstance(self.unavailable_roles, frozenset) or any(
+                not isinstance(name, str) or not name for name in self.unavailable_roles):
+            raise ValueError("unavailable_roles must contain confirmed role names")
         for name, binding in self.roles.items():
             if not isinstance(name, str) or not isinstance(binding, RoleBinding):
                 raise ValueError("invalid role binding")
@@ -101,6 +105,8 @@ class Decision:
     requested: Configuration | None
     action: Literal["local", "delegate", "blocked", "prerequisite", "defer"]
     reason: str
+    requested_role: str | None = None
+    binding_kind: Literal["adaptive", "fixed"] | None = None
 
 
 def low_eligible(s: TaskSignals) -> bool:
@@ -130,7 +136,7 @@ def recommend(s: TaskSignals, *, deep_reasoning: bool = False,
     return Configuration(lane, effort)
 
 
-def plan(s: TaskSignals, context: Context, profile: Profile = Profile(), *,
+def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *,
          deep_reasoning: bool = False, explicit_effort: str | None = None) -> Decision:
     """Return an admission decision. Never imply that a model has actually run.
 
@@ -147,8 +153,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile(), *,
         raise ValueError("explicit effort is not supported by this policy")
     rec = recommend(s, deep_reasoning=deep_reasoning, allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH"))
 
-    def result(action, reason, requested=None):
-        return Decision(rec, requested, action, reason)
+    def result(action, reason, requested=None, requested_role=None, binding_kind=None):
+        return Decision(rec, requested, action, reason, requested_role, binding_kind)
 
     if rec is None:
         return result("prerequisite", "repair prerequisites or run a safe discriminating check")
@@ -196,8 +202,26 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile(), *,
 
     if not context.host_supports_routing:
         return unavailable("native dispatch unavailable")
+    if profile.mode == "auto":
+        # Decide from already exposed capabilities; neither role selection runs a probe.
+        alias = "cer_auto_" + candidate.role
+        binding = context.roles.get(alias)
+        if (context.host_can_set_effort and alias not in context.unavailable_roles
+                and binding is not None and binding.model == candidate.model and binding.effort is None):
+            role, kind = alias, "adaptive"
+        else:
+            binding = context.roles.get(candidate.role)
+            if (candidate.role in context.unavailable_roles or binding is None
+                    or binding.model != candidate.model or binding.effort != candidate.effort):
+                return unavailable("no sufficient native binding for the selected pair; no mode switch or silent remapping")
+            role, kind = candidate.role, "fixed"
+        supported = context.catalog.get(candidate.model, ())
+        if candidate.effort not in supported:
+            return unavailable("catalog does not confirm selected pair")
+        return result("delegate", "automatic native binding selection; preserve checks and attempts",
+                      candidate, role, kind)
     binding = context.roles.get(candidate.role)
-    if binding is None or binding.model != candidate.model:
+    if candidate.role in context.unavailable_roles or binding is None or binding.model != candidate.model:
         return unavailable("role unavailable or role model conflicts with selection")
     if profile.mode == "adaptive":
         if not context.host_can_set_effort:
@@ -209,7 +233,7 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile(), *,
             return unavailable("fixed role effort differs from requested effort; no silent override")
     if candidate.effort not in context.catalog.get(candidate.model, ()):
         return unavailable("catalog does not confirm requested model/effort; no remapping")
-    return result("delegate", "explicit supported configuration at a safe boundary; retain attempts", candidate)
+    return result("delegate", "explicit supported configuration at a safe boundary; retain attempts", candidate, candidate.role, profile.mode)
 
 
 def check_observation(requested: Configuration, model: str | None,

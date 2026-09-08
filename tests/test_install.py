@@ -15,6 +15,7 @@ import manage
 import install as installer
 from package import MANIFEST, PROJECT, resolve_targets
 from doctor import validate_tree
+from profiles import Profile
 
 
 class InstallerTests(unittest.TestCase):
@@ -60,7 +61,7 @@ class InstallerTests(unittest.TestCase):
         config.write_bytes(b'# preserve exactly\r\nmodel = "custom"\r\n')
         with patch.object(Path, "home", return_value=home), patch.dict(os.environ, {"CODEX_HOME": str(codex)}):
             self.assertEqual(installer.install("user", None, False), 0)
-            self.assertEqual(validate_tree(home / ".agents/skills" / PROJECT / "SKILL.md", codex / "agents"), [])
+            self.assertEqual(validate_tree(home / ".agents/skills" / PROJECT / "SKILL.md", codex / "agents", Profile("auto")), [])
         self.assertEqual(config.read_bytes(), b'# preserve exactly\r\nmodel = "custom"\r\n')
         self.assertEqual(unrelated.read_text(), 'name = "existing"\n')
 
@@ -146,7 +147,7 @@ class InstallerTests(unittest.TestCase):
         self.legacy()
         self.install(adopt_v01=True)
         self.assertTrue((self.skill / MANIFEST).is_file())
-        self.assertEqual(validate_tree(self.skill / "SKILL.md", self.agents), [])
+        self.assertEqual(validate_tree(self.skill / "SKILL.md", self.agents, Profile("auto")), [])
         manage.uninstall("project", self.project)
         self.assertFalse(self.skill.exists())
 

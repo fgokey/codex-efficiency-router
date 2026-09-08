@@ -16,7 +16,7 @@ try:
 except ImportError as exc:
     raise SystemExit("Python 3.11+ is required") from exc
 
-from package import EXPECTED, INSTRUCTION_BUDGETS, MANIFEST, PROJECT, resolve_targets
+from package import EXPECTED, AUTO_EXPECTED, INSTRUCTION_BUDGETS, MANIFEST, PROJECT, resolve_targets
 from profiles import Profile, MARKER
 from catalog import parse_catalog
 
@@ -33,14 +33,14 @@ def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile 
     for key, value in zip(("name", "model"), expected[:2]):
         if data.get(key) != value:
             errors.append(f"{path}: shipped preset expects {key}={value!r}")
-    if profile.mode == "fixed" and data.get("model_reasoning_effort") != expected[2]:
+    if profile.mode in ("fixed", "auto") and data.get("model_reasoning_effort") != expected[2]:
         errors.append(f"{path}: fixed preset expects model_reasoning_effort={expected[2]!r}")
     if profile.mode == "adaptive" and "model_reasoning_effort" in data:
         errors.append(f"{path}: adaptive role must not pin model_reasoning_effort")
     for key in ("description", "developer_instructions"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             errors.append(f"{path}: nonempty {key} is required")
-    if expected[0] == "astra_architect" and data.get("sandbox_mode") != "read-only":
+    if expected[0] in ("astra_architect", "cer_auto_astra_architect") and data.get("sandbox_mode") != "read-only":
         errors.append(f"{path}: architect must remain read-only")
     return errors
 
@@ -101,6 +101,9 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
         errors.append("missing UI/invocation metadata")
     for filename, expected in EXPECTED.items():
         errors.extend(validate_agent(agent_dir / filename, expected, profile))
+    if profile.mode == "auto":
+        for filename, expected in AUTO_EXPECTED.items():
+            errors.extend(validate_agent(agent_dir / filename, expected, Profile("adaptive")))
     return errors
 
 
