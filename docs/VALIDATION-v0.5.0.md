@@ -47,3 +47,41 @@ Actual model/effort, runtime binding selection, task quality, full usage and lat
 remain user acceptance. No model inference, Codex login, hidden sessions, paid probes
 or live A/B runs are invoked by installation or CI. [Design](ADAPTIVE-EFFORT.md) ·
 [Acceptance](ACCEPTANCE.md) · [Offline audit](../evaluation/README.md).
+
+## Executed remote validation and measurements
+
+Code commit: `1271d5b8fde9ce073035174cdd751b0885cc32d0`, tree
+`37267aa1ca8a100899a129bfe75b6a9531d4a427`. The [exact CI run](https://github.com/fgokey/codex-efficiency-router/actions/runs/34230042864)
+completed successfully in all seven jobs. Its audit confirms 213 tests with zero
+failures/errors/skips, 8/8 retained boundaries, and 51/51 selected mutations detected
+(12 routing, 12 quality, 27 effort/binding). The report's working tree was clean;
+all reported source SHA-256 values matched the locally tested payload. Local and
+uploaded Git trees were identical before publication.
+
+[Raw report and logs](https://github.com/fgokey/codex-efficiency-router/actions/runs/34230042864/artifacts/10057376800)
+are retained for 14 days. Artifact ZIP SHA-256:
+`204d5b8c92621ba90a0dd60cc87f266402e72fa15faf254770e6483fb2a30b11`.
+
+Pinned `tiktoken==0.11.0`, raw instruction text only:
+
+| Measured text | o200k_base | cl100k_base |
+| --- | ---: | ---: |
+| v0.5 auto core | 1,085 | 1,091 |
+| v0.5 auto core + all references | 1,953 | 1,962 |
+| Additional four alias name/description strings | 67 | 67 |
+| Auto full text plus that additional discovery rendering | 2,020 | 2,029 |
+| Immutable v0.2.1 full-text budget baseline | 2,074 | 2,093 |
+
+Both the pre-existing instruction gates and the additional discovery-inclusive gate
+passed. Fixed/adaptive low-off variants produced the same token totals as auto
+under these two encodings; their byte counts differ by the installation marker.
+Auto core is 5,565 UTF-8 bytes and auto full text is 10,254 bytes. Byte/token limits
+were not raised to accommodate compatibility bindings.
+
+The 67-token discovery rendering is an explicit measurement format, not Codex's
+actual role-metadata serialization. Do not infer zero role-discovery overhead,
+exact Astra billing, whole-task savings or fewer model retries. All four model
+encoding lookups remain UNKNOWN in the pinned tokenizer. Parent context, tool
+framing/results, generated reasoning/output and actual task latency are unmeasured.
+These results refer to the exact code commit above; any documentation-only follow-up
+commit must be checked against its own CI rather than inheriting success by claim.
