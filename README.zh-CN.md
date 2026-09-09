@@ -7,16 +7,41 @@
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
 
+## Windows 解释器预检与验收边界
+
+下方统一使用 `cer.ps1`；install/uninstall 包装脚本也复用它。入口实际检查 Python
+版本及 `tomllib`，尝试 PATH 中可用解释器和 `py -0p` 列出的已安装版本，**在调用
+安装器前拒绝 3.10**。`python` 或 `py -3` 不代表一定满足 3.11+。不下载运行时，
+不改 PATH，不修改全局配置。
+
+已有可用解释器（包括你确认可用的应用内置 Python）时，在当前 PowerShell 会话
+显式指定它的**真实完整路径**：
+
+```powershell
+$env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
+.\cer.ps1 doctor --scope user --json
+```
+
+显式路径无效就停止，不静默换解释器。选中的路径和版本输出到 stderr，JSON stdout
+不混入提示。应用更新可能移动内置 Python；独立 Guard 会绑定安装时解释器绝对路径，
+路径变化后要重新检查/更新 Guard 并审查定义。Portable Plugin 的解释器发现另行验收，
+本入口不证明其生效。
+
+**安装 Skill 仍不等于启用 Guard。** 未显式安装并现场验证时，仍是 policy-only；
+CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
+`enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
+见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
 ## v0.7.0-rc.2：精简指令
 
 本候选版压缩核心 Skill、按需 references 和独立角色指令，不改变路由与写权限。
 引用文件仅在对应条件触发且尚未加载、失效或压缩后丢失时读取，避免逐工具重读。
-详见[体积与验证记录](docs/VALIDATION-v0.7.0-rc.2.md)。保留 fixed/low 设置，安装命令不变。
+详见[体积与验证记录](docs/VALIDATION-v0.7.0-rc.2.md)。保留 fixed/low 设置和底层安装参数；Windows 入口见上方预检说明。
 
 
 ## v0.7.0-rc.1：可验证状态，不冒充运行时已生效
 
-这是基于 v0.6.0 的**未发布候选版本**，不是已完成全部发布门槛的正式版。
+源码仍是基于 v0.6.0 的**候选版本，不是稳定正式版**；尚未完成全部发布门槛。
 保留已安装的 fixed 模式与 automatic low 关闭状态；不增加 Write Lease、
 常驻进程或强制并发状态账本。Astra 遇到复杂问题仍亲自诊断和验收，但不直接写入。
 
@@ -30,8 +55,8 @@ Hosted tools、已有执行会话的 `write_stdin` 仍不在完整覆盖范围�
 信任与 Windows 原生执行仍需实装验收。现有用户优先沿用 Skill 安装器加显式独立
 Guard 的路径，不要同时安装两套重复 Hook。
 
-本候选 ZIP 尚未推送到仓库，**不要用 `git pull` 代替此次候选包更新**。
-解压审查后按[候选版升级说明](docs/UPGRADE-v0.7.0-rc.1.md)执行。
+Git 工作区可按下方命令快进更新，并记录实际 commit。下载 ZIP 的用户解压审查后，
+按[候选版升级说明](docs/UPGRADE-v0.7.0-rc.1.md)执行。
 详见 [Canary](docs/CANARY.md)、[对比数据格式](docs/BENCHMARKING-v0.7.md)、
 [验证状态](docs/VALIDATION-v0.7.0-rc.1.md)和[优化计划评审](docs/REVIEW-v0.7.0.md)。
 
@@ -73,9 +98,9 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 ```powershell
 git clone https://github.com/fgokey/codex-efficiency-router.git
 cd codex-efficiency-router
-py -3 scripts/install.py --scope user --dry-run
-py -3 scripts/install.py --scope user
-py -3 scripts/doctor.py --scope user
+.\cer.ps1 install --scope user --dry-run
+.\cer.ps1 install --scope user
+.\cer.ps1 doctor --scope user
 ```
 
 ### macOS / Linux
@@ -92,24 +117,24 @@ python3 scripts/doctor.py --scope user
 
 ```powershell
 git pull --ff-only
-py -3 scripts/install.py --scope user --dry-run
-py -3 scripts/install.py --scope user
-py -3 scripts/doctor.py --scope user
+.\cer.ps1 install --scope user --dry-run
+.\cer.ps1 install --scope user
+.\cer.ps1 doctor --scope user
 ```
 
-macOS/Linux 使用 `python3`。**不再需要 `--mode adaptive`。** v0.4 及更早带清单安装在普通更新时迁移到 auto，并打印迁移提示、备份原文件、保留 low 设置。旧清单没有选择来源，无法区分旧默认和用户当时的意图；确需保持旧模式的高级用户可显式指定旧参数，见[迁移与兼容](docs/INSTALL.md)。v0.5+ 明确设定的高级覆盖会在以后普通更新中保留。原始 v0.1 无清单安装仍需安全认领 `--adopt-v01`，不凭文件名覆盖。
+macOS/Linux 将 `./cer.ps1 <action>` 换为 `python3 -B scripts/<action>.py`，并先确认版本为 3.11+。**不再需要 `--mode adaptive`。** v0.4 及更早带清单安装在普通更新时迁移到 auto，并打印迁移提示、备份原文件、保留 low 设置。旧清单没有选择来源，无法区分旧默认和用户当时的意图；确需保持旧模式的高级用户可显式指定旧参数，见[迁移与兼容](docs/INSTALL.md)。v0.5+ 明确设定的高级覆盖会在以后普通更新中保留。原始 v0.1 无清单安装仍需安全认领 `--adopt-v01`，不凭文件名覆盖。
 
 发现定制文件或同名冲突先核对，不直接 `--force`。`doctor: STATIC PASS` 仅表示静态安装一致，不是模型运行证据。更新后重新加载 Codex，新开任务可避免旧上下文混入。只复制 SKILL.md 不会部署角色，完整安装使用本仓库脚本。
 
 ### 项目级安装
 
 ```powershell
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
-py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
+.\cer.ps1 install --scope project --project-root "C:/Work/my-project" --dry-run
+.\cer.ps1 install --scope project --project-root "C:/Work/my-project"
+.\cer.ps1 doctor --scope project --project-root "C:/Work/my-project"
 ```
 
-macOS/Linux 换为 `python3` 和实际绝对路径。用户级 Skill 位于 `~/.agents/skills/codex-efficiency-router`，角色位于 `$CODEX_HOME/agents`（默认 `~/.codex/agents`）；项目级分别为 `.agents/skills`、`.codex/agents`。具体备份路径由安装器打印。
+macOS/Linux 使用 `python3 -B scripts/<action>.py` 和实际绝对路径。用户级 Skill 位于 `~/.agents/skills/codex-efficiency-router`，角色位于 `$CODEX_HOME/agents`（默认 `~/.codex/agents`）；项目级分别为 `.agents/skills`、`.codex/agents`。具体备份路径由安装器打印。
 
 ## 使用
 
@@ -125,8 +150,8 @@ $codex-efficiency-router
 使用与安装相同的 scope、项目路径和 CODEX_HOME。
 
 ```powershell
-py -3 scripts/uninstall.py --scope user --dry-run
-py -3 scripts/uninstall.py --scope user
+.\cer.ps1 uninstall --scope user --dry-run
+.\cer.ps1 uninstall --scope user
 ```
 
 ```sh
@@ -137,8 +162,8 @@ python3 scripts/uninstall.py --scope user
 项目级使用 `--scope project --project-root ...`。只删除清单拥有的角色及 Skill，保留未跟踪文件、现有配置和备份；用户修改默认阻止卸载。默认不会恢复旧版，没有 `--no-restore` 参数。需要恢复时用真实备份目录：
 
 ```powershell
-py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
-py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH"
+.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
+.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
 恢复按备份原样还原，不顺便升级到 auto；卸载后重新加载 Codex。不要公开包含私人定制的备份。完整[安装与安全恢复说明](docs/INSTALL.md)。

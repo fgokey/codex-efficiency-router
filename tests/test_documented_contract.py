@@ -22,7 +22,9 @@ class DocumentedContractTests(unittest.TestCase):
         for filename in ('README.md', 'README.zh-CN.md', 'docs/INSTALL.md', 'docs/ACCEPTANCE.md'):
             text = (ROOT / filename).read_text(encoding='utf-8')
             for block in re.findall(r'```(?:sh|bash|powershell)\n(.*?)```', text, re.S):
-                for script, rest in re.findall(r'scripts[/\\](install|uninstall|doctor)\.py([^\n]*)', block):
+                commands = re.findall(r'scripts[/\\](install|uninstall|doctor)\.py([^\n]*)', block)
+                commands += re.findall(r'\.\\cer\.ps1 (install|uninstall|doctor)([^\n]*)', block)
+                for script, rest in commands:
                     accepted = modules[script].build_parser()._option_string_actions
                     for option in re.findall(r'--[a-z][a-z0-9-]*', rest):
                         self.assertIn(option, accepted, f'{filename}: {script}.py {option}')

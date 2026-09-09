@@ -19,10 +19,14 @@ PRESENT. First reconcile/finish active writer sessions safely; do not interrupt 
 Review the current Hook in `/hooks` in the actual host. Inspect the effective model
 identity, not the model requested in prose. No model probing occurs at install time.
 
+Windows commands use the version-checked `cer.ps1` launcher. Set `CER_PYTHON` to a
+verified full Python 3.11+ executable path when needed; this does not establish Hook trust.
+On macOS/Linux use the matching `python3 -B scripts/write_guard.py` or `scripts/canary.py`.
+
 ```powershell
 $Project = "C:\Work\your-project"
-python -B scripts/write_guard.py doctor --scope project --project-root $Project --json
-python -B scripts/canary.py prepare --project-root $Project --scope project
+.\cer.ps1 guard doctor --scope project --project-root $Project --json
+.\cer.ps1 canary prepare --project-root $Project --scope project
 ```
 
 The command prints a newly owned `.cer-canary-<nonce>` directory inside that project.
@@ -79,7 +83,7 @@ Set `$Output` to a new file **outside** `$Run`, with an existing parent director
 
 ```powershell
 $Output = Join-Path $Project "cer-canary-result.json"
-python -B scripts/canary.py verify --run-dir $Run --output $Output
+.\cer.ps1 canary verify --run-dir $Run --output $Output
 ```
 
 Choose another new output name for repeated tests. The verifier checks observed native
@@ -91,14 +95,14 @@ Interrupted cleanup cannot be counted as complete. A verify failure before repor
 leaves the fixture intact. To explicitly clean up after inspection:
 
 ```powershell
-python -B scripts/canary.py cleanup --run-dir $Run
+.\cer.ps1 canary cleanup --run-dir $Run
 ```
 
 ## Reuse only for the current environment
 
 ```powershell
 # Supply the version actually observed in this current Codex environment.
-python -B scripts/write_guard.py status --scope project --project-root $Project --json --canary-report $Output --codex-version "ACTUAL_VERSION"
+.\cer.ps1 guard status --scope project --project-root $Project --json --canary-report $Output --codex-version "ACTUAL_VERSION"
 ```
 
 A static script cannot read or attest the host's full trust database. `trust=UNKNOWN`
