@@ -5,12 +5,15 @@ No model call, transcript read, state file, event logging or permission grants.
 """
 from __future__ import annotations
 import base64
+import hashlib
 import json
 import os
 from pathlib import Path
 import runpy
 import shlex
 import sys
+
+VERSION = '0.7.0-rc.2'
 
 # Exact local read/orchestration tools only, never guess MCP semantics by its name.
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
@@ -36,6 +39,10 @@ def duplicate_checked(pairs):
     return data
 
 
+def reject_constant(value):
+    raise ValueError('non-finite JSON value')
+
+
 def command(argv: list[str], windows: bool | None = None) -> str:
     if windows is None:
         windows = os.name == 'nt'
@@ -52,13 +59,14 @@ def decide(event: object) -> dict:
         return deny('CER: missing canonical tool identity.')
     # Transported fields are trusted only when sent by the native host, not a worker.
     model = event.get('model')
-    executor = isinstance(model, str) and any(model == m or model.startswith(m + '-') for m in EXECUTOR_FAMILIES)
+    executor = isinstance(model, str) and model in EXECUTOR_FAMILIES
+    # Snapshot aliases require an explicit audited addition, never prefix matching.
     data = event.get('tool_input')
     marker = name == 'Bash' and isinstance(data, dict) and isinstance(data.get('command'), str) and data['command'].startswith(PREFIX)
     if marker:
         # This is a virtual request protocol, not a shell binary. Rewrite before shell.
         try:
-            request = json.loads(data['command'][len(PREFIX):], object_pairs_hook=duplicate_checked)
+            request = json.loads(data['command'][len(PREFIX):], object_pairs_hook=duplicate_checked, parse_constant=reject_constant)
             reader = Path(__file__).resolve().with_name('readonly_reader.py')
             runpy.run_path(str(reader))['validate'](request)
             cwd = event.get('cwd')
@@ -83,10 +91,20 @@ def decide(event: object) -> dict:
 
 def main() -> int:
     try:
+        if sys.argv[1:]:
+            if len(sys.argv) != 3 or sys.argv[1] != '--expected-bundle':
+                raise ValueError('unsupported guard arguments')
+            directory = Path(__file__).resolve().parent
+            files = {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+                     for name in ('astra_write_guard.py', 'readonly_reader.py')}
+            actual = hashlib.sha256(json.dumps(files, sort_keys=True, separators=(',', ':'),
+                                               ensure_ascii=True).encode()).hexdigest()
+            if actual != sys.argv[2]:
+                raise ValueError('guard bundle changed since review')
         raw = sys.stdin.buffer.read(1024 * 1024 + 1)
         if len(raw) > 1024 * 1024:
             raise ValueError('oversized event')
-        event = json.loads(raw, object_pairs_hook=duplicate_checked)
+        event = json.loads(raw, object_pairs_hook=duplicate_checked, parse_constant=reject_constant)
         output = decide(event)
     except Exception:
         output = deny('CER: guard input/processing failed; do not execute this call.')

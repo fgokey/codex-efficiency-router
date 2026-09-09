@@ -1,0 +1,13 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "codex-efficiency-router",
+  "version": "0.7.0-rc.2",
+  "description": "Quality-gated Codex routing with explicit native write guardrails and scoped verification.",
+  "repository": "https://github.com/fgokey/codex-efficiency-router",
+  "license": "MIT",
+  "extensions": {
+    "com.openai": {
+      "hooks": "./hooks/hooks.json"
+    }
+  }
+}

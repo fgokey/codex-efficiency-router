@@ -4,6 +4,8 @@
 Does not start Codex, spend model tokens, read credentials or prove live routing.
 """
 from __future__ import annotations
+import sys
+sys.dont_write_bytecode = True
 
 import argparse
 import json
@@ -40,6 +42,10 @@ def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile 
     for key in ("description", "developer_instructions"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             errors.append(f"{path}: nonempty {key} is required")
+    instructions = data.get("developer_instructions")
+    if (isinstance(instructions, str)
+            and len(instructions.encode("utf-8")) > INSTRUCTION_BUDGETS["role_developer_instruction_bytes"]):
+        errors.append(f"{path}: role instructions exceed the project instruction budget")
     if expected[0] in ("astra_architect", "cer_auto_astra_architect") and data.get("sandbox_mode") != "read-only":
         errors.append(f"{path}: architect must remain read-only")
     return errors
@@ -107,6 +113,43 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
     return errors
 
 
+
+def instruction_footprint(skill_file: Path, agent_dir: Path, profile: Profile = Profile()) -> dict:
+    """Measure validated source text, never infer tokenizer counts or host billing.
+
+    Full text includes the core once and one separator per reference. Role values
+    are separate prompts, NOT four agents that necessarily run or a task total.
+    Called only by explicit doctor, not on activation, dispatch or tool events.
+    """
+    core = skill_file.read_text(encoding="utf-8")
+    references = {
+        p.relative_to(skill_file.parent).as_posix(): len(p.read_text(encoding="utf-8").encode("utf-8"))
+        for p in sorted((skill_file.parent / "references").rglob("*.md"))
+    }
+    roles = dict(EXPECTED)
+    if profile.mode == "auto":
+        roles.update(AUTO_EXPECTED)
+    role_bytes = {
+        name: len(tomllib.loads((agent_dir / name).read_text(encoding="utf-8"))[
+            "developer_instructions"].encode("utf-8"))
+        for name in roles
+    }
+    description = next(line.removeprefix("description: ") for line in core.splitlines()
+                       if line.startswith("description: "))
+    return {
+        "basis": "UTF-8 source text; excludes host framing, history, tools and billing",
+        "core_skill_bytes": len(core.encode("utf-8")),
+        "reference_bytes": references,
+        "reference_separator_bytes": len(references),
+        "full_skill_bytes": len(core.encode("utf-8")) + sum(references.values()) + len(references),
+        "description_characters": len(description),
+        "role_developer_instruction_bytes": role_bytes,
+        "budgets": dict(INSTRUCTION_BUDGETS),
+        "token_counts": "NOT_MEASURED",
+        "whole_task_savings": "NOT_MEASURED",
+    }
+
+
 def validate_catalog(data: object, profile: Profile = Profile()) -> list[str]:
     try:
         found = parse_catalog(data)
@@ -127,6 +170,7 @@ def validate_catalog(data: object, profile: Profile = Profile()) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--scope", choices=("user", "project"), default="user")
     parser.add_argument("--project-root", type=Path)
     parser.add_argument("--source-tree", type=Path)
@@ -158,15 +202,38 @@ def main() -> int:
                         errors.append(f"installed file missing or modified: {key}")
         if args.catalog:
             errors.extend(validate_catalog(json.loads(args.catalog.read_text(encoding="utf-8")), profile))
+        from release_identity import source_identity
+        identity = source_identity(root) if args.source_tree else None
+        guard = None
+        if args.source_tree and (root / "plugin.json").exists():
+            from release_package import validate_release
+            errors.extend(validate_release(root))
+        if not args.source_tree:
+            from write_guard import inspect_status
+            guard = inspect_status(args.scope, args.project_root)
+        footprint = instruction_footprint(skill, agents, profile) if not errors else None
+        if args.as_json:
+            print(json.dumps({"policy": "FAIL" if errors else "PASS", "errors": errors,
+                              "instruction_footprint": footprint,
+                              "profile": profile.mode, "automatic_low": profile.allow_low,
+                              "source_identity": identity, "guard": guard,
+                              "enforcement": "NOT_VERIFIED", "runtime_loaded_version": "UNKNOWN",
+                              "catalog": "EXPORTED_ONLY" if args.catalog else "NOT_CHECKED"}, indent=2))
+            return int(bool(errors))
         for error in errors:
             print(f"- {error}")
         print(f"profile: {profile.mode}; automatic low: {profile.allow_low}")
         print("doctor: STATIC FAIL" if errors else "doctor: STATIC PASS")
         print("live Codex discovery/model execution: NOT VERIFIED")
+        if guard:
+            print(f"guard registration: {guard['registration']}; trust: UNKNOWN; enforcement: NOT VERIFIED")
         print("catalog: checked supplied export only" if args.catalog else "catalog: NOT CHECKED")
         return int(bool(errors))
     except (OSError, ValueError, TypeError) as exc:
-        print(f"doctor: STATIC FAIL: {exc}", file=sys.stderr)
+        if args.as_json:
+            print(json.dumps({"policy": "FAIL", "errors": [str(exc)], "enforcement": "NOT_VERIFIED"}))
+        else:
+            print(f"doctor: STATIC FAIL: {exc}", file=sys.stderr)
         return 1
 
 

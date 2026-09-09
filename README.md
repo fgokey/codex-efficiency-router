@@ -2,9 +2,41 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.6.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.2 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
+
+
+## v0.7.0-rc.2: smaller instructions
+
+This candidate compresses the loaded Skill and role text without changing routing
+or write permissions. References load once at explicit triggers while valid, not
+on every tool call. See [footprint and validation](docs/VALIDATION-v0.7.0-rc.2.md).
+Existing fixed/low settings remain preserved; installation commands are unchanged.
+
+
+## v0.7.0-rc.1: verifiable state, not assumed enforcement
+
+This is an **unpublished release candidate**, based on v0.6.0. Existing fixed-mode
+installations and automatic-low opt-outs are preserved. No Write Lease, permanent
+background service, runtime concurrency ledger or model-driven installer is added.
+
+`policy-only` means policy text only; `guarded` means registered, not trusted or
+proven active; `live-verified` requires fresh, scoped **operator-witnessed native**
+Canary evidence. Disk version, static tests and an absent sentinel alone are not
+proof. Hosted paths and existing `write_stdin` sessions remain outside the guarantee.
+
+The candidate adds status/doctor JSON, version and digest checks, explicit guarded
+updates, a bounded `cer-read batch`, per-call three-arm accounting and reproducible
+Plugin/source packaging. The Plugin manifest validates offline; native Plugin role
+discovery/trust/Windows execution still require host acceptance. Existing users
+should keep the supported Skill installer plus explicit standalone Guard path until
+that acceptance is complete. Do not install duplicate Plugin and standalone Hooks.
+
+For this candidate ZIP, **do not run `git pull` expecting these unpublished changes**.
+Extract it, review it, and use the [RC upgrade instructions](docs/UPGRADE-v0.7.0-rc.1.md).
+See [Canary](docs/CANARY.md), [benchmark format](docs/BENCHMARKING-v0.7.md),
+[validation status](docs/VALIDATION-v0.7.0-rc.1.md) and [plan review](docs/REVIEW-v0.7.0.md).
 
 ## v0.6: read-only Astra, active diagnosis
 

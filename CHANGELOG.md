@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.7.0-rc.2 — 2026-09-09 (candidate, not published)
+
+- Compress the core Skill, private references and self-contained worker instructions.
+- Add explicit once-per-valid-context reference triggers, no blanket docs/hooks loading,
+  no copying the full Router into children, and no repeated routing banners.
+- Tighten core/full/discovery budgets and add per-role instruction-size enforcement.
+- Report source instruction bytes in doctor JSON; not model token counts or billing.
+- Preserve model/effort presets, fixed/low opt-outs, guard decisions, ownership,
+  evidence requirements and task-wide repair budgets. No new runtime calls or service.
+- Refresh version/digest metadata; old Canary evidence cannot certify this candidate.
+- Native prompt-compliance, exact token counts, Windows Canary and live costs NOT VERIFIED.
+
+## 0.7.0-rc.1 — 2026-09-09 (candidate, not published)
+
+- Add portable plugin packaging, synchronized version/hash checks and deterministic ZIP provenance.
+- Separate policy, registration, trust, current task loading and native Canary evidence.
+- Add read-only JSON diagnostics and explicit Guard update; preserve external changes on rollback.
+- Bind registered hook definitions to exact script hashes; reject unaudited model suffix aliases.
+- Add bounded, whole-batch-preflight `cer-read batch` and explicit local latency measurement.
+- Add operator-witnessed native Canary preparation/verification without nested model calls.
+- Add three-arm per-call accounting; distinguish actual cost, rate-card estimate and UNKNOWN.
+- Preserve existing fixed profile, low opt-in rules, writer ownership and active Astra diagnosis.
+- Pending: Windows/macOS execution, native Codex trust/Canary, live cost/quality trials, tag and release.
+
+
 ## [0.6.0] - 2026-09-09
 
 - Put actor write authority ahead of local/cost fallbacks; include Astra roots and leaves.

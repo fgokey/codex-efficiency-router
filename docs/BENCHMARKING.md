@@ -44,3 +44,9 @@ Offline tests guard shipped policy, packaging, install/uninstall/restore and mea
 ## v0.3 behavioral acceptance
 
 The [20-case corpus](../evaluation/behavior_cases.json) includes natural user prompts, fixture setup, required observations and forbidden behavior. CI checks its shape only; all live results remain null. A human constructs isolated fixtures and presents prompt/setup without exposing grader answers. Grade actual changes, traces and requirement evidence; do not infer triggering or correctness by scanning output for model names. Completion, handoff and recovery helpers test declared conditions, not natural-language inference. No online calibrator or automatic model trial is included. [Protocol](QUALITY-PROTOCOL.md).
+
+## v0.7 candidate extension
+
+See [three-arm per-call accounting and subprocess measurements](BENCHMARKING-v0.7.md).
+The original paired format remains supported, but without attributable per-call money
+and all descendants it cannot establish monetary efficiency. No live savings are claimed.

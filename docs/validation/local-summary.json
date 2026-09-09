@@ -1,0 +1,48 @@
+{
+  "candidate": {
+    "version": "0.7.0-rc.1",
+    "base_commit": "a1ca29d69d8fcf32499ea8062c05316004489692",
+    "policy_sha256": "636d3b2783abf93a3643d918231eac159385ebc8567934676c446459c0ff4bdf",
+    "guard_sha256": "55e65771ce28a62c73f7317f6ee02b62733612dab627dd4871ad3f871fb8687b"
+  },
+  "platform": "Linux",
+  "python_version": "3.13.5",
+  "baseline": {
+    "version": "0.6.0",
+    "unit_tests": 278,
+    "passed": true
+  },
+  "unit_suite": {
+    "tests": 339,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "passed": true,
+    "elapsed_seconds": 53.319,
+    "routing_scenarios": 36
+  },
+  "added_tests": 61,
+  "mutations_killed": {
+    "mutations": 12,
+    "quality_mutations": 12,
+    "effort_mutations": 27,
+    "write_mutations": 12
+  },
+  "all_mutations_killed": true,
+  "instruction_bytes": {
+    "core": 6082,
+    "full_with_separators": 11404,
+    "core_budget": 6500,
+    "full_budget": 12000
+  },
+  "schema": "PASS",
+  "doctor": "STATIC_PASS",
+  "native_canary": "NOT_RUN",
+  "windows_ci": "NOT_RUN",
+  "macos_ci": "NOT_RUN",
+  "tokenizer_audit": "NOT_RUN: pinned tiktoken==0.11.0 unavailable",
+  "live_model_cost_quality_comparison": "NOT_RUN",
+  "github_release": "NOT_CREATED",
+  "tag": "NOT_CREATED",
+  "user_machine_modified": false
+}

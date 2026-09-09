@@ -1,0 +1,79 @@
+{
+  "test": "actual-uploaded-v0.6.0-to-candidate-lifecycle",
+  "result": "PASS",
+  "scope": "temporary-local-project-only",
+  "prior_guard": "OUTDATED",
+  "updated_guard": "PRESENT",
+  "fixed_preserved": true,
+  "automatic_low": false,
+  "dry_run_no_changes": true,
+  "protected_files_unchanged": true,
+  "third_party_hook_preserved": true,
+  "native_execution": "NOT_RUN",
+  "commands": [
+    {
+      "command": [
+        "old",
+        "scripts/install.py",
+        "--scope"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "old",
+        "scripts/write_guard.py",
+        "install"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/write_guard.py",
+        "status"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/install.py",
+        "--scope"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/write_guard.py",
+        "update"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/write_guard.py",
+        "update"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/write_guard.py",
+        "status"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "codex-efficiency-router",
+        "scripts/write_guard.py",
+        "remove"
+      ],
+      "exit": 0
+    }
+  ]
+}

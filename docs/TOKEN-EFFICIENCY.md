@@ -33,3 +33,17 @@ These are scoped source-text measurements, not host prompt totals or billed usag
 ## v0.3 regression budget
 
 The full current Skill includes three references. Separate offline CI compares core, all references, and all-reference text plus each role's own instruction text against the immutable v0.2.1 tree. Budgets are not raised to accommodate quality additions. A raw-text budget is not full-context billing; observed model identity, actual usage, retries and elapsed time still require user acceptance. See [release validation](VALIDATION-v0.3.0.md).
+
+
+## v0.7.0-rc.2 instruction budget
+
+The compact candidate reduces the core to 4,985 UTF-8 bytes and the core plus all
+four references to 9,262 bytes. Standalone role instructions remain self-contained.
+Reference triggers are explicit and once-per-valid-context; do not preload docs or
+copy the whole router into every leaf. Missing constraints after compaction must
+be reloaded, so this is not a "never reread" rule or a guarantee of host caching.
+
+The explicit doctor JSON now reports source bytes and enforces smaller budgets:
+5,200 core, 9,600 full, 180 description characters and 950 bytes per role. It does
+not run per turn or consume model calls. Exact tokenization and live task savings
+were not measured in this environment. See [candidate validation](VALIDATION-v0.7.0-rc.2.md).

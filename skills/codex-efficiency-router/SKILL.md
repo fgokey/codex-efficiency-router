@@ -1,55 +1,55 @@
 ---
 name: codex-efficiency-router
-description: Quality-gated model and effort routing for substantial Codex tasks; reserve Astra for exceptional decisions and use sufficient cheaper models for implementation. Not tiny edits, simple questions or concurrent routers.
+description: Quality-gated routing for substantial Codex tasks; reserve Astra for hard read-only decisions. Skip tiny edits, simple questions and concurrent routers.
 ---
 
 # Codex Efficiency Router
 
-Preserve quality/authorization; reduce waste. Keep the parent model. No extra LLM classifier, per-turn scripts or foreign runtime.
+<!-- CER version: 0.7.0-rc.2 -->
+
+Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
 
 Installation: fixed; automatic low: disabled.
 
+Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not loaded-state proof; guarded is not enforced. Require current scoped native Canary for live-verified; reload only at safe boundaries.
+
 ## Before any side effect
 
-Observe actor identity BEFORE local shortcuts. Astra roots/leaves and read-only coordinators NEVER patch/write (including checkpoints), format, build or run side-effecting tests/commands. Unknown identity/effects cannot authorize local writes. This overrides tiny-task, sufficient-parent and unavailable-route fallbacks.
+Authority precedes every shortcut. Astra roots/leaves and read-only coordinators NEVER patch, write/checkpoint, format, build or run side-effecting tests/commands. Unknown identity/effects grant no writes. Reuse compatible authorized Terra/Sol owners; missing authority/owner/capacity means stop risky writes and BLOCKED/defer. Preserve existing edits for independent review/tests/ownership; never auto-revert.
 
-Reuse a compatible authorized Terra/Sol owner at a safe boundary; with two active writers, wait, not a third writer. Preserve existing edits; hand them over as unverified for independent review, tests and explicit ownership, never auto-revert. Missing authority/owner/capacity means BLOCKED/defer, not Astra writes.
-
-Astra handles hard decisions and repeated qualified unexplained failures: read source/diffs/evidence, arbitrate hypotheses, specify experiments and patch proposals without applying them. Already-Astra parents reason locally, not spawn another Astra. Retry exhaustion stops blind editing, NOT diagnosis. Send experiments/writes back to executors; missing prerequisites/counts alone never justify escalation.
+Astra actively diagnoses hard judgments and qualified repeated failures; executors run its experiments/fixes. Already-Astra reasons locally. Exhaustion stops blind edits, not diagnosis.
 
 ## Route once per meaningful decision
 
-Map requirements to evidence; preserve unit/contract IDs. Reassess on phases, evidence, classified failures or user requests, not each tool. Repair prerequisites; prefer safe discriminating checks.
+Route on phase/evidence changes, classified failures or user requests, not each tool. Preserve requirement/unit IDs; repair prerequisites before escalating.
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` / medium | Mechanical, low-risk, strongly verifiable |
-| `terra_executor` | `gpt-5.6-terra` / medium | Settled bounded implementation |
-| `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration/fixes |
-| `astra_architect` | `gpt-6-astra` / high | Exceptional reasoning; read-only |
+| `luna_worker` | `gpt-5.6-luna` / medium | Mechanical, low-risk, strongly checked |
+| `terra_executor` | `gpt-5.6-terra` / medium | Settled implementation |
+| `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration |
+| `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
-Choose model AND effort: medium normally, high for deeper reasoning; Astra automatically high. Auto prefers unpinned `cer_auto_<role>` with explicit native effort, otherwise fixed role for the SAME pair. No mode switching/config edits. Read [effort.md](references/effort.md) before dispatch.
-
-Astra requires useful stronger reasoning, consequential/exceptionally hard judgment and insufficient cheap falsification; [routing.md](references/routing.md) gives boundaries. No compulsory ladder or keyword/size triggers. Never auto-select `max` or xhigh; Ultra excluded. Auto-low remains opt-in, never waives quality.
+Select sufficient model AND effort. Never auto-select `max` or xhigh; no Ultra. Auto-low requires opt-in and quality gates. Astra needs useful stronger reasoning, consequential/exceptionally hard judgment AND insufficient cheap falsification; no ladder/keyword/size triggers.
 
 ## Decide whether delegation is worth it
 
-After authority, keep sufficient read/tool work local; prefer safe tool concurrency. Delegate for capability, write ownership or net benefit after context/coordination/checks/rework. Same-model delegation at identical effort needs contextual value AND a net benefit, except mandatory write separation. Higher effort needs evidence; no weaker unresolved execution.
+Keep sufficient authorized work local; prefer safe tool concurrency. Delegate for capability, write ownership or benefit after context/coordination/checks/rework. Same-model delegation at identical effort needs contextual value AND a net benefit, except mandatory write separation. Never weaken unresolved execution.
 
-Default one leaf, two concurrent writers maximum. Require disjoint writes, safe resources and independent acceptance. No agent per file, recursive workers or ritual reviewers. No conflicting edits/builds/devices/side effects. Use real tools/roles/pairs; [dispatch.md](references/dispatch.md) covers native guard and lifecycle. No hidden CLI/API or permission bypass; otherwise stop risky writes, not read-only analysis.
+Default one leaf; at most two concurrent writers, the third waits. Require disjoint writes/resources and independent acceptance. No agent per file, recursive workers, ritual reviewers or conflicting side effects. Use supported native bindings, not permission bypasses.
 
 ## Handoff without losing the decision
 
-Pass contract/outcomes; revision/dirty state/paths; facts vs assumptions/evidence; invariants; allowed writes/non-goals; checks, pair/binding and attempts. No transcript dumps/secrets. Receiver checks completeness, assumptions, plan conflicts and current state. Strong-model plans cannot override requirements. Block affected scope; contrary evidence reopens decisions. Parent verifies integration; child success is not project success.
+Pass contract/outcomes, revision/dirty state/paths, facts vs assumptions/evidence, invariants, allowed writes/non-goals, checks, pair/binding and attempts; no transcripts/secrets. Receiver checks completeness/state/assumptions/conflicts. Requirements outrank plans; block affected scope, and contrary evidence reopens decisions. Parent verifies integration, not just child success.
 
 ## Failure, validation, and stopping
 
-Classify prerequisites/environment/observability/implementation/capability. One targeted repair after initial failure across ALL owners of the unit/failure signature. Model/effort/worker/compaction never renews attempts. Exhaustion needs diagnosis/experiment/escalation or explicit justified bounded extension retaining history.
+Classify prerequisite/environment/observability/implementation/capability failures. One targeted repair after initial failure per task/unit/failure signature across ALL owners. Worker/model/effort/compaction never renews attempts. Exhaustion needs diagnosis/experiment/escalation or justified bounded extension retaining history.
 
-Check requirement fit and correctness together; honor repository checks and reproduce defects. New tests are not independent proof. Do not weaken assertions, delete relevant tests or waive acceptance. Bind evidence to relevant final code/checks/environment, not HEAD alone. Reuse unaffected checks. Unrun checks are UNKNOWN, not PASS. PASS requires every necessary outcome evidenced with no blocker; else PARTIAL/BLOCKED. Disclosure cannot waive required work. Stop after acceptance; speculative optimization stays a measurement plan.
+Check requirements/correctness, repository checks and defect reproduction. New tests are not independent proof. Do not weaken assertions, delete relevant tests or waive acceptance. Bind evidence to final code/checks/environment, not HEAD alone; reuse unaffected checks. Unrun is UNKNOWN, not PASS. PASS requires all necessary outcomes evidenced with no blocker; else PARTIAL/BLOCKED. Stop after acceptance; speculative optimization stays a measurement plan.
 
 ## Context and reporting
 
-Read narrowly, keep log paths. Long work/recovery uses one permitted checkpoint owned by a writer: contracts/state, valid completed scopes, active workers, failed methods/pairs/budget. Update on transitions; reconcile before replaying unknown effects. [quality.md](references/quality.md) covers recovery.
+Load each reference once at its trigger; reread only when stale or lost after compaction: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/guarded shell; [quality.md](references/quality.md) for checkpointing/recovery/disputed evidence.
 
-Honor disable/no-subagent/no-escalation (both axes), without granting writes. Separate requested/observed pairs; UNKNOWN/MISMATCH suspends auto-low. Report material fallback/gaps, not invented identity/savings/cache or hook enforcement. Collect required leaves; stop only owned superseded work; no unobserved cleanup claims.
+Read narrowly; keep log paths. Do not preload docs/hooks or copy the router into children; send contracts and their own role. Long work/recovery uses one permitted writer-owned checkpoint. Honor disable/no-subagent/no-escalation on both axes without granting writes. Report requested vs observed pairs; UNKNOWN/MISMATCH suspends auto-low. No invented identity/savings/cache/enforcement. Collect required leaves; stop only owned superseded work; reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.

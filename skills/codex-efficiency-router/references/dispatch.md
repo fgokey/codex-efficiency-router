@@ -1,7 +1,13 @@
-# Dispatch and native guard
+# Native dispatch and guard
 
-Authority precedes cost. Reuse compatible idle Terra/Sol owners; wait for active owners, never overlap their scope. Preserve prior edits as unverified until independent requirement/diff review; no rollback or rewrite merely to change ownership. Read-only Astra diagnosis can proceed while two writers exist, using stable evidence; it is not a third writer.
+Wait for compatible active owners; Astra may diagnose stable evidence meanwhile. Do not interrupt writers for reloads. Leaves never spawn/publish.
 
-The optional registered/trusted synchronous PreToolUse guard denies Astra/unknown shell, patches and unknown tools on covered paths. It permits native reads/orchestration. For shell-only inspection use `cer-read {"op":"read","path":"src/file","start":1,"lines":120}`; list/search/diff/status are supported. This is a guarded rewrite protocol, not an installed shell binary. Never replay it without an active guard or bypass via another tool. Plain shell/build/test execution belongs to executors.
+The optional trusted synchronous PreToolUse guard denies Astra/unknown shell, patches and unknown tools on covered paths; native reads/coordination remain usable. Registration, trust and live interception differ. Skill installation removes no permissions; opt-out cannot preserve claimed protection.
 
-Registration, trust and real interception are separate. A Skill cannot remove root permissions; unsupported tools/existing shell sessions may bypass hooks. Do not claim complete isolation. Respect opt-outs without claiming protection remains. Parent coordinates only owned work; leaves never spawn/publish. Count all work, not summed parallel times; cached input isn't zero. Reconcile unknown workers/effects before replay. Configuration changes require safe boundaries.
+Astra NEVER inherits or inputs to existing shell sessions: `write_stdin` is UNPROTECTED. Only the original Sol/Terra owner continues; reconcile unknown ownership. Hosted paths are UNPROTECTED, specialized paths UNKNOWN. Guardrail, not complete isolation; two-writer capacity is policy, not a runtime lock.
+
+Guarded reads use `cer-read {"op":"read","path":"src/file","start":1,"lines":120}`. Other operations: list/search/diff/status; batch uses `{"op":"batch","requests":[<operations>]}`. This is a guard rewrite protocol, NOT a shell binary; never replay without an active guard or bypass through other tools. Plain shell/build/test belongs to executors.
+
+Batch: 1-16 non-nested requests; 16 KiB input, 16 MiB total file reads, 128 KiB output. Preflight every path; invalid batches yield no partial output. Search is literal in one file, not a directory. No arbitrary commands.
+
+Count all agents/retries; parallel time is wall-clock, not summed durations. Cached input is not zero.

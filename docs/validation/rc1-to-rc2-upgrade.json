@@ -1,0 +1,12 @@
+{
+  "status": "PASS",
+  "route": "0.7.0-rc.1 -> 0.7.0-rc.2",
+  "profile": "fixed",
+  "automatic_low": false,
+  "preserved_sha256": {
+    "AGENTS.md": "342c5624cb50ea233bbabf6077d0a75b0aeaaedfa7ef214affaeef66c5c3563a",
+    ".codex/config.toml": "72443dd4ee4d0e2a38556351dcc8881217c318704d93ec9aa1c5316544a08412",
+    ".codex/hooks.json": "7fa0dda0634e6807838496d93dbac7059df5e4c28051d1c3f0eedde2d47d2c61"
+  },
+  "temporary_project_only": true
+}

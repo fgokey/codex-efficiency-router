@@ -1,7 +1,7 @@
-# Effort/binding admission
+# Effort and binding
 
-Auto chooses ONE unpinned `cer_auto_<role>` with explicit supported model/effort, or the original pinned role for exactly that pair. Fixed/adaptive overrides remain respected. File pins win; omission inherits/defaults, not intelligent selection. Inspect actual tool fields, loaded roles and account pair support once, refresh on invalidation. No remapping high to medium or model substitution for compatibility.
+Normally medium; high needs deeper reasoning, Astra automatically high. Respect fixed/adaptive overrides. Auto selects ONE unpinned `cer_auto_<role>` with explicit supported native effort, else the original pinned role for the SAME pair. Pins win; omission inherits/defaults, not intelligent selection. Inspect native fields, loaded roles and account pair support once; refresh after invalidation. No model substitution or unsupported high-to-medium mapping.
 
-Cache failed bindings within the task; no paid probes, config rewrites, routine mode switching or unsafe replay. Idle-turn changes need exposed host support, compatible ownership and preserved attempts; steer is not a hot-switch. Local fallback never authorizes Astra writes.
+Cache failed bindings; no paid probes, config rewrites, routine mode switching or unsafe replay. Idle-turn changes require host support, compatible ownership and retained attempts; steer is not a hot-switch.
 
-Auto-low: opted-in mechanical Luna, settled and strongly checked, low consequence/coupling/irreversibility, no novelty/conflict/failure. Explicit low obeys the floor. Astra medium is explicit-only for bounded nonexceptional work. xhigh/max require intent/support. No-escalation covers both axes; unknown settings cannot prove compliance. UNKNOWN/MISMATCH suspends auto-low for the task. Requests aren't observations; effort isn't a token cap or quality guarantee.
+Auto-low: opted-in mechanical Luna, settled strong checks, low consequence/coupling/irreversibility, no novelty/conflict/failure. Explicit low obeys the floor; Astra medium is explicit-only for bounded nonexceptional work. xhigh/max require intent/support. Unknown settings prove nothing; effort is neither a token cap nor quality guarantee.

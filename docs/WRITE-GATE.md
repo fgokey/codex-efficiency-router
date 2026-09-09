@@ -1,4 +1,4 @@
-# Astra write boundary and active diagnostic participation (v0.6)
+# Astra write boundary and active diagnostic participation (v0.7.0-rc.1)
 
 ## Two independent decisions
 
@@ -96,8 +96,14 @@ py -3 scripts/write_guard.py remove --scope project --project-root "C:/Work/my-p
 py -3 scripts/write_guard.py remove --scope project --project-root "C:/Work/my-project"
 ```
 
-Rerun guard registration after updating this repo to update its owned scripts; review
-changes and inspect trust again. Native trust is never inferred by the installer.
+Use explicit `write_guard.py update` for an existing owned registration; review
+changes and inspect trust again. `update` does not implicitly install an absent Guard.
+Native trust is never inferred by the installer. The Hook command includes the
+version and current guard+reader bundle digest, so changes are visible to definition
+review. A digest mismatch denies covered calls, including executor calls, until reviewed.
+Exact base model IDs in the audited executor allowlist are used; unknown snapshot
+suffixes are not accepted by prefix similarity. Normal executors return no additional
+permission decision; the host sandbox and other Hook decisions remain in force.
 
 ## Source inspection without an arbitrary shell
 
@@ -158,3 +164,27 @@ live canary consumes model work if run through Codex and is not started by CI or
 These sources define the host contract. Strict Astra write separation, qualified
 failure escalation, the reader protocol and writer ownership are this project's policy,
 not OpenAI's guarantee that an arbitrary Skill is enforced.
+
+## v0.7 status and batching
+
+`write_guard.py status --json` and `doctor --json` are read-only diagnostics for the
+selected standalone registration layer: ABSENT/PRESENT/OUTDATED/BROKEN, interpreter
+existence, actual bytes, version drift, duplicated/overlapping definitions, UNKNOWN
+trust and NOT_RUN/STALE/FAIL/PASS/UNKNOWN evidence. No trustworthy access to Plugin or
+other configuration layers is inferred. See [upgrade](UPGRADE-v0.7.0-rc.1.md) and
+[explicit operator-witnessed Canary](CANARY.md); native evidence is never prebundled.
+
+```text
+cer-read {"op":"batch","requests":[{"op":"status","path":"."},{"op":"search","path":"src/component.cpp","query":"Owner"},{"op":"read","path":"src/component.cpp","start":1,"lines":120}]}
+```
+
+Batch limit: 16 operations; 16 KiB input; 16 MiB combined file reads plus at most one
+byte of overflow detection; 128 KiB returned body. All requests/paths preflight before
+execution. Search remains one literal file, not recursive directory scanning. Aggregate
+output failure emits no partial batch. Git uses a bounded output pipe and timeout, not
+an unbounded capture or an output temp file. This does not bound Git's internal scanning
+or eliminate local path TOCTOU; trusted local binaries/filesystem remain assumptions.
+
+Source references for candidate packaging: [OpenAI Plugin guide](https://developers.openai.com/plugins/build/plugins)
+and [portable Plugin schema](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json).
+Native scope/trust restrictions remain governed by the host version, not this package.

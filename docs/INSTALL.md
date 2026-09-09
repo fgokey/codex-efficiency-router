@@ -39,3 +39,14 @@ Advanced compatibility only (not required for normal use): `--mode fixed`, `--mo
 Explicit restore retains the original mode/bytes, including legacy manifests; it does not migrate them. Auto uninstall removes all eight owned bindings, not unrelated aliases or user files. Switching an advanced override removes obsolete owned aliases safely. A collision on any generated filename blocks before writes, even with force.
 
 Python CLI flags are canonical. PowerShell wrappers forward `--scope`, `--dry-run`, etc., not PowerShell-style aliases. There is no `--no-restore`; restoration is `install.py --restore`. Actual dynamic-vs-compatibility selection needs no configuration change. See [acceptance](ACCEPTANCE.md).
+
+## Candidate v0.7.0-rc.1
+
+Use the [candidate upgrade guide](UPGRADE-v0.7.0-rc.1.md) for an extracted unpublished
+ZIP. Do not use git pull to replace it with upstream main. Existing profile schema-2
+fixed/low choices survive ordinary updates. Installation manifests now include the base
+commit and the actual rendered policy hash; the base commit is not a claim that edited
+candidate bytes were committed. Full distributions include a separate per-file release
+manifest. Guard registration remains explicit and independent of Skill installation.
+Rollback preserves concurrently changed files instead of overwriting them with backup
+bytes; inspect reported recovery gaps. Multi-file power-loss atomicity is not promised.

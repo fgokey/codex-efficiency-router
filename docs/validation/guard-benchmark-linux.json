@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "evidence_kind": "offline-subprocess-microbenchmark",
+  "identity": {
+    "version": "0.7.0-rc.1",
+    "base_commit": "a1ca29d69d8fcf32499ea8062c05316004489692",
+    "policy_sha256": "636d3b2783abf93a3643d918231eac159385ebc8567934676c446459c0ff4bdf",
+    "guard_sha256": "55e65771ce28a62c73f7317f6ee02b62733612dab627dd4871ad3f871fb8687b"
+  },
+  "platform": "Linux",
+  "python_version": "3.13.5",
+  "measurements": {
+    "guard_deny": {
+      "samples": 30,
+      "p50_ms": 629.4811029999892,
+      "p95_ms": 787.5276259999282,
+      "mean_ms": 649.1199617999958
+    },
+    "guard_passthrough": {
+      "samples": 30,
+      "p50_ms": 636.884241999951,
+      "p95_ms": 748.4888019998834,
+      "mean_ms": 649.5428686333147
+    },
+    "guard_read_rewrite": {
+      "samples": 30,
+      "p50_ms": 622.0704289999048,
+      "p95_ms": 745.4700410000896,
+      "mean_ms": 632.4268003333297
+    },
+    "reader_four_processes": {
+      "samples": 30,
+      "p50_ms": 2492.3741820000487,
+      "p95_ms": 2779.825836999862,
+      "mean_ms": 2533.0804494333356
+    },
+    "reader_one_batch": {
+      "samples": 30,
+      "p50_ms": 650.338339999962,
+      "p95_ms": 717.0585239998672,
+      "mean_ms": 647.9854999666865
+    }
+  },
+  "cold_start_included": true,
+  "live_codex_latency": "UNKNOWN",
+  "model_cost": "UNKNOWN"
+}

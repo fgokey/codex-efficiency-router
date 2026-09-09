@@ -2,9 +2,38 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.6.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.2 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
+
+
+## v0.7.0-rc.2：精简指令
+
+本候选版压缩核心 Skill、按需 references 和独立角色指令，不改变路由与写权限。
+引用文件仅在对应条件触发且尚未加载、失效或压缩后丢失时读取，避免逐工具重读。
+详见[体积与验证记录](docs/VALIDATION-v0.7.0-rc.2.md)。保留 fixed/low 设置，安装命令不变。
+
+
+## v0.7.0-rc.1：可验证状态，不冒充运行时已生效
+
+这是基于 v0.6.0 的**未发布候选版本**，不是已完成全部发布门槛的正式版。
+保留已安装的 fixed 模式与 automatic low 关闭状态；不增加 Write Lease、
+常驻进程或强制并发状态账本。Astra 遇到复杂问题仍亲自诊断和验收，但不直接写入。
+
+`policy-only` 只代表规则；`guarded` 只代表已注册，不代表已信任或已拦截；
+`live-verified` 需要与当前环境绑定且未过期的**操作者见证原生 Canary**。
+磁盘版本、静态测试和“哨兵文件不存在”都不能单独证明现场生效。
+Hosted tools、已有执行会话的 `write_stdin` 仍不在完整覆盖范围内。
+
+新增状态 JSON、版本/哈希诊断、显式 Guard 更新、受限 batch 读取、三组逐调用
+费用统计，以及可复现 Plugin/源码打包。Plugin manifest 已有离线校验；插件角色发现、
+信任与 Windows 原生执行仍需实装验收。现有用户优先沿用 Skill 安装器加显式独立
+Guard 的路径，不要同时安装两套重复 Hook。
+
+本候选 ZIP 尚未推送到仓库，**不要用 `git pull` 代替此次候选包更新**。
+解压审查后按[候选版升级说明](docs/UPGRADE-v0.7.0-rc.1.md)执行。
+详见 [Canary](docs/CANARY.md)、[对比数据格式](docs/BENCHMARKING-v0.7.md)、
+[验证状态](docs/VALIDATION-v0.7.0-rc.1.md)和[优化计划评审](docs/REVIEW-v0.7.0.md)。
 
 ## v0.6：Astra 不亲自写，但必须参与难题
 

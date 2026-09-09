@@ -1,0 +1,19 @@
+{
+  "description": "Explicit native write guardrail; review /hooks before use.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/astra_write_guard.py\" --expected-bundle 44d718681a41483bf7d199c5c6760fdde60315ab22b0a20e8f3db23cc82f3792",
+            "commandWindows": "python -I -B \"$env:PLUGIN_ROOT/hooks/astra_write_guard.py\" --expected-bundle 44d718681a41483bf7d199c5c6760fdde60315ab22b0a20e8f3db23cc82f3792",
+            "timeout": 5,
+            "statusMessage": "CER 0.7.0-rc.2 Astra write boundary"
+          }
+        ]
+      }
+    ]
+  }
+}

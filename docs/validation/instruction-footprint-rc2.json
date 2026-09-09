@@ -1,0 +1,121 @@
+{
+  "baseline": {
+    "version": "0.7.0-rc.1",
+    "zip_sha256": "9600c9b6b3a20d57a7a695e3a96f5cb91c9bd8296b65afbc4bfbf16e569ce87f"
+  },
+  "current_version": "0.7.0-rc.2",
+  "unit": "UTF-8 source bytes; not tokenizer counts, host context or billed usage",
+  "exact_token_counts": {
+    "status": "NOT_MEASURED",
+    "reason": "tiktoken is absent; package installation failed because the container cannot resolve package index DNS."
+  },
+  "source_sizes": {
+    "skills/codex-efficiency-router/SKILL.md": {
+      "before": 6082,
+      "after": 4985,
+      "removed": 1097,
+      "reduction_percent": 18.037
+    },
+    "skills/codex-efficiency-router/references/dispatch.md": {
+      "before": 2074,
+      "after": 1461,
+      "removed": 613,
+      "reduction_percent": 29.556
+    },
+    "skills/codex-efficiency-router/references/effort.md": {
+      "before": 1182,
+      "after": 1033,
+      "removed": 149,
+      "reduction_percent": 12.606
+    },
+    "skills/codex-efficiency-router/references/quality.md": {
+      "before": 920,
+      "after": 715,
+      "removed": 205,
+      "reduction_percent": 22.283
+    },
+    "skills/codex-efficiency-router/references/routing.md": {
+      "before": 1142,
+      "after": 1064,
+      "removed": 78,
+      "reduction_percent": 6.83
+    }
+  },
+  "role_developer_instructions": {
+    "astra-architect.toml": {
+      "before": 1071,
+      "after": 819,
+      "removed": 252,
+      "reduction_percent": 23.529
+    },
+    "luna-worker.toml": {
+      "before": 1034,
+      "after": 794,
+      "removed": 240,
+      "reduction_percent": 23.211
+    },
+    "sol-engineer.toml": {
+      "before": 1173,
+      "after": 890,
+      "removed": 283,
+      "reduction_percent": 24.126
+    },
+    "terra-executor.toml": {
+      "before": 1046,
+      "after": 810,
+      "removed": 236,
+      "reduction_percent": 22.562
+    }
+  },
+  "same_path_load_examples": {
+    "core_only": {
+      "before": 6082,
+      "after": 4985,
+      "removed": 1097,
+      "reduction_percent": 18.037
+    },
+    "core_effort_dispatch": {
+      "before": 9340,
+      "after": 7481,
+      "removed": 1859,
+      "reduction_percent": 19.904
+    },
+    "core_astra_admission": {
+      "before": 7225,
+      "after": 6050,
+      "removed": 1175,
+      "reduction_percent": 16.263
+    }
+  },
+  "runtime_guard_logic_unchanged": true,
+  "protected_files_unchanged": [
+    "AGENTS.md",
+    "config/optional-defaults.toml",
+    "scripts/install.py",
+    "scripts/manage.py",
+    "scripts/profiles.py",
+    "scripts/write_policy.py",
+    "scripts/effort_reference.py",
+    "scripts/policy_reference.py",
+    "scripts/quality_reference.py"
+  ],
+  "full_skill_plus_all_references": {
+    "before": 11404,
+    "after": 9262,
+    "removed": 2142,
+    "reduction_percent": 18.783
+  },
+  "discovery_description_characters": {
+    "before": 217,
+    "after": 152,
+    "removed": 65,
+    "reduction_percent": 29.954
+  },
+  "critical_policy_sha256": {
+    "SKILL.md": "8d6e3ec1532358844cbdd1f736769072ce85b19909edb9e86d62ac7567a4c1fe",
+    "references/dispatch.md": "920e22850a691d16e1ea6a3320db3c195bcb89e7f5209a38a397aba4651b0c0f",
+    "references/effort.md": "bfe8944e7a036811bcc0062edb3ec35ae6d7421d23dfdfbb35638565e23efebb",
+    "references/quality.md": "ab956ec48dafbab9911ff2b322033093d1b7b8997c355f8791a02c1ac81a5c10",
+    "references/routing.md": "af478192c10e3d7ef35b1d77b0527542ebb6657c1c338879c72ca561d2e697a1"
+  }
+}

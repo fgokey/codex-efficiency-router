@@ -80,14 +80,15 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.6.0",
+  "version": "0.7.0-rc.2",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
-    "core_skill_bytes": 6500,
-    "discovery_description_characters": 400,
+    "core_skill_bytes": 5200,
+    "discovery_description_characters": 180,
     "default_parallel_children": 2,
     "notes": "Project policy, not official platform limits; no fixed assumed startup latency.",
-    "full_skill_bytes": 12000
+    "full_skill_bytes": 9600,
+    "role_developer_instruction_bytes": 950
   },
   "same_lane_reasons": [
     "none",

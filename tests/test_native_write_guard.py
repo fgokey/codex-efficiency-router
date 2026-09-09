@@ -58,11 +58,11 @@ class NativeGuardTests(unittest.TestCase):
         self.assertEqual(self.file.read_text(),'sol-owned')
 
     def test_terra_and_luna_not_given_explicit_permission_override(self):
-        for m in ('gpt-5.6-terra','gpt-5.6-luna','gpt-5.6-sol-2026-09-01'):
+        for m in ('gpt-5.6-terra','gpt-5.6-luna','gpt-5.6-sol'):
             self.assertEqual(self.hook(model=m),{})
 
     def test_unknown_identity_and_snapshot_deny(self):
-        for m in (None,'','gpt-6-astra-2026-09-01','fake-sol',{'model':'gpt-5.6-sol'}):
+        for m in (None,'','gpt-6-astra-2026-09-01','gpt-5.6-sol-2026-09-01','gpt-5.6-sol-untrusted','fake-sol',{'model':'gpt-5.6-sol'}):
             self.assertTrue(self.denied(self.hook(model=m)))
 
     def test_tool_input_cannot_spoof_actual_model(self):

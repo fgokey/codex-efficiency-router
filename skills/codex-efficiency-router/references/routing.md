@@ -1,15 +1,15 @@
-# Astra boundary examples
+# Astra admission
 
-Apply all three core gates, not keywords or a mandatory ladder.
+All three core gates apply; counts or prerequisite gaps alone never qualify.
 
-| Unresolved judgment | Settled counterexample |
+| Open judgment | Settled alternative |
 | --- | --- |
-| Durable API/format/ownership/compatibility tradeoffs | Implement accepted contract |
-| Ambiguous trust/data/billing/production invariant | Apply a specified checked rule |
-| Credible conflict or surviving causal hypotheses | Run discriminating check |
-| Migration coexistence/ordering/rollback/recovery | Authorized steps on fixtures |
-| Novel algorithm/protocol/state/scheduling | Adapt documented pattern |
-| Consequential independent arbitration | Repeat sufficient routine review |
-| Qualified Sol reasoning failure | Fix missing dependency |
+| API/format/ownership/compatibility tradeoffs | Accepted contract |
+| Ambiguous trust/data/billing/production invariant | Specified checked rule |
+| Conflicting evidence or causal hypotheses | Discriminating check |
+| Migration coexistence/order/rollback/recovery | Authorized fixture steps |
+| Novel algorithm/protocol/state/scheduling | Documented pattern |
+| Consequential independent arbitration | Sufficient routine review |
+| Qualified Sol reasoning failure | Missing dependency |
 
-Isolate answerable instrumentation design from an unobservable root cause. Cheap experiments must be safe/authorized; frozen migration strategy does not authorize live rollout. New requirements/code/dependencies/evidence can reopen decisions. Changed errors count as progress only if they narrow the problem. More effort is not always better than another model. Offline helpers are policy approximations, not execution or quality proof.
+Investigate source/diffs/evidence; arbitrate hypotheses and return safe experiments/unapplied fixes, not just blockers. Separate instrumentation design from unobservable causes. Frozen migration plans do not authorize rollout. New requirements/code/dependencies/evidence reopen decisions; changed errors are progress only when narrowing causes. More effort need not beat another model. Offline routing is not quality proof.

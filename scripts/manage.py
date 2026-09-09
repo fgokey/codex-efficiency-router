@@ -189,8 +189,15 @@ def apply(changes: dict[str, bytes | None], skill: Path, agents: Path, backup_ro
             written.append(key)
     except BaseException:
         for key in reversed(written):
-            replace(target(key, skill, agents), before[key])
-        print(f"write failed; restored previous bytes; backup: {backup}")
+            path = target(key, skill, agents)
+            try:
+                if read_bytes(path) == changes[key]:
+                    replace(path, before[key])
+                else:
+                    print(f"rollback preserved concurrent change: {path}")
+            except (OSError, ValueError) as rollback_error:
+                print(f"rollback requires manual recovery: {path}: {rollback_error}")
+        print(f"write failed; restored unchanged owned writes; inspect backup: {backup}")
         raise
     print(f"backup: {backup}")
     return backup
@@ -223,7 +230,13 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
                 raise ValueError(f"managed file was changed or removed: {path}; review before --force")
         changes = {key: None for key in owned if key not in payload}
         changes.update(payload)
+        from release_identity import source_identity, sha, canonical as canonical_json
+        identity = source_identity(root)
+        policy_parts = {key[len("skill/"):]: digest(value) for key, value in payload.items()
+                        if key == "skill/SKILL.md" or key.startswith("skill/references/")}
         manifest = {"schema": 1, "owner": PROJECT, "version": version,
+                    "base_commit": identity["base_commit"],
+                    "policy_sha256": sha(canonical_json(policy_parts)),
                     "mode": profile.mode, "allow_low": profile.allow_low, "profile_schema": 2,
                     "files": {key: digest(value) for key, value in sorted(payload.items())}}
         changes[f"skill/{MANIFEST}"] = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()

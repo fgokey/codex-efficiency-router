@@ -1,0 +1,20 @@
+{
+  "policy": {
+    "cases": 12,
+    "killed": 12
+  },
+  "quality": {
+    "cases": 12,
+    "killed": 12
+  },
+  "effort": {
+    "cases": 27,
+    "killed": 27
+  },
+  "write": {
+    "cases": 12,
+    "killed": 12
+  },
+  "invocation": "Existing mutation functions invoked directly; Git-report CLI not used because the supplied candidate ZIP has no .git.",
+  "holdout_passed": true
+}
