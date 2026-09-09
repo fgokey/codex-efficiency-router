@@ -7,17 +7,44 @@
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
 
+## Windows Python preflight and acceptance boundaries
+
+Use `cer.ps1` below (the install/uninstall wrappers share it). It checks the actual
+Python version and `tomllib`, tries compatible PATH executables and `py -0p` listed
+runtimes, and rejects 3.10 **before** invoking any installer. A name such as `python`
+or `py -3` does not guarantee 3.11+. No downloads, PATH changes or global configuration edits occur.
+
+To use an already verified runtime, including an app-bundled Python, explicitly set
+its **actual full executable path** in this PowerShell session:
+
+```powershell
+$env:CER_PYTHON = 'C:\actual\Python312\python.exe'
+.\cer.ps1 doctor --scope user --json
+```
+
+An invalid explicit override stops; it does not silently fall back. The selected path
+and version go to stderr, leaving JSON stdout intact. Bundled runtimes can move after
+an app update. Standalone Guard installation binds the selected absolute executable;
+recheck/update the Guard and review its definition if that path changes. Portable
+Plugin hooks have separate runtime discovery requirements; this launcher does not verify them.
+
+**Skill installation is still policy-only unless a Guard is explicitly installed and
+validated.** CI success is offline evidence, not a native Canary or real-task savings
+claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
+host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
 ## v0.7.0-rc.2: smaller instructions
 
 This candidate compresses the loaded Skill and role text without changing routing
 or write permissions. References load once at explicit triggers while valid, not
 on every tool call. See [footprint and validation](docs/VALIDATION-v0.7.0-rc.2.md).
-Existing fixed/low settings remain preserved; installation commands are unchanged.
+Existing fixed/low settings and underlying installer arguments remain preserved;
+Windows entry-point preflight is described above.
 
 
 ## v0.7.0-rc.1: verifiable state, not assumed enforcement
 
-This is an **unpublished release candidate**, based on v0.6.0. Existing fixed-mode
+The source remains a **release candidate, not a stable release**, based on v0.6.0. Existing fixed-mode
 installations and automatic-low opt-outs are preserved. No Write Lease, permanent
 background service, runtime concurrency ledger or model-driven installer is added.
 
@@ -33,8 +60,8 @@ discovery/trust/Windows execution still require host acceptance. Existing users
 should keep the supported Skill installer plus explicit standalone Guard path until
 that acceptance is complete. Do not install duplicate Plugin and standalone Hooks.
 
-For this candidate ZIP, **do not run `git pull` expecting these unpublished changes**.
-Extract it, review it, and use the [RC upgrade instructions](docs/UPGRADE-v0.7.0-rc.1.md).
+Git checkouts can use the fast-forward update below; record the actual commit.
+For a downloaded ZIP, extract and review it using the [RC upgrade instructions](docs/UPGRADE-v0.7.0-rc.1.md).
 See [Canary](docs/CANARY.md), [benchmark format](docs/BENCHMARKING-v0.7.md),
 [validation status](docs/VALIDATION-v0.7.0-rc.1.md) and [plan review](docs/REVIEW-v0.7.0.md).
 
@@ -84,9 +111,9 @@ Review source first. Installation only manages owned files; it does not edit glo
 ```powershell
 git clone https://github.com/fgokey/codex-efficiency-router.git
 cd codex-efficiency-router
-py -3 scripts/install.py --scope user --dry-run
-py -3 scripts/install.py --scope user
-py -3 scripts/doctor.py --scope user
+.\cer.ps1 install --scope user --dry-run
+.\cer.ps1 install --scope user
+.\cer.ps1 doctor --scope user
 ```
 
 ### macOS / Linux
@@ -103,24 +130,24 @@ python3 scripts/doctor.py --scope user
 
 ```powershell
 git pull --ff-only
-py -3 scripts/install.py --scope user --dry-run
-py -3 scripts/install.py --scope user
-py -3 scripts/doctor.py --scope user
+.\cer.ps1 install --scope user --dry-run
+.\cer.ps1 install --scope user
+.\cer.ps1 doctor --scope user
 ```
 
-Use `python3` on macOS/Linux. **No `--mode adaptive` is needed.** Ordinary updates migrate pre-v0.5 manifests to auto with a printed notice and backup, preserving the low choice. Old manifests did not record whether fixed/adaptive was deliberate or default; advanced users needing a previous policy can explicitly retain it. Later v0.5+ explicit overrides survive ordinary updates. Original unmanifested v0.1 installations still require safe `--adopt-v01` adoption. See [migration details](docs/INSTALL.md).
+On macOS/Linux, replace `./cer.ps1 <action>` with `python3 -B scripts/<action>.py` after checking Python is 3.11+. **No `--mode adaptive` is needed.** Ordinary updates migrate pre-v0.5 manifests to auto with a printed notice and backup, preserving the low choice. Old manifests did not record whether fixed/adaptive was deliberate or default; advanced users needing a previous policy can explicitly retain it. Later v0.5+ explicit overrides survive ordinary updates. Original unmanifested v0.1 installations still require safe `--adopt-v01` adoption. See [migration details](docs/INSTALL.md).
 
 Review customization/collision errors instead of blindly adding `--force`. STATIC PASS is installation integrity, not live model proof. Reload Codex after updates; an old conversation can retain old instructions. A Skill-only copy does not deploy the role bindings: use the full installer.
 
 ### Project scope
 
 ```powershell
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project" --dry-run
-py -3 scripts/install.py --scope project --project-root "C:/Work/my-project"
-py -3 scripts/doctor.py --scope project --project-root "C:/Work/my-project"
+.\cer.ps1 install --scope project --project-root "C:/Work/my-project" --dry-run
+.\cer.ps1 install --scope project --project-root "C:/Work/my-project"
+.\cer.ps1 doctor --scope project --project-root "C:/Work/my-project"
 ```
 
-On macOS/Linux substitute `python3` and a real absolute project path. User Skills go to `~/.agents/skills/codex-efficiency-router`; bindings to `$CODEX_HOME/agents` or `~/.codex/agents`. Project scope uses `.agents/skills` and `.codex/agents`. The installer prints actual backup paths.
+On macOS/Linux use `python3 -B scripts/<action>.py` and a real absolute project path. User Skills go to `~/.agents/skills/codex-efficiency-router`; bindings to `$CODEX_HOME/agents` or `~/.codex/agents`. Project scope uses `.agents/skills` and `.codex/agents`. The installer prints actual backup paths.
 
 ## Use
 
@@ -136,8 +163,8 @@ Relevant substantial work may trigger implicitly; explicit invocation is clearer
 Use the same scope, project root and CODEX_HOME as installation.
 
 ```powershell
-py -3 scripts/uninstall.py --scope user --dry-run
-py -3 scripts/uninstall.py --scope user
+.\cer.ps1 uninstall --scope user --dry-run
+.\cer.ps1 uninstall --scope user
 ```
 
 ```sh
@@ -148,8 +175,8 @@ python3 scripts/uninstall.py --scope user
 For project scope use `--scope project --project-root ...`. Only manifest-owned files are removed; untracked files, configuration and backups survive. Local modifications block removal by default. Uninstall does not automatically restore an old version; there is no `--no-restore` option. Restore explicitly from the printed backup directory:
 
 ```powershell
-py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
-py -3 scripts/install.py --scope user --restore "ACTUAL-BACKUP-PATH"
+.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
+.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
 Restore preserves the original selection without migrating it to auto. Reload Codex after uninstall; keep private customization backups out of public reports. [Full lifecycle and recovery](docs/INSTALL.md).

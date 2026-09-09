@@ -65,3 +65,39 @@ jobs:
           path: evaluation-results/
           if-no-files-found: error
           retention-days: 14
+
+  windows-python310-bootstrap:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        id: compatible
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-python@v5
+        id: old
+        with:
+          python-version: '3.10'
+      - name: Real 3.10 default, explicit 3.12 launcher and read-only preflight
+        shell: pwsh
+        env:
+          CER_PYTHON: ${{ steps.compatible.outputs.python-path }}
+          CER_OLD_PYTHON: ${{ steps.old.outputs.python-path }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          python -c "import sys; assert sys.version_info[:2] == (3, 10)"
+          if ($LASTEXITCODE -ne 0) { throw 'Expected actual Python 3.10 default' }
+          $Project = Join-Path $env:RUNNER_TEMP 'cer bootstrap project'
+          New-Item -ItemType Directory -Path $Project | Out-Null
+          ./cer.ps1 install --scope project --project-root $Project --dry-run
+          if ($LASTEXITCODE -ne 0) { throw 'Compatible explicit runtime was not selected' }
+          if (@(Get-ChildItem -Force $Project).Count -ne 0) { throw 'Dry-run wrote files' }
+          # Run rejection in a child PowerShell so its expected failure is inspectable.
+          $env:CER_PYTHON = $env:CER_OLD_PYTHON
+          pwsh -NoProfile -NonInteractive -File ./cer.ps1 install --scope project --project-root $Project
+          if ($LASTEXITCODE -eq 0) { throw 'Explicit Python 3.10 was incorrectly accepted' }
+          if (@(Get-ChildItem -Force $Project).Count -ne 0) { throw 'Rejected interpreter wrote files' }
+          exit 0

@@ -81,7 +81,7 @@ def source_payload(root=ROOT):
     for name in ('VERSION', 'LICENSE', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'AGENTS.md',
                  'CONTRIBUTING.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
                  '.editorconfig', '.gitattributes', '.gitignore', 'plugin.json',
-                 'install.sh', 'install.ps1', 'uninstall.sh', 'uninstall.ps1'):
+                 'install.sh', 'install.ps1', 'uninstall.sh', 'uninstall.ps1', 'cer.ps1'):
         payload[name] = (root / name).read_bytes()
     return payload
 

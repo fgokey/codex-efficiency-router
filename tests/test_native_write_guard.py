@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import runpy
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -107,15 +108,34 @@ class NativeGuardTests(unittest.TestCase):
 
     def test_readonly_git_diff_disables_external_diff(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
-        subprocess.run(['git','init','-q',str(self.root)],check=True)
-        subprocess.run(['git','-C',str(self.root),'add','sentinel.txt'],check=True)
-        subprocess.run(['git','-C',str(self.root),'-c','user.name=Test','-c','user.email=test@example.invalid','commit','-qm','base'],check=True)
-        self.file.write_text('after')
+        # Fixture writes must finish before the read-only snapshot. In validate #27
+        # commit's auto-maintenance removed .git/objects/maintenance.lock mid-check.
+        # Isolate setup; never hide .git changes, sleep, or skip the assertion.
+        env = {k: v for k, v in os.environ.items() if not k.upper().startswith('GIT_')}
+        env.update(GIT_CONFIG_NOSYSTEM='1', GIT_CONFIG_GLOBAL=os.devnull)
+        git = ['git', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0',
+               '-c', 'gc.autoDetach=false', '-c', 'core.hooksPath=' + os.devnull,
+               '-C', str(self.root)]
+        subprocess.run([*git, 'init', '-q', '--template='], env=env, check=True)
+        subprocess.run([*git, 'add', 'sentinel.txt'], env=env, check=True)
+        subprocess.run([*git, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+                        'commit', '--no-gpg-sign', '-qm', 'base'], env=env, check=True)
+        # Actually configure an external diff that would leave an observable write.
+        external = self.root / 'external_diff.py'
+        external.write_text('from pathlib import Path\nPath(__file__).with_name("external-called").write_text("called")\n', encoding='utf-8')
+        command = shlex.join([Path(sys.executable).as_posix(), external.as_posix()])
+        subprocess.run([*git, 'config', 'diff.external', command], env=env, check=True)
+        self.file.write_text('after', encoding='utf-8')
+        subprocess.run([*git, 'diff', '--ext-diff', '--', 'sentinel.txt'], env=env, check=True)
+        self.assertTrue((self.root / 'external-called').is_file(), 'external diff positive control did not run')
+        (self.root / 'external-called').unlink()
         before={str(p.relative_to(self.root)):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
         result=reader['run'](self.root,{'op':'diff','path':'sentinel.txt'})
         self.assertIn('-before',result);self.assertIn('+after',result)
         after={str(p.relative_to(self.root)):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
-        self.assertEqual(before,after)
+        self.assertFalse((self.root / 'external-called').exists())
+        changed = sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
+        self.assertEqual(changed, [], 'read-only operation changed paths (including .git)')
 
     def test_windows_command_quoting_is_literal(self):
         cmd=MODULE['command'](["C:/Program Files/Python/python.exe","-I","C:/O'Brien/reader.py"],True)
