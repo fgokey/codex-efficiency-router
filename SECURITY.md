@@ -11,3 +11,7 @@ Backups can contain private custom instructions. Keep them local, out of Git and
 The Astra role is read-only in both configuration and instructions. Host permissions can take precedence over role defaults; instructions alone do not enforce a sandbox. Workers must not spawn agents, publish, deploy, or alter authorization. User intent and host policy remain authoritative.
 
 Report security concerns privately through GitHub's private vulnerability reporting **when enabled**. Otherwise contact the maintainer through an available private channel before disclosing exploit details. Do not include secrets or real private prompts in public issues. See [support](SUPPORT.md).
+
+## Optional native write guard
+
+`write_guard.py` is an explicit separate local installer that merges one owned group into hooks.json; the main Skill installer still leaves that file unchanged. The native hook requires trust and only covers supported tool paths. Its exact tool allowlist assumes trusted host semantics; host failures/skip paths and pre-existing exec sessions remain limitations. It is not malicious-code isolation or runtime ownership verification. See [WRITE-GATE](docs/WRITE-GATE.md) before enabling it. Removing the Skill does not remove the separately installed guard; removal is explicit.

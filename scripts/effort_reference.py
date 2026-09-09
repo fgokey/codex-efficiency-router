@@ -11,6 +11,7 @@ from typing import Literal, Mapping
 from package import EXPECTED
 from policy_reference import LANES, SAME_LANE_REASONS, TaskSignals, choose_lane
 from profiles import Profile
+from write_policy import OPERATIONS, WriteScope, before_action, diagnostic_action
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 PRESETS = {model.rsplit("-", 1)[-1]: (role, model, effort)
@@ -51,6 +52,9 @@ class RoleBinding:
 @dataclass(frozen=True)
 class Context:
     current: Configuration | None = None
+    operation: str = "reasoning"  # Legacy planner calls are analysis, NEVER write authorization.
+    read_only: bool = False
+    write_scope: WriteScope = field(default_factory=WriteScope)
     current_sufficient: bool = False
     host_supports_routing: bool = False
     host_can_set_effort: bool = False
@@ -66,11 +70,17 @@ class Context:
     worker_active: bool = False
     last_observation: str = "NOT_CHECKED"
     automatic_low_suspended: bool = False  # Sticky for this task after unknown/mismatched identity.
+    failure_kind: str = "none"  # Classified evidence, not just an error counter.
     diagnosis_only: bool = False
     repair_extension_reason: str | None = None
     unavailable_roles: frozenset[str] = frozenset()  # Task-local confirmed failures; never probe in a loop.
 
     def validate(self) -> None:
+        if self.operation not in OPERATIONS or type(self.read_only) is not bool or not isinstance(self.write_scope, WriteScope):
+            raise ValueError("invalid operation/authority context")
+        self.write_scope.validate()
+        if self.failure_kind not in ("none", "capability", "unexplained", "implementation", "environment", "specification", "observability"):
+            raise ValueError("invalid classified failure")
         for name in ("current_sufficient", "host_supports_routing", "host_can_set_effort",
                      "benefit_clear", "no_escalation", "no_effort_escalation", "keep_model",
                      "safe_boundary", "worker_active", "diagnosis_only", "automatic_low_suspended"):
@@ -103,10 +113,11 @@ class Context:
 class Decision:
     recommended: Configuration | None
     requested: Configuration | None
-    action: Literal["local", "delegate", "blocked", "prerequisite", "defer"]
+    action: Literal["local", "delegate", "blocked", "prerequisite", "defer", "reuse"]
     reason: str
     requested_role: str | None = None
     binding_kind: Literal["adaptive", "fixed"] | None = None
+    owner_id: str | None = None
 
 
 def low_eligible(s: TaskSignals) -> bool:
@@ -153,9 +164,52 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
         raise ValueError("explicit effort is not supported by this policy")
     rec = recommend(s, deep_reasoning=deep_reasoning, allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH"))
 
+    write_intent = context.operation in ("mutation", "unknown")
+    gate = before_action(context.operation, context.current.model if context.current else None,
+                         context.write_scope, read_only=context.read_only,
+                         no_subagents=s.no_subagents, host_supports_routing=context.host_supports_routing)
+    must_delegate = write_intent and gate.action != "local_write"
+    if must_delegate and rec is not None and rec.lane == "luna":
+        rec = Configuration("terra", "medium")
+    diagnostic = diagnostic_action(
+        model=context.current.model if context.current else None,
+        complex_judgment=rec is not None and rec.lane == "astra",
+        prerequisites_ready=s.spec_complete and s.authority_ready and s.environment_ready and s.observability_ready,
+        cheap_check_available=s.cheap_check_available, failure_kind=context.failure_kind,
+        qualified_attempts=s.failed_attempts, no_escalation=context.no_escalation)
+    if context.diagnosis_only and not write_intent and diagnostic == "delegate_astra_readonly":
+        rec = Configuration("astra", "high")
+
     def result(action, reason, requested=None, requested_role=None, binding_kind=None):
+        if action == "local" and must_delegate:
+            return Decision(rec, None, "blocked", "local mutation forbidden; " + reason)
         return Decision(rec, requested, action, reason, requested_role, binding_kind)
 
+    if write_intent and gate.action in ("blocked", "defer"):
+        return Decision(rec, None, gate.action, gate.reason, owner_id=gate.owner)
+    if write_intent and rec is not None and rec.lane == "astra":
+        return result("blocked", "split out Astra read-only diagnosis, then assign settled writes to Terra/Sol")
+
+    if write_intent and s.failed_attempts >= 2 and context.repair_extension_reason is None:
+        return result("blocked", "write budget exhausted; reuse/diagnosis labels cannot renew repairs")
+    if write_intent and gate.action == "reuse":
+        owner = next(w for w in context.write_scope.writers if w.agent_id == gate.owner)
+        owner_lane = next((lane for lane, (_, model, _) in PRESETS.items() if model == owner.model), None)
+        current = context.current
+        if context.keep_model and (current is None or owner_lane != current.lane):
+            return result("blocked", "existing owner does not satisfy the model lock")
+        if explicit_effort is not None and owner.effort != explicit_effort:
+            return result("blocked", "existing owner does not confirm the explicitly requested effort")
+        if context.no_escalation or context.no_effort_escalation:
+            if current is None or owner.effort is None:
+                return result("blocked", "unknown owner configuration cannot verify upgrade limits")
+            if (context.no_escalation and LANES.index(owner_lane) > LANES.index(current.lane)) or EFFORTS.index(owner.effort) > EFFORTS.index(current.effort):
+                return result("blocked", "existing owner exceeds an upgrade limit")
+        return Decision(rec, None, "reuse", gate.reason, owner_id=gate.owner)
+    if context.diagnosis_only and not write_intent and diagnostic in ("repair_prerequisite", "executor_experiment"):
+        return result("prerequisite", "repair prerequisites or run a safe discriminating check before diagnosis")
+    if context.diagnosis_only and not write_intent and diagnostic == "astra_local_readonly_diagnosis":
+        return result("local", "Astra participates directly in read-only diagnosis; exhausted write budget remains exhausted")
     if rec is None:
         return result("prerequisite", "repair prerequisites or run a safe discriminating check")
     if s.failed_attempts >= 2 and not context.diagnosis_only and context.repair_extension_reason is None:
@@ -186,13 +240,13 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     if context.change_event == "none":
         return result("local" if context.current_sufficient else "blocked", "no event justifies reselection")
     if current == candidate:
-        if context.same_config_reason == "none" or not context.benefit_clear:
+        if (context.same_config_reason == "none" or not context.benefit_clear) and not (must_delegate and context.current_sufficient):
             return result("local" if context.current_sufficient else "blocked", "identical configuration needs contextual value and benefit")
     elif current is not None and not context.current_sufficient:
         if LANES.index(candidate.lane) < LANES.index(current.lane) or (
                 candidate.lane == current.lane and EFFORTS.index(candidate.effort) < EFFORTS.index(current.effort)):
             return result("blocked", "do not downgrade the same unresolved insufficiency")
-    if context.current_sufficient and explicit_effort is None and not s.force_astra and not context.benefit_clear:
+    if context.current_sufficient and explicit_effort is None and not s.force_astra and not context.benefit_clear and not must_delegate:
         return result("local", "current agent is sufficient; handoff benefit not established")
 
     def unavailable(reason):

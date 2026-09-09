@@ -2,9 +2,23 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.5.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.6.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
+
+## v0.6: read-only Astra, active diagnosis
+
+Write authority now precedes tiny/local shortcuts. Astra roots and leaves never patch,
+write checkpoints, format, build or run side-effecting tests. They still inspect evidence,
+solve hard decisions and diagnose repeated qualified unexplained failures. Executors
+apply the resulting plan; changing worker/model never renews repairs. Preserve existing
+edits for independent takeover review; wait when two writers are active.
+
+A Skill cannot revoke root tools. A separately registered native synchronous PreToolUse
+guard blocks covered side-effect paths and provides bounded read access. **Normal Skill
+installation does not register or trust it.** Registration affects its Codex configuration
+scope, even outside this Skill, so consent/trust is explicit and project scope is preferred.
+This is not another routing mode. [Guard setup, removal and limits](docs/WRITE-GATE.md).
 
 ## One install, capability-aware execution
 
@@ -14,7 +28,7 @@ After deciding capability and delegation benefit, the parent uses actual native 
 | --- | --- |
 | Explicit effort field and correctly loaded unpinned alias | Request the selected pair using that alias |
 | Otherwise, a fixed role matches the exact same pair | Use the compatibility binding, without reinstalling |
-| Neither route meets the requirement | Keep a sufficient parent, or report BLOCKED; never silently weaken effort |
+| Neither route meets the requirement | Keep sufficient permitted work local; Astra mutations still require an executor, otherwise BLOCKED |
 
 Only one binding is selected per child. No model calls just to probe capability, no runtime configuration rewrites, hidden sessions or replay while another writer's state is uncertain. A compatibility route is not dynamic-effort success; missing runtime identity remains UNKNOWN.
 
@@ -83,7 +97,7 @@ $codex-efficiency-router
 Complete this task using suitable model/effort choices and the required acceptance checks.
 ```
 
-Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple work stays local; do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
+Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local; Astra writes always go to an executor. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
 
 ## Uninstall and restore
 
@@ -120,4 +134,4 @@ No model calls. CI also measures named reference token encodings. Pure helpers t
 
 [Architecture](docs/ARCHITECTURE.md) · [Sources](docs/PRIOR-ART.md) · [Changes](CHANGELOG.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)
 
-[Validation v0.5.0](docs/VALIDATION-v0.5.0.md)
+[Validation v0.6.0](docs/VALIDATION-v0.6.0.md)

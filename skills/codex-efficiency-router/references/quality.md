@@ -1,7 +1,5 @@
-# Evidence and recovery
+# Evidence/recovery
 
-Reuse the contract: requirement | check/review evidence | applicable state | PASS/FAIL/UNKNOWN. Design tasks can use reasoned review, not irrelevant builds. Mandatory integration/review belongs in required outcomes. Optional disclosed risks may coexist with PASS; required gaps cannot. Only authorized scope changes revise the contract; retain earlier gaps, never let executors waive failed checks.
+Reuse the contract: requirement | current check/review | applicable state | PASS/FAIL/UNKNOWN. Design can use reasoned review, not irrelevant builds. Required integration/review cannot be waived; optional risks may coexist with PASS. Authorized scope changes retain earlier gaps. Same HEAD isn't freshness: dirty files, tests, dependencies/environment matter; revalidate affected parts.
 
-Same HEAD does not prove freshness: dirty code, tests, dependencies and environment matter. Revalidate affected parts only. A checkpoint needs one parent owner and a permitted location; never overwrite another task or persist secrets. Reconcile actual files, active workers and uncertain external effects before replay; reuse valid completed work.
-
-Unknown failure history must be reconstructed, not assigned a fresh budget. Changing worker, model, effort, error wording or contract label alone never renews attempts. Only justified bounded parent reassessment permits more repairs. Offline helpers test declarations, not real code or model compliance; live grading remains user-run.
+One permitted checkpoint, owned/written by an executor, only for long work/recovery; don't overwrite another task or store secrets. Reconcile files, active workers and uncertain effects before replay. Reuse valid completed work. Reconstruct unknown history, never invent fresh budgets. Worker/model/effort/error/contract renaming does not renew retries. Justified bounded reassessment may extend repairs; readonly diagnosis remains available. Offline helpers test declarations, not live enforcement or quality.

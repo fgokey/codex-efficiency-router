@@ -2,9 +2,15 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.5.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.6.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
+
+## v0.6：Astra 不亲自写，但必须参与难题
+
+写入资格现在优先于“小任务本地完成”：Astra 根/子代理只读，不能 patch、写检查点、格式化、构建或运行有副作用的测试。它仍直接分析源码/diff、裁决架构和诊断反复失败；两次有质量尝试仍无法解释时，停止盲改、交 Astra 分析，结论由现有 Sol/Terra 实施。重试预算不重置。已有修改保留并移交独立复核；两个写入者忙时等待，不再开第三个。
+
+Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Codex 原生同步 PreToolUse 门禁，拦截已覆盖路径上的直接写入，并提供受限只读读取方式。**门禁必须显式注册并在 `/hooks` 中信任；普通 Skill 安装不改共享 hooks.json，也不等于硬拦截已生效。** 这是一项作用于配置范围的权限保护，不是又一个路由模式。优先按项目一次安装，详见[写入门禁、安装/卸载与验收](docs/WRITE-GATE.md)。
 
 ## 一次安装，运行时自动适配
 
@@ -14,7 +20,7 @@
 | --- | --- |
 | 可显式传档位，且自适应绑定正确加载 | 使用自适应绑定，明确传入选定模型和档位 |
 | 缺少上述能力，但固定角色恰好满足同一模型/档位 | 使用固定兼容绑定，无需重装 |
-| 两条路径均不满足 | 当前父代理足够则继续；否则报告阻塞，不静默降档或启动隐藏会话 |
+| 两条路径均不满足 | 仅能力及权限均足够的本地工作可继续；Astra 写入仍交执行者，否则阻塞 |
 
 只选择一个绑定、创建一个必要子任务。不会为了探测而调用模型，不修改运行中的配置；未知写入者或副作用未确认前不重新派发。兼容回退不代表动态调档成功，实际身份未知时仍标记 UNKNOWN。
 
@@ -83,7 +89,7 @@ $codex-efficiency-router
 完成当前任务，按任务需求选择模型与思考档位，保留必要验收。
 ```
 
-支持相关任务的隐式触发；显式调用更明确。父线程模型不改变。简单工作直接工具执行，不默认多 Agent。不叠加多个 Router；“禁用路由”“不要子 Agent”“不要升级”仍有效。必要要求逐项对应当前证据，区分 PASS/PARTIAL/BLOCKED；换绑定、模型或上下文不重置重试次数。
+支持相关任务的隐式触发；显式调用更明确。父线程模型不改变。简单且有权限的工作直接执行；Astra 写入仍交执行者，不默认多 Agent。不叠加多个 Router；“禁用路由”“不要子 Agent”“不要升级”仍有效。必要要求逐项对应当前证据，区分 PASS/PARTIAL/BLOCKED；换绑定、模型或上下文不重置重试次数。
 
 ## 卸载与恢复
 
@@ -120,4 +126,4 @@ python3 evaluation/offline_audit.py --without-tokenizer
 
 [架构](docs/ARCHITECTURE.md) · [参考资料](docs/PRIOR-ART.md) · [变更](CHANGELOG.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [许可](LICENSE)
 
-[Validation v0.5.0](docs/VALIDATION-v0.5.0.md)
+[Validation v0.6.0](docs/VALIDATION-v0.6.0.md)

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0] - 2026-09-09
+
+- Put actor write authority ahead of local/cost fallbacks; include Astra roots and leaves.
+- Preserve existing edits and task-wide attempts; prefer compatible Terra/Sol owners, never a third active writer.
+- Keep Astra actively involved in hard decisions and qualified repeated failures; repair exhaustion does not disable read-only diagnosis.
+- Add an optional synchronous native PreToolUse guard, bounded reader protocol, owned hook registration/removal and explicit trust/coverage limits.
+- Add operation-aware, real-sentinel synthetic-host, lifecycle and adversarial tests. No live Codex task is started.
+
+
 ## [0.5.0] - 2026-09-08
 
 - Ordinary install/update now uses automatic native capability adaptation, without routine mode flags.

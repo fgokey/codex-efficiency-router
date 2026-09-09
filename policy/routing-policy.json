@@ -44,7 +44,11 @@
     "joint_model_effort_selection",
     "explicit_adaptive_effort_no_inheritance_guess",
     "effort_change_preserves_task_retry_budget",
-    "no_silent_unsupported_effort_mapping"
+    "no_silent_unsupported_effort_mapping",
+    "write_authority_before_local_shortcuts",
+    "astra_root_and_leaf_no_local_mutation",
+    "retry_exhaustion_does_not_disable_readonly_diagnosis",
+    "existing_edits_preserved_for_owner_review"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -76,7 +80,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.5.0",
+  "version": "0.6.0",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 6500,
