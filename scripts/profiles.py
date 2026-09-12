@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 import re
 import tomllib
 from typing import Literal
 
-from package import EXPECTED, AUTO_EXPECTED, PROJECT
+from package import AUTO_DESCRIPTION_PREFIX, EXPECTED, AUTO_EXPECTED, PROJECT
 
 Mode = Literal["auto", "fixed", "adaptive"]
 MODES = ("auto", "fixed", "adaptive")
@@ -95,8 +96,14 @@ def render_payload(payload: dict[str, bytes], profile: Profile) -> dict[str, byt
                     raise ValueError(f"ambiguous role name: {filename}")
                 source = source.replace(line, f'name = "{alias_name}"\n', 1)
                 expected["name"] = alias_name
+                line = "description = " + json.dumps(config["description"]) + "\n"
+                if source.count(line) != 1:
+                    raise ValueError(f"ambiguous role description: {filename}")
+                description = AUTO_DESCRIPTION_PREFIX + config["description"]
+                source = source.replace(line, "description = " + json.dumps(description) + "\n", 1)
+                expected["description"] = description
                 if tomllib.loads(source) != expected:
-                    raise ValueError(f"alias changed non-binding settings: {filename}")
+                    raise ValueError(f"alias changed protected settings: {filename}")
                 key = "agents/" + alias_file
             output[key] = source.encode("utf-8")
     return output

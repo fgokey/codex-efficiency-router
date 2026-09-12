@@ -4,13 +4,13 @@
 
 Ordinary install/update is auto. Users do not choose fixed/adaptive to suit each Codex host. The parent selects a model/effort pair from task evidence, then a supported native binding. No new model level, classifier call, proxy, daemon, hidden CLI or in-flight hot switching is introduced.
 
-Four canonical fixed definitions generate four additional aliases named `cer_auto_<role>` in files `cer-auto-<original-file>.toml`. Aliases preserve model, developer instructions and sandbox fields exactly, changing only name and removing the top-level effort pin. Auto installs eight bindings; explicit legacy fixed/adaptive overrides install four. A file does not spawn a worker. Extra role discovery text has a cost and is reported separately.
+Four canonical fixed definitions generate four additional aliases named `cer_auto_<role>` in files `cer-auto-<original-file>.toml`. Aliases preserve model, developer instructions and sandbox fields, add a short auto-effort discovery marker, change the name and remove the top-level effort pin. Auto installs eight bindings; explicit legacy fixed/adaptive overrides install four. A file does not spawn a worker. Extra role discovery text has a cost and is reported separately.
 
 ## Admission order
 
 Apply requirements, quality floors, user opt-outs/ceilings, shared repair budgets, safe boundaries and benefit gates BEFORE choosing a binding. Then:
 
-1. Prefer a discovered matching unpinned alias when native tools expose explicit effort. Pass the chosen model and effort using the actual schema.
+1. A discovered matching unpinned alias is mandatory when native tools expose explicit effort. Pass the chosen effort using the actual schema; selecting the base role in this state is a dispatch mismatch.
 2. Otherwise use the matching fixed base role only when its pinned model AND effort equal the selected pair.
 3. If no binding qualifies, keep an adequate current agent or report BLOCKED. Explicit unfulfilled settings are disclosed. Never invent parameters, ignore pins, inherit an unknown effort, reduce high to medium or upgrade models solely for compatibility.
 

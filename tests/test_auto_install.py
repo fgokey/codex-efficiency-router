@@ -14,7 +14,7 @@ sys.path.insert(0,str(ROOT/'scripts'))
 import manage
 import doctor
 from profiles import Profile, from_manifest, select_profile, render_payload
-from package import EXPECTED, AUTO_EXPECTED, MANIFEST, resolve_targets
+from package import AUTO_DESCRIPTION_PREFIX, EXPECTED, AUTO_EXPECTED, MANIFEST, resolve_targets
 
 
 class AutomaticInstallTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class AutomaticInstallTests(unittest.TestCase):
     def backup(self):return sorted(p for p in self.backups.iterdir() if p.is_dir())[-1]
     def manifest(self):return json.loads((self.skill/MANIFEST).read_text())
 
-    def test_plain_install_creates_eight_bindings_with_four_unchanged_policies(self):
+    def test_plain_install_marks_auto_bindings_for_native_discovery(self):
         self.install()
         self.assertEqual(self.manifest()['mode'],'auto')
         self.assertEqual(len(list(self.agents.glob('*.toml'))),8)
@@ -41,6 +41,7 @@ class AutomaticInstallTests(unittest.TestCase):
             fixed=tomllib.loads((self.agents/name).read_text())
             alias=tomllib.loads((self.agents/('cer-auto-'+name)).read_text())
             expected=dict(fixed,name='cer_auto_'+role);del expected['model_reasoning_effort']
+            expected['description']=AUTO_DESCRIPTION_PREFIX+fixed['description']
             self.assertEqual(alias,expected)
         astra=tomllib.loads((self.agents/'cer-auto-astra-architect.toml').read_text())
         self.assertEqual(astra['sandbox_mode'],'read-only')
@@ -89,10 +90,13 @@ class AutomaticInstallTests(unittest.TestCase):
         self.assertEqual(p.read_text(),'private unrelated settings')
         self.assertFalse((self.skill/MANIFEST).exists())
 
-    def test_missing_or_pinned_alias_fails_doctor(self):
+    def test_missing_pinned_or_unmarked_alias_fails_doctor(self):
         self.install();p=self.agents/'cer-auto-sol-engineer.toml';original=p.read_bytes()
         p.write_bytes(b'model_reasoning_effort = "medium"\n'+original)
         self.assertTrue(doctor.validate_tree(self.skill/'SKILL.md',self.agents,Profile('auto')))
+        p.write_bytes(original.replace(AUTO_DESCRIPTION_PREFIX.encode(),b''))
+        self.assertTrue(doctor.validate_tree(self.skill/'SKILL.md',self.agents,Profile('auto')))
+        p.write_bytes(original)
         p.unlink()
         self.assertTrue(doctor.validate_tree(self.skill/'SKILL.md',self.agents,Profile('auto')))
 

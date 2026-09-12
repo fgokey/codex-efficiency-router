@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; reserve Astra fo
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.2 -->
+<!-- CER version: 0.7.0-rc.3 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
 
@@ -30,7 +30,7 @@ Route on phase/evidence changes, classified failures or user requests, not each 
 | `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
-Select sufficient model AND effort. Never auto-select `max` or xhigh; no Ultra. Auto-low requires opt-in and quality gates. Astra needs useful stronger reasoning, consequential/exceptionally hard judgment AND insufficient cheap falsification; no ladder/keyword/size triggers.
+Select sufficient model AND effort. Auto preflight: when the actual schema exposes `reasoning_effort` and matching `cer_auto_<role>`, use that alias with explicit effort; a base role is MISMATCH. Base roles require unavailable alias/field evidence and an exact pinned pair; state why. Never auto-select `max`/xhigh/Ultra; auto-low needs opt-in. Astra needs useful stronger reasoning, consequentially hard judgment AND no cheap falsification.
 
 ## Decide whether delegation is worth it
 
@@ -46,10 +46,10 @@ Pass contract/outcomes, revision/dirty state/paths, facts vs assumptions/evidenc
 
 Classify prerequisite/environment/observability/implementation/capability failures. One targeted repair after initial failure per task/unit/failure signature across ALL owners. Worker/model/effort/compaction never renews attempts. Exhaustion needs diagnosis/experiment/escalation or justified bounded extension retaining history.
 
-Check requirements/correctness, repository checks and defect reproduction. New tests are not independent proof. Do not weaken assertions, delete relevant tests or waive acceptance. Bind evidence to final code/checks/environment, not HEAD alone; reuse unaffected checks. Unrun is UNKNOWN, not PASS. PASS requires all necessary outcomes evidenced with no blocker; else PARTIAL/BLOCKED. Stop after acceptance; speculative optimization stays a measurement plan.
+Check requirements/correctness, repository checks and reproduction. New tests are not independent proof. Do not weaken assertions, delete relevant tests or waive acceptance. Bind evidence to final code/checks/environment; reuse unaffected checks. Unrun is UNKNOWN, not PASS. PASS needs all outcomes with no blocker; else PARTIAL/BLOCKED. Stop after acceptance; speculative optimization stays a measurement plan.
 
 ## Context and reporting
 
 Load each reference once at its trigger; reread only when stale or lost after compaction: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/guarded shell; [quality.md](references/quality.md) for checkpointing/recovery/disputed evidence.
 
-Read narrowly; keep log paths. Do not preload docs/hooks or copy the router into children; send contracts and their own role. Long work/recovery uses one permitted writer-owned checkpoint. Honor disable/no-subagent/no-escalation on both axes without granting writes. Report requested vs observed pairs; UNKNOWN/MISMATCH suspends auto-low. No invented identity/savings/cache/enforcement. Collect required leaves; stop only owned superseded work; reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.
+Read narrowly; keep log paths. Do not preload docs/hooks or copy the router into children; send contract and role. Long work uses one permitted writer checkpoint. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Never invent identity/savings/cache/enforcement. Collect leaves and reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.

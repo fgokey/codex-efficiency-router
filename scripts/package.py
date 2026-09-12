@@ -24,6 +24,7 @@ AUTO_EXPECTED = {
     "cer-auto-" + filename: ("cer_auto_" + role, model, effort)
     for filename, (role, model, effort) in EXPECTED.items()
 }
+AUTO_DESCRIPTION_PREFIX = "Auto-effort binding; pass explicit reasoning_effort. "
 MANAGED_AGENT_FILES = AGENT_FILES + list(AUTO_EXPECTED)
 
 

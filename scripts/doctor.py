@@ -18,7 +18,8 @@ try:
 except ImportError as exc:
     raise SystemExit("Python 3.11+ is required") from exc
 
-from package import EXPECTED, AUTO_EXPECTED, INSTRUCTION_BUDGETS, MANIFEST, PROJECT, resolve_targets
+from package import (AUTO_DESCRIPTION_PREFIX, EXPECTED, AUTO_EXPECTED, INSTRUCTION_BUDGETS,
+                     MANIFEST, PROJECT, resolve_targets)
 from profiles import Profile, MARKER
 from catalog import parse_catalog
 
@@ -42,6 +43,8 @@ def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile 
     for key in ("description", "developer_instructions"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             errors.append(f"{path}: nonempty {key} is required")
+    if expected[0].startswith("cer_auto_") and not data.get("description", "").startswith(AUTO_DESCRIPTION_PREFIX):
+        errors.append(f"{path}: auto binding description must expose explicit effort selection")
     instructions = data.get("developer_instructions")
     if (isinstance(instructions, str)
             and len(instructions.encode("utf-8")) > INSTRUCTION_BUDGETS["role_developer_instruction_bytes"]):

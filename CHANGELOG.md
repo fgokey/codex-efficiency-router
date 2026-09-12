@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased — rc.2 compatibility corrections
+## 0.7.0-rc.3 — 2026-09-12 (candidate, not published)
 
+- Mark generated `cer_auto_*` roles in native discovery, require their use with an explicit effort when available, and treat an unnecessary fixed-role dispatch as a mismatch.
+- Validate the discovery marker during doctor checks and add negative coverage for unmarked aliases and weakened dispatch instructions.
 - Preserve reviewability when child executors own writes: require repository-rooted exact change handoffs, parent-side status/diff verification and supported native unstaged reviews. The Skill reports the host limitation when child `fileChange` events are not aggregated; Astra does not touch files to manufacture parent attribution.
 - Isolate the readonly Git fixture from automatic maintenance and external config; keep byte-for-byte workspace and .git checks and exercise an actual external-diff sentinel. Fixes the maintenance.lock race seen in validate #27 on macOS/Python 3.11. No platform is skipped to obtain green CI.
 - Add a shared Windows launcher with actual Python 3.11+/tomllib preflight and authoritative CER_PYTHON override. Install, uninstall, doctor, standalone Guard and Canary use the same selected interpreter; no Python downloads or PATH/config changes.

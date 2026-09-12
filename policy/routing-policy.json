@@ -80,7 +80,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.7.0-rc.2",
+  "version": "0.7.0-rc.3",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -135,8 +135,8 @@
   },
   "automatic_bindings": {
     "default_install": "auto",
-    "generation": "four fixed roles and four unpinned cer_auto aliases from one canonical set",
-    "selection": "native effort plus valid unpinned alias first; otherwise exact fixed pair; otherwise sufficient parent or blocked",
+    "generation": "four fixed roles and four marked unpinned cer_auto aliases from one canonical set",
+    "selection": "valid unpinned alias plus explicit native effort is mandatory when exposed; otherwise evidenced exact fixed pair; otherwise sufficient parent or blocked",
     "legacy_upgrade": "ordinary update backs up and migrates pre-profile_schema=2 installs; later explicit overrides preserved",
     "no_probe_calls": true,
     "no_runtime_config_writes": true,

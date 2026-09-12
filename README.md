@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.2 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.3 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,14 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.3: explicit auto-effort dispatch
+
+Auto-generated roles now identify themselves in native role discovery as auto-effort
+bindings. When the host exposes both a matching `cer_auto_<role>` and an explicit effort
+field, the parent must use that alias and pass the selected effort. Fixed roles are an
+evidenced compatibility fallback only; selecting one while the auto path is available is
+reported as a mismatch. This remains policy-only and does not add model calls or a daemon.
 
 ## v0.7.0-rc.2: smaller instructions
 
@@ -85,8 +93,8 @@ After deciding capability and delegation benefit, the parent uses actual native 
 
 | Available capability | Action |
 | --- | --- |
-| Explicit effort field and correctly loaded unpinned alias | Request the selected pair using that alias |
-| Otherwise, a fixed role matches the exact same pair | Use the compatibility binding, without reinstalling |
+| Explicit effort field and correctly loaded unpinned alias | Must request the selected effort using that alias |
+| Otherwise, a fixed role matches the exact same pair | Use the compatibility binding and record why auto was unavailable |
 | Neither route meets the requirement | Keep sufficient permitted work local; Astra mutations still require an executor, otherwise BLOCKED |
 
 Only one binding is selected per child. No model calls just to probe capability, no runtime configuration rewrites, hidden sessions or replay while another writer's state is uncertain. A compatibility route is not dynamic-effort success; missing runtime identity remains UNKNOWN.
@@ -98,7 +106,7 @@ Only one binding is selected per child. No model calls just to probe capability,
 | `sol_engineer` | `gpt-5.6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-Auto generates four `cer_auto_<role>` unpinned aliases alongside the four fixed bindings: **eight small TOML files, four responsibilities**, not eight running agents or extra capability tiers. Generated aliases change only name and effort pin; model, instructions and permissions remain identical. Additional discovery descriptions can add host context; the text audit reports their separate footprint rather than claiming zero overhead.
+Auto generates four `cer_auto_<role>` unpinned aliases alongside the four fixed bindings: **eight small TOML files, four responsibilities**, not eight running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
 
 Ordinary implementation normally uses medium; deeper reasoning may use high; automatic Astra remains high. Automatic low is off by default and retains explicit prior choice. xhigh/max require explicit intent and support. No mandatory weak-model ladder. A host lacking Sol/high does not make Sol/medium an acceptable substitute.
 

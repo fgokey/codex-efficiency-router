@@ -1,6 +1,6 @@
 # Effort and binding
 
-Normally medium; high needs deeper reasoning, Astra automatically high. Respect fixed/adaptive overrides. Auto selects ONE unpinned `cer_auto_<role>` with explicit supported native effort, else the original pinned role for the SAME pair. Pins win; omission inherits/defaults, not intelligent selection. Inspect native fields, loaded roles and account pair support once; refresh after invalidation. No model substitution or unsupported high-to-medium mapping.
+Normally medium; high needs deeper reasoning; Astra automatically high. In auto, an exposed effort field plus valid `cer_auto_<role>` requires that alias and explicit effort; a base role is MISMATCH. Fallback requires unavailable alias/field and an exact pinned pair; record why. Pins win; omission inherits/defaults, not selection. Inspect fields, roles and pair support once; refresh after invalidation. No substitution or high-to-medium mapping.
 
 Cache failed bindings; no paid probes, config rewrites, routine mode switching or unsafe replay. Idle-turn changes require host support, compatible ownership and retained attempts; steer is not a hot-switch.
 

@@ -104,6 +104,15 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn('current requirement-to-check/review evidence', instructions)
             self.assertIn('not parent completion', instructions)
 
+    def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
+        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
+        for text in (core, effort):
+            self.assertIn('`cer_auto_<role>`', text)
+            self.assertIn('explicit effort', text)
+            self.assertIn('base role is MISMATCH', text)
+            self.assertIn('exact pinned pair', text)
+
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
         import inspect

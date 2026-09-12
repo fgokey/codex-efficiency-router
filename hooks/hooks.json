@@ -7,10 +7,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/astra_write_guard.py\" --expected-bundle 44d718681a41483bf7d199c5c6760fdde60315ab22b0a20e8f3db23cc82f3792",
-            "commandWindows": "python -I -B \"$env:PLUGIN_ROOT/hooks/astra_write_guard.py\" --expected-bundle 44d718681a41483bf7d199c5c6760fdde60315ab22b0a20e8f3db23cc82f3792",
+            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/astra_write_guard.py\" --expected-bundle 3fb48b5bed1a4fd26a34f38b715f661b58d1ab198d5b16e45b09352ab6bd88cf",
+            "commandWindows": "python -I -B \"$env:PLUGIN_ROOT/hooks/astra_write_guard.py\" --expected-bundle 3fb48b5bed1a4fd26a34f38b715f661b58d1ab198d5b16e45b09352ab6bd88cf",
             "timeout": 5,
-            "statusMessage": "CER 0.7.0-rc.2 Astra write boundary"
+            "statusMessage": "CER 0.7.0-rc.3 Astra write boundary"
           }
         ]
       }

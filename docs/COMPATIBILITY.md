@@ -4,7 +4,7 @@ Source review: 2026-09-08. [Design and primary sources](ADAPTIVE-EFFORT.md).
 
 Four canonical fixed roles remain under `agents/`. Default auto generates four unpinned `cer_auto_` aliases as well. User bindings live under `$CODEX_HOME/agents`, project bindings under `.codex/agents`; Skills use `~/.agents/skills` or project `.agents/skills`. No runtime config rewrite or foreign framework. Legacy fixed/adaptive overrides remain supported but are unnecessary for ordinary use.
 
-File pins override contradictory spawn values. Auto prefers a verified unpinned alias when explicit native effort exists; otherwise it uses the exact matching fixed pair. Absence of an effort pin alone is not adaptive behavior: explicitly pass supported model/effort through the real schema. Do not infer support from version strings, model self-description or successful installation.
+File pins override contradictory spawn values. Auto requires a verified unpinned alias when explicit native effort exists; the generated description marks that binding in native discovery. Otherwise it uses the exact matching fixed pair and records why the alias or field was unavailable. Absence of an effort pin alone is not adaptive behavior: explicitly pass supported model/effort through the real schema. Do not infer support from version strings, model self-description or successful installation.
 
 If no sufficient binding exists, use a sufficient current parent or disclose BLOCKED. No silent downgrade, hidden CLI, paid capability probes or retry loops. Parent live permissions still govern execution; architect instructions and both architect bindings retain read-only intent and defaults, not a new OS security guarantee.
 
