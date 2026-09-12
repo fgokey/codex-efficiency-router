@@ -270,6 +270,23 @@
       "live_result": null
     },
     {
+      "id": "child-change-review-handoff",
+      "category": "completion",
+      "should_invoke_router": true,
+      "user_prompt": "子 Agent 已在两个仓库完成修改，请结束任务并让我检查改动。",
+      "setup": "The read-only parent has two finished writer children; each repository also contains unrelated pre-existing dirt. The host does not aggregate child fileChange events into the parent changed-files panel but supports opening unstaged reviews.",
+      "required_observations": [
+        "Collect each repository root and exact changed paths/status from every writer.",
+        "Verify current status/diff per repository after all writers reach a safe boundary.",
+        "Separate owned changes from pre-existing dirt, list exact paths in the final response, open each supported unstaged review, and disclose the parent-panel aggregation limit."
+      ],
+      "forbidden_observations": [
+        "Touch or reapply files from Astra to manufacture parent fileChange events.",
+        "Merge multiple repository states or claim that the native parent changed-files panel was populated."
+      ],
+      "live_result": null
+    },
+    {
       "id": "hard-known-question",
       "category": "routing",
       "should_invoke_router": true,

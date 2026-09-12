@@ -2,6 +2,7 @@
 
 ## Unreleased — rc.2 compatibility corrections
 
+- Preserve reviewability when child executors own writes: require repository-rooted exact change handoffs, parent-side status/diff verification and supported native unstaged reviews. The Skill reports the host limitation when child `fileChange` events are not aggregated; Astra does not touch files to manufacture parent attribution.
 - Isolate the readonly Git fixture from automatic maintenance and external config; keep byte-for-byte workspace and .git checks and exercise an actual external-diff sentinel. Fixes the maintenance.lock race seen in validate #27 on macOS/Python 3.11. No platform is skipped to obtain green CI.
 - Add a shared Windows launcher with actual Python 3.11+/tomllib preflight and authoritative CER_PYTHON override. Install, uninstall, doctor, standalone Guard and Canary use the same selected interpreter; no Python downloads or PATH/config changes.
 - Keep policy-only, native Canary and real-task accounting boundaries explicit. These corrections do not enable or trust Hooks, certify performance, or constitute a stable release.

@@ -158,6 +158,8 @@ Complete this task using suitable model/effort choices and the required acceptan
 
 Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local; Astra writes always go to an executor. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
 
+When child executors modify files, each writer returns repository-rooted exact paths and status. After all writers finish, the read-only parent verifies each repository, lists the paths in its final response and opens supported native unstaged reviews. Some Codex hosts do not aggregate child `fileChange` events into the parent task's changed-files panel; this workflow makes the changes reviewable without having Astra touch them again, but it cannot claim that native panel was populated.
+
 ## Uninstall and restore
 
 Use the same scope, project root and CODEX_HOME as installation.

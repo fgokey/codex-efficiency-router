@@ -87,6 +87,23 @@ class DocumentedContractTests(unittest.TestCase):
                        'No extra LLM classifier', 'No agent per file', 'Never auto-select `max`'):
             self.assertIn(phrase, core)
 
+    def test_writer_changes_remain_reviewable_from_readonly_parent(self):
+        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        self.assertIn('writer review handoff in dispatch', core)
+        for phrase in ('every repository root', 'exact changed paths/status',
+                       'pre-existing dirt', 'status/diff per repository',
+                       'native review/open-review', 'unstaged review',
+                       'does not aggregate child `fileChange` events',
+                       'never touches or reapplies files for attribution'):
+            self.assertIn(phrase, dispatch)
+        for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
+            instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
+            self.assertIn('every repository root and exact changed paths/status', instructions)
+            self.assertIn('owned from prior dirt', instructions)
+            self.assertIn('current requirement-to-check/review evidence', instructions)
+            self.assertIn('not parent completion', instructions)
+
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
         import inspect

@@ -11,7 +11,7 @@ class BehaviorCorpusTests(unittest.TestCase):
         self.assertEqual(data['schema'], 1)
         self.assertIn('NOT executed', data['purpose'])
         cases = data['cases']
-        self.assertEqual(len(cases), 20)
+        self.assertEqual(len(cases), 21)
         self.assertEqual(len({item['id'] for item in cases}), len(cases))
         self.assertTrue(any(not item['should_invoke_router'] for item in cases))
         self.assertEqual({item['category'] for item in cases}, {'trigger', 'handoff', 'completion', 'measurement', 'recovery', 'routing'})
