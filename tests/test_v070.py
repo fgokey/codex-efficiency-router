@@ -399,6 +399,7 @@ class AccountingV070(unittest.TestCase):
 
     def test_parent_child_failed_costs_all_counted(self):
         result = compare_three(self.rows())
+        self.assertEqual(result['schema'],3)
         self.assertAlmostEqual(result['measurements']['monetary_cost']['guarded'], .12)
         self.assertEqual(result['measurements']['total_tokens']['guarded'], 175)
         self.assertEqual(result['measurements']['elapsed_seconds']['guarded'], 8)
@@ -451,6 +452,18 @@ class AccountingV070(unittest.TestCase):
         self.assertFalse(compare_three(rows)['efficiency_claim_eligible'])
         rows = self.rows(3); rows[1]['calls'][0]['effort'] = 'UNKNOWN'
         self.assertFalse(compare_three(rows)['efficiency_claim_eligible'])
+
+    def test_qualified_policy_only_astra_patch_is_not_misclassified_as_violation(self):
+        rows = self.rows(3); rows[1].update(astra_writes=1,astra_write_exceptions=1)
+        result=compare_three(rows)
+        self.assertTrue(result['efficiency_claim_eligible'])
+        self.assertEqual(result['runs'][1]['violations']['unqualified_astra_writes'],0)
+
+    def test_astra_write_classification_fails_closed_and_strict_guard_has_no_exception(self):
+        rows=self.rows();rows[1].update(astra_writes=1,astra_write_exceptions=2)
+        with self.assertRaises(ValueError):compare_three(rows)
+        rows=self.rows();rows[2].update(astra_writes=1,astra_write_exceptions=1)
+        with self.assertRaises(ValueError):compare_three(rows)
 
     def test_guard_counter_consistency(self):
         rows = self.rows(); rows[2]['guard']['calls'] = 20

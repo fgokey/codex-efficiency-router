@@ -69,7 +69,7 @@ class DocumentedContractTests(unittest.TestCase):
             shutil.copytree(ROOT / 'skills' / PROJECT, skill)
             path = skill / 'SKILL.md'
             original = path.read_text()
-            for bad in (original.replace('tasks; reserve', 'tasks: reserve'),
+            for bad in (original.replace('tasks; use Astra', 'tasks: use Astra'),
                         original.replace('name: codex-efficiency-router',
                                          'name: codex-efficiency-router\nname: duplicate'),
                         original.replace('description: Quality-gated', 'description: # missing')):
@@ -83,7 +83,7 @@ class DocumentedContractTests(unittest.TestCase):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
                        'Do not weaken assertions', 'contrary evidence', 'revision/dirty state',
-                       'Same-model delegation', 'AND a net benefit', 'stop risky writes',
+                       'Same-model delegation', 'AND a net benefit', 'missing authority/ownership/capacity',
                        'No extra LLM classifier', 'No agent per file', 'Never auto-select `max`'):
             self.assertIn(phrase, core)
 
@@ -95,10 +95,11 @@ class DocumentedContractTests(unittest.TestCase):
                        'pre-existing dirt', 'status/diff per repository',
                        'Native review/open-review', 'unstaged review',
                        'task workspace roots', 'write-capable Sol/Terra parent',
-                       'Astra as a read-only child', 'Before write delegation',
+                       'Astra as a read-only child', 'Before write routing',
+                       'fully qualified bounded local-patch exception',
                        'A required parent badge', 'stop before writes',
                        'does not populate that badge',
-                       'never touches or reapplies files for attribution'):
+                       'Never touch/reapply files only for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
             instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
@@ -115,6 +116,15 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn('explicit effort', text)
             self.assertIn('base role is MISMATCH', text)
             self.assertIn('exact pinned pair', text)
+
+    def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
+        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        for phrase in ('one bounded local code patch', 'two qualified executor attempts failed',
+                       'current-workspace target', 'strict Guard must be confirmed inactive'):
+            self.assertIn(phrase, core)
+        self.assertIn('optional strict PreToolUse Guard denies every Astra', dispatch)
+        self.assertIn('unknown/active blocks it', dispatch)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.

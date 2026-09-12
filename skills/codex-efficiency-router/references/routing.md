@@ -12,4 +12,4 @@ All three core gates apply; counts or prerequisite gaps alone never qualify.
 | Consequential independent arbitration | Sufficient routine review |
 | Qualified Sol reasoning failure | Missing dependency |
 
-Investigate source/diffs/evidence; arbitrate hypotheses and return safe experiments/unapplied fixes, not just blockers. Separate instrumentation design from unobservable causes. Frozen migration plans do not authorize rollout. New requirements/code/dependencies/evidence reopen decisions; changed errors are progress only when narrowing causes. More effort need not beat another model. Offline routing is not quality proof.
+Investigate evidence; arbitrate hypotheses and return experiments/precise fixes. Astra admission does not grant writes. A root may apply one local patch only under the dispatch exception; leaves stay read-only. Separate instrumentation from unobservable causes. Plans do not authorize rollout. New requirements/code/dependencies/evidence reopen decisions; changed errors matter only when narrowing causes. More effort need not win. Offline routing is not quality proof.

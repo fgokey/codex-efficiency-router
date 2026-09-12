@@ -62,7 +62,7 @@ def group_for(directory):
     return {'matcher': '*', 'hooks': [{'type': 'command',
             'command': shell_command([str(Path(sys.executable).resolve()), '-I', '-B',
                        str(directory / FILES[0]), '--expected-bundle', identity['guard_sha256']]),
-            'timeout': 5, 'statusMessage': f"CER {identity['version']} Astra write boundary"}]}
+              'timeout': 5, 'statusMessage': f"CER {identity['version']} strict Astra write boundary"}]}
 
 
 def load_config(raw):

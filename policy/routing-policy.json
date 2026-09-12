@@ -1,5 +1,5 @@
 {
-  "schema_version": 7,
+  "schema_version": 8,
   "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
@@ -46,7 +46,9 @@
     "effort_change_preserves_task_retry_budget",
     "no_silent_unsupported_effort_mapping",
     "write_authority_before_local_shortcuts",
-    "astra_root_and_leaf_no_local_mutation",
+    "astra_leaf_and_readonly_roles_no_local_mutation",
+    "astra_root_default_readonly_single_bounded_patch_exception",
+    "strict_guard_disables_astra_patch_exception",
     "retry_exhaustion_does_not_disable_readonly_diagnosis",
     "existing_edits_preserved_for_owner_review"
   ],
@@ -80,7 +82,28 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.7.0-rc.4",
+  "astra_write_exception": {
+    "operation": "one bounded local code patch only",
+    "actor": "root Astra only; leaves and read-only roles excluded",
+    "trigger": "two qualified same-signature implementation/capability/unexplained executor failures or material critical-context handoff loss",
+    "required": [
+      "user_authorized",
+      "exact_scope",
+      "target_is_current_task_workspace",
+      "exclusive_ownership_and_safe_boundary",
+      "verification_defined",
+      "no_active_writer",
+      "no_prior_exception",
+      "strict_guard_inactive"
+    ],
+    "excluded": [
+      "arbitrary_shell",
+      "format_build_or_side_effecting_test",
+      "git_publish_or_deploy"
+    ],
+    "missing_evidence": "reuse_delegate_defer_or_block"
+  },
+  "version": "0.7.0-rc.5",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,

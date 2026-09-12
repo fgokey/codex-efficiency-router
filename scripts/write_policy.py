@@ -2,7 +2,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 
-OPERATIONS = ('reasoning', 'read', 'coordinate', 'mutation', 'unknown')
+OPERATIONS = ('reasoning', 'read', 'coordinate', 'local_patch', 'mutation', 'unknown')
+ASTRA_WRITE_REASONS = ('none', 'qualified_executor_failure', 'critical_context_loss')
 
 
 def is_astra(model: str | None) -> bool:
@@ -32,6 +33,47 @@ class Writer:
 
 
 @dataclass(frozen=True)
+class AstraWriteEvidence:
+    """Caller-observed evidence for one exceptional root-Astra local patch.
+
+    This is an offline policy input, not a permission token or runtime ledger.
+    """
+    reason: str = 'none'
+    root_actor: bool = False
+    scope_bounded: bool = False
+    target_in_workspace: bool = False
+    verification_defined: bool = False
+    failure_kind: str = 'none'
+    qualified_attempts: int = 0
+    prior_exception_writes: int = 0
+    guard_status: str = 'unknown'  # unknown, inactive, active
+
+    def validate(self):
+        if self.reason not in ASTRA_WRITE_REASONS:
+            raise ValueError('invalid Astra write reason')
+        flags = (self.root_actor, self.scope_bounded, self.target_in_workspace,
+                 self.verification_defined)
+        if any(type(v) is not bool for v in flags):
+            raise ValueError('Astra write evidence flags must be boolean')
+        if self.guard_status not in ('unknown', 'inactive', 'active'):
+            raise ValueError('invalid strict Guard status')
+        if self.failure_kind not in ('none', 'capability', 'unexplained', 'implementation',
+                                     'environment', 'specification', 'observability'):
+            raise ValueError('invalid Astra write failure kind')
+        for value in (self.qualified_attempts, self.prior_exception_writes):
+            if type(value) is not int or value < 0:
+                raise ValueError('Astra write evidence counts must be nonnegative integers')
+
+    def qualifies(self) -> bool:
+        failure_ready = (self.reason == 'qualified_executor_failure' and self.qualified_attempts >= 2
+                         and self.failure_kind in ('capability', 'unexplained', 'implementation'))
+        context_ready = self.reason == 'critical_context_loss'
+        return (self.root_actor and self.scope_bounded and self.target_in_workspace
+                and self.verification_defined and self.prior_exception_writes == 0
+                and self.guard_status == 'inactive' and (failure_ready or context_ready))
+
+
+@dataclass(frozen=True)
 class WriteScope:
     unit: str = ''
     authorized: bool = False
@@ -41,6 +83,7 @@ class WriteScope:
     local_owner: bool = False
     writer_limit: int = 2
     actor_id: str | None = None
+    astra_write: AstraWriteEvidence = AstraWriteEvidence()
 
     def validate(self):
         if self.actor_id is not None and (not isinstance(self.actor_id, str) or not self.actor_id):
@@ -55,6 +98,9 @@ class WriteScope:
             raise ValueError('writers must be a tuple of Writer')
         if len({w.agent_id for w in self.writers}) != len(self.writers):
             raise ValueError('duplicate writer identity')
+        if not isinstance(self.astra_write, AstraWriteEvidence):
+            raise ValueError('invalid Astra write evidence')
+        self.astra_write.validate()
 
 
 @dataclass(frozen=True)
@@ -62,6 +108,7 @@ class WriteDecision:
     action: str  # local_read, local_write, delegate, reuse, defer, blocked
     reason: str
     owner: str | None = None
+    exception: str | None = None
 
 
 def before_action(operation: str, model: str | None, scope: WriteScope = WriteScope(), *,
@@ -93,6 +140,15 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
         if not continuing_owner and sum(w.state == 'active' for w in scope.writers) >= scope.writer_limit:
             return WriteDecision('defer', 'writer slots occupied; do not become a third writer')
         return WriteDecision('local_write', 'known authorized non-read-only owner; normal checks still apply')
+    astra_patch = (operation == 'local_patch' and is_astra(model) and not read_only
+                   and scope.local_owner and not owners
+                   and not any(w.state == 'active' for w in scope.writers)
+                   and scope.astra_write.qualifies())
+    if astra_patch:
+        return WriteDecision('local_write',
+                             'one bounded root-Astra patch is justified by recorded exception evidence; '
+                             'ordinary implementation and side-effecting verification remain executor work',
+                             exception='bounded_astra_patch')
     if sum(w.state == 'active' for w in scope.writers) >= scope.writer_limit:
         return WriteDecision('defer', 'writer slots occupied; do not create an extra writer')
     if no_subagents:

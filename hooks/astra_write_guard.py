@@ -13,14 +13,14 @@ import runpy
 import shlex
 import sys
 
-VERSION = '0.7.0-rc.4'
+VERSION = '0.7.0-rc.5'
 
 # Exact local read/orchestration tools only, never guess MCP semantics by its name.
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
 COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan'))
 EXECUTOR_FAMILIES = ('gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
 PREFIX = 'cer-read '
-REASON = ('CER: Astra/unknown identity cannot write, build, format or run tests. '
+REASON = ('CER strict Guard: Astra/unknown identity cannot write, build, format or run tests. '
           'Reuse an authorized Terra/Sol owner or wait. Continue read-only diagnosis; '
           'for source inspection use cer-read {"op":"read","path":"..."}.')
 

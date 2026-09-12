@@ -1,18 +1,29 @@
-# Astra write boundary and active diagnostic participation (v0.7.0-rc.1)
+# Astra write boundary and active diagnostic participation (v0.7.0-rc.5)
 
 ## Two independent decisions
 
 A model's ability to solve a task is not permission to write. Before any side effect,
 check the actor, authorization and exclusive owner; only then select a model/effort
-and consider cost. The gate outranks all tiny-task, sufficient-parent, unavailable
-binding and exhausted-slot local fallbacks. It applies to Astra **roots and leaves**,
-not just the `astra_architect` TOML sandbox setting. Auto/fixed/adaptive do not alter it.
+and consider cost. The gate outranks tiny-task, sufficient-parent, unavailable-binding
+and exhausted-slot fallbacks. Unknown effect/identity is not permission.
 
-Astra may read source, inspect existing diffs/logs, reason, propose patches as text,
-coordinate owned agents, and accept/reject evidence. It must not apply patches, write
-reports/checkpoints, format, generate, build, execute side-effecting tests, mutate Git
-or publish/deploy. Unknown effect/identity is not permission. Read-only responsibility
-also remains if a coordinator changes models; role changes need explicit reassessment.
+All Astra leaves and read-only roles stay read-only. Root Astra also defaults read-only,
+but can apply **one bounded local code patch** when every condition below is observed:
+
+1. Two qualified executor attempts failed on the same task/unit/failure signature for a
+   classified implementation, capability or unexplained issue, or a handoff would
+   materially lose reasoning context needed for the fix. Prerequisite, environment,
+   specification and observability gaps do not qualify.
+2. The user authorized the change; exact files/scope, verification and safe boundary are
+   known; the target repository is the current task workspace.
+3. Ownership is exclusive, no writer is active, and no earlier root exception was used.
+4. The optional strict Guard is confirmed inactive for this task; UNKNOWN blocks.
+
+This exception covers the patch only. It does not cover arbitrary shell, formatting,
+builds, side-effecting tests, Git mutation, publishing or deployment. Sol/Terra performs
+those steps. Missing evidence fails closed to reuse/delegation/defer/BLOCKED. High risk,
+task size, an Astra model selection, or a no-subagent request alone does not grant it.
+Auto/fixed/adaptive do not alter the boundary.
 
 ## Astra must still participate
 
@@ -22,10 +33,10 @@ bring the unresolved question to Astra with original requirements, actual diff, 
 history and evidence. Retry counts, missing dependencies and absent observations alone
 are not proof that stronger reasoning will solve the problem.
 
-If the parent is already Astra, it investigates directly in read-only mode rather than
-spawning another Astra merely to think. It can reconcile hypotheses, design a safe
-minimal experiment and propose precise changes. Executors perform experiments/builds
-and return results. Once the decision is stable, reuse Sol/Terra for implementation.
+If the parent is already Astra, it investigates directly rather than spawning another
+Astra merely to think. It reconciles hypotheses and designs a minimal experiment.
+Executors normally perform experiments/builds and return results. Once the decision is
+stable, reuse Sol/Terra unless the bounded root exception above is fully established.
 An exhausted repair budget does NOT forbid a separately scoped diagnosis and does NOT
 get reset by that diagnosis. An explicit bounded parent reassessment is needed for more
 repairs. Missing observations may justify an instrumentation-design subtask, not an
@@ -43,6 +54,7 @@ Prefer the existing compatible Sol/Terra owner at a safe boundary. Busy owners f
 or acknowledge the handoff before expanding scope. Two active writers means wait; an
 idle third owner must not start alongside them. Shared integration files have one owner.
 Astra can diagnose against stable evidence while writers exist; it is not a third writer.
+Its bounded patch exception requires no active writer.
 Unknown writer state or potentially completed side effects must be reconciled, not replayed.
 Business-specific agent names and file counts are not hardcoded in this Skill.
 
@@ -52,8 +64,9 @@ Business-specific agent names and file counts are not hardcoded in this Skill.
 2. **Offline references:** `write_policy.py` and the operation-aware joint planner test
    declared authorization, writer capacity, reuse and diagnostic admission. Legacy
    lane-only planner results describe reasoning recommendations, never write permission.
-3. **Native synchronous Hook:** `hooks/astra_write_guard.py` emits documented
-   `PreToolUse` denial for covered Astra/unknown-model side effects. It acts on the host's
+3. **Optional strict native Hook:** `hooks/astra_write_guard.py` emits documented
+   `PreToolUse` denial for every covered Astra/unknown-model side effect, so it disables
+   the bounded root exception in its scope. It acts on the host's
    `model`, not prompt text, `tool_input.model`, or the parent's shared `session_id`.
 4. **Host acceptance:** trust, event delivery and actual prevention must be checked in
    the intended Codex version. A synthetic-host test is NOT that live acceptance.
@@ -161,8 +174,8 @@ live canary consumes model work if run through Codex and is not started by CI or
   inheritance and live permission overrides; don't make all writers read-only to
   compensate for a coordinator policy.
 
-These sources define the host contract. Strict Astra write separation, qualified
-failure escalation, the reader protocol and writer ownership are this project's policy,
+These sources define the host contract. The Astra default boundary, strict optional
+Guard, bounded root exception, failure escalation, reader protocol and ownership are project policy,
 not OpenAI's guarantee that an arbitrary Skill is enforced.
 
 ## v0.7 status and batching

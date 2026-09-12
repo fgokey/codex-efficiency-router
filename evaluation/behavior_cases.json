@@ -300,6 +300,22 @@
         "Exhaust every cheaper tier first or keep Astra on routine tail work."
       ],
       "live_result": null
+    },
+    {
+      "id": "bounded-root-astra-repair",
+      "category": "recovery",
+      "should_invoke_router": true,
+      "user_prompt": "执行者多轮仍未解决；父 Astra 保留关键推理并完成这个小修复。",
+      "setup": "Two qualified same-signature executor attempts failed. The parent is Astra; one exact local patch is authorized in the current task workspace, checks are defined, no writer is active, no prior exception exists, and the strict Guard is inactive.",
+      "required_observations": [
+        "Let the root Astra apply only the bounded local code patch and preserve the failure history.",
+        "Return shell, build, side-effecting tests and publishing to an authorized Sol or Terra owner."
+      ],
+      "forbidden_observations": [
+        "Grant the exception to an Astra leaf, a second patch unit, an outside-workspace target or while the strict Guard is active.",
+        "Treat task risk, model selection or a no-subagent request alone as write authority."
+      ],
+      "live_result": null
     }
   ]
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0-rc.5 — 2026-09-12 (candidate, not published)
+
+- Keep Astra leaves and read-only roles strictly read-only, while allowing a root Astra one bounded local code patch after qualified executor failure or material handoff-context loss when every authority, scope, ownership, workspace, verification and concurrency gate is satisfied.
+- Keep shell/build/test/publish work with Sol/Terra; the optional native Guard remains a stricter profile that disables the root exception and denies all Astra writes.
+- Let a qualifying root patch produce the native parent change summary, and distinguish qualified policy-only Astra exceptions from unqualified Astra writes in cost/quality comparisons.
+
 ## 0.7.0-rc.4 — 2026-09-12 (candidate, not published)
 
 - Preflight native changed-files badge ownership before write delegation. A required badge now needs a target-repository task with a write-capable Sol/Terra parent; Astra and cross-workspace child writes are reported as ineligible before mutation, and Review is no longer presented as equivalent.

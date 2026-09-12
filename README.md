@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.4 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.5 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,17 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.5: bounded root-Astra repair
+
+Astra remains the primary reasoner for hard diagnosis and arbitration. Astra leaves and
+read-only roles never write. A root Astra may apply one bounded local code patch only after
+qualified executor failure or when handoff would materially lose critical reasoning, with
+authorization, exact scope, current-workspace ownership, a safe boundary, defined checks,
+no active writer or prior exception, and a confirmed-inactive strict Guard. Shell/build/test and
+publish/deploy work remains with Sol/Terra. Missing evidence falls back to delegation or a
+blocked/deferred result. The optional native Guard deliberately remains stricter and denies
+all Astra writes.
 
 ## v0.7.0-rc.4: native change-summary preflight
 
@@ -81,13 +92,14 @@ For a downloaded ZIP, extract and review it using the [RC upgrade instructions](
 See [Canary](docs/CANARY.md), [benchmark format](docs/BENCHMARKING-v0.7.md),
 [validation status](docs/VALIDATION-v0.7.0-rc.1.md) and [plan review](docs/REVIEW-v0.7.0.md).
 
-## v0.6: read-only Astra, active diagnosis
+## v0.6 historical rule: read-only Astra, active diagnosis
 
 Write authority now precedes tiny/local shortcuts. Astra roots and leaves never patch,
 write checkpoints, format, build or run side-effecting tests. They still inspect evidence,
 solve hard decisions and diagnose repeated qualified unexplained failures. Executors
 apply the resulting plan; changing worker/model never renews repairs. Preserve existing
-edits for independent takeover review; wait when two writers are active.
+edits for independent takeover review; wait when two writers are active. rc.5 supersedes
+the root-only part of this historical rule with the bounded exception above.
 
 A Skill cannot revoke root tools. A separately registered native synchronous PreToolUse
 guard blocks covered side-effect paths and provides bounded read access. **Normal Skill
@@ -172,9 +184,9 @@ $codex-efficiency-router
 Complete this task using suitable model/effort choices and the required acceptance checks.
 ```
 
-Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local; Astra writes always go to an executor. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
+Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local. Astra writes normally go to an executor; only the bounded root exception above applies. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
 
-The native changed-files badge belongs to the task workspace and its own file-change events. If that badge is required, start mutation work in the target repository with a write-capable Sol/Terra parent; use Astra only as a read-only child for hard judgments. An Astra parent, a repository outside the task workspace, or a host that does not aggregate child `fileChange` events cannot guarantee the badge. The Router detects this before delegation instead of treating an unstaged Review as equivalent. When the badge is optional, writers still return repository-rooted exact paths; the parent verifies each repository, lists the paths and opens supported Reviews.
+The native changed-files badge belongs to the task workspace and its own file-change events. If required, use the target repository and the same parent for writes. Normally that parent is Sol/Terra; root Astra qualifies only for its bounded local-patch exception. A repository outside the task workspace or a host that does not aggregate child `fileChange` events cannot guarantee the badge. The Router detects this before writes instead of treating an unstaged Review as equivalent. Writers still return repository-rooted exact paths; the parent verifies each repository, lists paths and opens supported Reviews.
 
 ## Uninstall and restore
 

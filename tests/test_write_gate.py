@@ -3,13 +3,21 @@ from pathlib import Path
 import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from write_policy import Writer, WriteScope, before_action, diagnostic_action
+from write_policy import AstraWriteEvidence, Writer, WriteScope, before_action, diagnostic_action
 from effort_reference import Context, Configuration as C, RoleBinding, PRESETS, plan
 from policy_reference import TaskSignals as S
 
 
 def scope(**kw):
     return replace(WriteScope('unit-a', True, True, True), **kw)
+
+
+def astra_write(**kw):
+    evidence = AstraWriteEvidence(reason='qualified_executor_failure', root_actor=True,
+                                  scope_bounded=True, target_in_workspace=True,
+                                  verification_defined=True, failure_kind='unexplained', qualified_attempts=2,
+                                  guard_status='inactive')
+    return replace(evidence, **kw)
 
 
 def host(**kw):
@@ -23,14 +31,56 @@ def host(**kw):
 
 
 class WriteGateTests(unittest.TestCase):
-    def test_astra_root_never_local_write_despite_privileges_or_tiny_task(self):
+    def test_astra_defaults_to_no_local_write_despite_privileges_or_tiny_task(self):
         for operation in ('mutation','unknown'):
             for local_owner in (False,True):
                 d=before_action(operation,'gpt-6-astra',scope(local_owner=local_owner),host_supports_routing=True)
                 self.assertEqual(d.action,'delegate')
 
-    def test_astra_snapshot_is_readonly(self):
+    def test_astra_snapshot_is_readonly_without_exception_evidence(self):
         self.assertEqual(before_action('mutation','gpt-6-astra-2026-09-01',scope(local_owner=True)).action,'blocked')
+
+    def test_root_astra_can_apply_one_qualified_bounded_local_patch(self):
+        d=before_action('local_patch','gpt-6-astra',
+                        scope(local_owner=True,astra_write=astra_write()),
+                        host_supports_routing=True)
+        self.assertEqual((d.action,d.exception),('local_write','bounded_astra_patch'))
+
+    def test_context_loss_can_qualify_without_fake_failed_attempts(self):
+        evidence=astra_write(reason='critical_context_loss',qualified_attempts=0)
+        d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=evidence))
+        self.assertEqual(d.action,'local_write')
+
+    def test_astra_exception_fails_closed_when_any_gate_is_missing(self):
+        cases=(
+            astra_write(root_actor=False), astra_write(scope_bounded=False),
+            astra_write(target_in_workspace=False), astra_write(verification_defined=False),
+            astra_write(qualified_attempts=1), astra_write(prior_exception_writes=1),
+            astra_write(guard_status='active'), astra_write(guard_status='unknown'),
+            astra_write(failure_kind='environment'), astra_write(failure_kind='specification'),
+            astra_write(failure_kind='observability'),
+        )
+        for evidence in cases:
+            with self.subTest(evidence=evidence):
+                d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=evidence),
+                                host_supports_routing=True)
+                self.assertNotEqual(d.action,'local_write')
+
+    def test_exception_is_only_for_explicit_local_patch(self):
+        for operation in ('mutation','unknown'):
+            d=before_action(operation,'gpt-6-astra',scope(local_owner=True,astra_write=astra_write()),
+                            host_supports_routing=True)
+            self.assertNotEqual(d.action,'local_write')
+
+    def test_astra_leaf_readonly_role_and_active_writer_still_prevent_exception(self):
+        evidence=astra_write()
+        self.assertNotEqual(before_action('local_patch','gpt-6-astra',
+                            scope(local_owner=True,astra_write=evidence),read_only=True,
+                            host_supports_routing=True).action,'local_write')
+        writers=(Writer('other','other-unit','gpt-5.6-sol','active'),)
+        self.assertNotEqual(before_action('local_patch','gpt-6-astra',
+                            scope(local_owner=True,astra_write=evidence,writers=writers),
+                            host_supports_routing=True).action,'local_write')
 
     def test_read_and_orchestration_remain_local(self):
         for operation in ('read','reasoning','coordinate'):
@@ -47,6 +97,11 @@ class WriteGateTests(unittest.TestCase):
 
     def test_no_subagents_not_an_astra_write_exception(self):
         self.assertEqual(before_action('mutation','gpt-6-astra',scope(),no_subagents=True,host_supports_routing=True).action,'blocked')
+
+    def test_no_subagents_does_not_block_a_fully_qualified_local_exception(self):
+        d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=astra_write()),
+                        no_subagents=True,host_supports_routing=True)
+        self.assertEqual(d.action,'local_write')
 
     def test_authority_or_ownership_unknown_blocks(self):
         for field in ('authorized','ownership_clear'):
@@ -84,6 +139,11 @@ class WriteGateTests(unittest.TestCase):
     def test_joint_planner_mechanical_astra_writes_go_to_terra_not_luna(self):
         d=plan(S(mechanical=True,uncertainty=0,verifiability=3),host())
         self.assertEqual((d.action,d.requested.lane),('delegate','terra'))
+
+    def test_joint_planner_retains_root_astra_for_qualified_bounded_patch(self):
+        c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()))
+        d=plan(S(risk=3,uncertainty=3,failed_attempts=2,prior_lane='sol'),c)
+        self.assertEqual(d.action,'local');self.assertIn('bounded root-Astra patch',d.reason)
 
     def test_joint_planner_no_route_blocks_even_sufficient_astra(self):
         for c in (host(host_supports_routing=False),host(roles={}),host(catalog={})):
@@ -151,6 +211,8 @@ class WriteGateTests(unittest.TestCase):
     def test_strict_input_validation(self):
         for ctx in (scope(authorized='yes'),scope(writer_limit=0)):
             with self.assertRaises(ValueError):before_action('mutation','gpt-6-astra',ctx)
+        with self.assertRaises(ValueError):
+            before_action('local_patch','gpt-6-astra',scope(astra_write=astra_write(reason='invented')))
         with self.assertRaises(ValueError):before_action('write?',None)
 
 

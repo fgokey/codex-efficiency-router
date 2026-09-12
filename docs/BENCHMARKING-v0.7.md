@@ -25,7 +25,8 @@ proof that omitted children do not exist. Each row includes:
 | run_order / randomized_order | 1..3 permutation in the trial and explicit randomized-order declaration |
 | calls_complete | Whether all parent, child, failed, abandoned and retried calls were captured |
 | calls | Full normalized per-call records below |
-| astra_writes / duplicate_writers / retry_replays | Observed counts; omitted is UNKNOWN, not zero |
+| astra_writes / astra_write_exceptions | Total root/leaf Astra patches and the subset satisfying the bounded root exception; positive writes without classification are UNKNOWN |
+| duplicate_writers / retry_replays | Observed violations; omitted is UNKNOWN, not zero |
 | guard | Calls, denied, errors and a latency sample per invocation for the guarded arm |
 
 A per-call example **with unknown prices, not fictional billing evidence**:
@@ -68,6 +69,8 @@ explicit missing data. `efficiency_claim_eligible` requires complete actual cost
 observed model/effort, quality pass, recorded safe behavior, measured guard calls,
 wall time/tokens and the formal sampling gate. This Boolean is a necessary data gate,
 not a guarantee that costs fell, future quality is preserved or a causal effect exists.
+Qualified Astra exceptions are allowed only in `policy-only`; a `guarded` arm claiming
+one is invalid because the strict Guard denies all Astra writes.
 
 ```powershell
 python -B scripts/compare_runs.py ACTUAL_RUNS.json

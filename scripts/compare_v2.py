@@ -146,12 +146,22 @@ def normalize(row):
             raise ValueError('guard counters/latency samples inconsistent')
         guard_stats = {'status': 'measured', 'calls': count, 'denied': denied, 'errors': errors,
                        'p50_ms': percentile(times, .50), 'p95_ms': percentile(times, .95)}
-    violations = {}
-    for key in ('astra_writes', 'duplicate_writers', 'retry_replays'):
+    astra_writes = number(row.get('astra_writes'), 'astra_writes', integer=True)
+    astra_exceptions = number(row.get('astra_write_exceptions'), 'astra_write_exceptions', integer=True)
+    if astra_writes == 0 and astra_exceptions is None:
+        astra_exceptions = 0  # Backward-compatible zero; positive writes still need classification.
+    if astra_writes is not None and astra_exceptions is not None and astra_exceptions > astra_writes:
+        raise ValueError('Astra write exceptions cannot exceed Astra writes')
+    unqualified = astra_writes - astra_exceptions if None not in (astra_writes, astra_exceptions) else None
+    if row['variant'] == 'guarded' and astra_exceptions not in (None, 0):
+        raise ValueError('strict guarded runs cannot claim Astra write exceptions')
+    violations = {'unqualified_astra_writes': unqualified}
+    for key in ('duplicate_writers', 'retry_replays'):
         violations[key] = number(row.get(key), key, integer=True)
     return {'variant': row['variant'], 'metrics': metrics, 'price_status': price_status,
             'currency': next(iter(currency_set)) if money_complete else 'UNKNOWN',
             'per_model': dict(per_model), 'guard': guard_stats, 'violations': violations,
+            'astra_write_observation': {'total': astra_writes, 'qualified_exceptions': astra_exceptions},
             'calls_complete': row.get('calls_complete') is True,
             'all_pairs_observed': bool(calls) and all(c['model'] != 'UNKNOWN' and c['effort'] != 'UNKNOWN' for c in calls)}
 
@@ -201,7 +211,7 @@ def compare_three(rows):
     measurements_ready = all(measurements[k]['status'] in ('measured', 'actual') for k in ('total_tokens', 'monetary_cost', 'elapsed_seconds'))
     guard_ready = all(r['guard']['status'] == 'measured' and r['guard']['errors'] == 0 and r['guard']['calls'] > 0 for r in normalized if r['variant'] == 'guarded')
     boundaries = all(all(v == 0 for v in r['violations'].values()) for r in normalized if r['variant'] != 'baseline')
-    return {'schema': 2, 'matched_trials': len(groups), 'quality_status': 'pass' if quality else 'incomplete',
+    return {'schema': 3, 'matched_trials': len(groups), 'quality_status': 'pass' if quality else 'incomplete',
             'efficiency_claim_eligible': quality and accounting and measurements_ready and sampling and boundaries and guard_ready,
             'formal_sampling_ready': sampling, 'accounting_complete': accounting,
             'measurements': measurements, 'runs': normalized,

@@ -26,7 +26,7 @@ def plugin_hooks(identity):
                 'type': 'command',
                 'command': 'python3 -I -B "${PLUGIN_ROOT}/hooks/astra_write_guard.py"' + suffix,
                 'commandWindows': 'python -I -B "$env:PLUGIN_ROOT/hooks/astra_write_guard.py"' + suffix,
-                'timeout': 5, 'statusMessage': f"CER {identity['version']} Astra write boundary"}]}]}}
+                'timeout': 5, 'statusMessage': f"CER {identity['version']} strict Astra write boundary"}]}]}}
 
 
 def validate_release(root=ROOT, *, schema=False):

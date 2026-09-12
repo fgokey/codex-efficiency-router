@@ -94,7 +94,8 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_readonly_diagnosis_and_limits_remain_in_core(self):
         text = SKILL.read_text()
-        for phrase in ('Astra roots/leaves', 'NEVER patch', 'Unknown identity/effects grant no writes',
+        for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
+                       'one bounded local code patch', 'Unknown identity/effects grant no writes',
                        'never auto-revert', 'two concurrent writers', 'the third waits',
                        'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
                        'never renews attempts', 'independent acceptance'):

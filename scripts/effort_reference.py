@@ -164,7 +164,7 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
         raise ValueError("explicit effort is not supported by this policy")
     rec = recommend(s, deep_reasoning=deep_reasoning, allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH"))
 
-    write_intent = context.operation in ("mutation", "unknown")
+    write_intent = context.operation in ("local_patch", "mutation", "unknown")
     gate = before_action(context.operation, context.current.model if context.current else None,
                          context.write_scope, read_only=context.read_only,
                          no_subagents=s.no_subagents, host_supports_routing=context.host_supports_routing)
@@ -187,6 +187,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
 
     if write_intent and gate.action in ("blocked", "defer"):
         return Decision(rec, None, gate.action, gate.reason, owner_id=gate.owner)
+    if write_intent and gate.exception == "bounded_astra_patch":
+        return Decision(rec, None, "local", gate.reason)
     if write_intent and rec is not None and rec.lane == "astra":
         return result("blocked", "split out Astra read-only diagnosis, then assign settled writes to Terra/Sol")
 

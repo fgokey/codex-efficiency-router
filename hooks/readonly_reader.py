@@ -14,7 +14,7 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.7.0-rc.4'
+VERSION = '0.7.0-rc.5'
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
