@@ -13,7 +13,7 @@ import runpy
 import shlex
 import sys
 
-VERSION = '0.7.0-rc.6'
+VERSION = '0.7.0-rc.7'
 
 # Exact local read/orchestration tools only, never guess MCP semantics by its name.
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))

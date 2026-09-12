@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-rc.7 — 2026-09-12 (candidate, not published)
+
+- Hold continuation after a confirmed model/effort mismatch until safe-boundary reconciliation and scoped acceptance review. Later matching metadata cannot erase pending review; resolution preserves observations, user limits and retry history.
+- Carry applicable rule paths, decision rationale and critical context in compact handoffs; every role reads project rules before acting. Missing critical context blocks affected work.
+- Permit the exclusive root owner to continue the same qualified repair unit; other writers and classified prerequisite failures still prevent the exception.
+- Keep instruction budgets unchanged and use existing task logs for requested comparisons. No new calls, monitor, Hook registration or runtime-savings claim.
+
 ## 0.7.0-rc.6 — 2026-09-12 (candidate, not published)
 
 - Apply prerequisites, current capability/effort checks, safe boundaries and absolute retry ceilings before root repairs or owner reuse. A justification alone cannot renew repairs.

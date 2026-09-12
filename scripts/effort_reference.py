@@ -69,6 +69,8 @@ class Context:
     safe_boundary: bool = False
     worker_active: bool = False
     last_observation: str = "NOT_CHECKED"
+    observation_review: str = "none"  # none, pending, resolved; scoped to this unit.
+    observation_resolution_reason: str | None = None
     automatic_low_suspended: bool = False  # Sticky for this task after unknown/mismatched identity.
     failure_kind: str = "none"  # Classified evidence, not just an error counter.
     diagnosis_only: bool = False
@@ -100,6 +102,13 @@ class Context:
             raise ValueError("extended absolute limit requires a parent reassessment")
         if self.last_observation not in ("NOT_CHECKED", "VERIFIED", "UNKNOWN", "MISMATCH"):
             raise ValueError("invalid observed configuration status")
+        if self.observation_review not in ("none", "pending", "resolved"):
+            raise ValueError("invalid observation review state")
+        if self.observation_review == "resolved":
+            if not isinstance(self.observation_resolution_reason, str) or not self.observation_resolution_reason.strip():
+                raise ValueError("resolved mismatch requires scoped review evidence")
+        elif self.observation_resolution_reason is not None:
+            raise ValueError("resolution evidence requires a resolved review")
         if not isinstance(self.roles, Mapping) or not isinstance(self.catalog, Mapping):
             raise ValueError("roles and catalog must be mappings")
         if not isinstance(self.unavailable_roles, frozenset) or any(
@@ -169,6 +178,11 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
         raise ValueError("explicit effort is not supported by this policy")
     rec = recommend(s, deep_reasoning=deep_reasoning, allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH"))
 
+    if context.observation_review == "pending" or (
+            context.last_observation == "MISMATCH" and context.observation_review != "resolved"):
+        return Decision(rec, None, "defer" if context.worker_active or not context.safe_boundary else "prerequisite",
+                        "reconcile actual binding and effects, then review affected acceptance before continuation; read-only investigation remains available")
+
     write_intent = context.operation in ("local_patch", "mutation", "unknown")
     gate = before_action(context.operation, context.current.model if context.current else None,
                          context.write_scope, read_only=context.read_only,
@@ -202,6 +216,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     minimum = "high" if needs_deeper_reasoning(s, deep_reasoning) or (
         rec is not None and rec.lane == "astra" and choose_lane(replace(s, force_astra=False)) == "astra") else "low" if low_eligible(s) else "medium"
     if write_intent and gate.exception == "bounded_astra_patch":
+        if diagnostic == "repair_prerequisite":
+            return result("prerequisite", "classified prerequisite failures do not qualify for root repairs")
         if not context.current_sufficient:
             return result("blocked", "root repair requires current capability evidence")
         if context.current.effort == "low" or (explicit_effort is not None and context.current.effort != explicit_effort) or EFFORTS.index(context.current.effort) < EFFORTS.index(minimum):
@@ -317,7 +333,7 @@ def dispatch_arguments(decision: Decision) -> dict[str, str]:
     explicit effort override; fixed bindings already pin the verified pair.
     """
     if decision.action != "delegate" or decision.requested is None or decision.requested_role is None or decision.binding_kind not in ("fixed", "adaptive"):
-        raise ValueError("a verified delegation decision is required")
+        raise ValueError("an admitted delegation decision is required")
     args = {"agent_type": decision.requested_role, "fork_turns": "none"}
     if decision.binding_kind == "adaptive":
         args["reasoning_effort"] = decision.requested.effort
@@ -347,6 +363,30 @@ def record_observation(context: Context, requested: Configuration, model: str | 
     """
     context.validate()
     status = check_observation(requested, model, effort)
+    pending = status == "MISMATCH" or context.observation_review == "pending" or (
+        context.last_observation == "MISMATCH" and context.observation_review != "resolved")
     return replace(context, last_observation=status,
+                   observation_review="pending" if pending else context.observation_review,
+                   observation_resolution_reason=None if pending else context.observation_resolution_reason,
                    automatic_low_suspended=context.automatic_low_suspended or
-                   status in ("UNKNOWN", "MISMATCH"))
+                   context.last_observation in ("UNKNOWN", "MISMATCH") or status in ("UNKNOWN", "MISMATCH"))
+
+
+def resolve_observation(context: Context, *, effects_reconciled: bool,
+                        acceptance_reviewed: bool, reason: str) -> Context:
+    """Record a scoped parent review, not a model identity or live PASS certificate.
+
+    The reason identifies affected work/checks and whether to retain sufficient
+    work or correct a binding. No restart, effort change or budget renewal occurs.
+    """
+    context.validate()
+    if any(type(v) is not bool for v in (effects_reconciled, acceptance_reviewed)):
+        raise ValueError("review evidence flags must be boolean")
+    pending = context.observation_review == "pending" or (
+        context.last_observation == "MISMATCH" and context.observation_review != "resolved")
+    if not pending or context.worker_active or not context.safe_boundary:
+        raise ValueError("an outstanding mismatch needs a safe review boundary")
+    if not effects_reconciled or not acceptance_reviewed or not isinstance(reason, str) or not reason.strip():
+        raise ValueError("reconcile effects and review affected acceptance with scoped evidence")
+    return replace(context, observation_review="resolved", observation_resolution_reason=reason,
+                   automatic_low_suspended=True)

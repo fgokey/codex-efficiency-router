@@ -1,4 +1,4 @@
-# Astra write boundary and active diagnostic participation (v0.7.0-rc.6)
+# Astra write boundary and active diagnostic participation (v0.7.0-rc.7)
 
 ## Two independent decisions
 
@@ -16,7 +16,7 @@ but can apply **one bounded local repair unit** when every condition below is ob
    specification and observability gaps do not qualify.
 2. The user authorized the change; exact files/scope, verification and safe boundary are
    known; the target repository is the current task workspace.
-3. Ownership is exclusive, no writer is active, and no earlier root exception unit was completed.
+3. Ownership is exclusive, no other writer is active, and no earlier root exception unit was completed.
 4. An observed active strict Guard is absent. UNKNOWN does not grant host permission:
    the policy may request the patch, but an unobserved active Hook can still deny it.
 

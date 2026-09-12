@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.6 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.7 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,16 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.7: reconcile mismatches and retain critical context
+
+Confirmed model/effort mismatches pause continuation at a safe boundary for binding/effect
+reconciliation and review of affected checks. Preserve valid work and attempt history;
+later matching metadata cannot erase that review. UNKNOWN alone is not a confirmed failure.
+Compact handoffs include applicable rule paths, decision rationale and critical context;
+each role reads those rules and stops affected work when essential context is missing.
+The exclusive root owner can continue its qualified repair unit; other writers still block it.
+Requested cost/quality comparisons reuse existing task logs, without probes or polling.
 
 ## v0.7.0-rc.6: repair admission and explicit task-based effort
 

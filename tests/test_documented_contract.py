@@ -141,6 +141,23 @@ class DocumentedContractTests(unittest.TestCase):
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
         self.assertIn('Handoff grants no new authority',dispatch)
 
+    def test_compact_handoff_preserves_rules_and_decision_rationale(self):
+        core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
+        for phrase in ('rule paths','decision rationale','missing critical context blocks affected work'):
+            self.assertIn(phrase,core)
+        for name in EXPECTED:
+            role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
+            self.assertIn('read applicable repository rules',role,name)
+            self.assertIn('missing critical context blocks affected work',role,name)
+
+    def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
+        core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
+        effort=(ROOT/'skills'/PROJECT/'references/effort.md').read_text()
+        self.assertIn('Resolve MISMATCH before continuation',core)
+        for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase pending review',
+                       'UNKNOWN alone is not a confirmed failure','preserving attempts and user limits'):
+            self.assertIn(phrase,effort)
+
 
 if __name__ == '__main__':
     unittest.main()

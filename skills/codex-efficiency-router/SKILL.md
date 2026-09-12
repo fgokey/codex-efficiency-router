@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.6 -->
+<!-- CER version: 0.7.0-rc.7 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
 
@@ -32,7 +32,7 @@ Route on phase/evidence changes, classified failures or user requests, not each 
 | `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
-Select sufficient model AND effort. With `reasoning_effort` and matching `cer_auto_<role>`, use explicit effort; a base role is MISMATCH. Fallback needs unavailable alias/field evidence and an exact pinned pair. Never auto-select `max`/xhigh/Ultra; auto-low needs opt-in. Astra needs useful stronger reasoning, consequentially hard judgment AND no cheap falsification.
+Select sufficient model AND explicit effort via `cer_auto_<role>`; an avoidable base role is MISMATCH. Fallback needs unavailable alias/field evidence and an exact pinned pair. Never auto-select `max`/xhigh/Ultra; low needs opt-in. Astra needs useful stronger reasoning, consequentially hard judgment AND no cheap falsification.
 
 ## Decide whether delegation is worth it
 
@@ -42,7 +42,7 @@ Default one leaf; at most two concurrent writers, the third waits. Require disjo
 
 ## Handoff without losing the decision
 
-Pass outcomes, revision/dirty state/paths, evidence, invariants, write scope, checks, binding and attempts; no transcripts/secrets. Receiver checks state/conflicts. Requirements win; contrary evidence reopens decisions. Parent completes the native change-summary preflight in dispatch and verifies integration, not just child success.
+Pass outcomes, revision/dirty state/paths, rule paths, decision rationale, invariants, write scope, checks, binding and attempts. Read applicable rules; missing critical context blocks affected work. Requirements win; contrary evidence reopens decisions. Parent completes the native change-summary preflight in dispatch and verifies integration, not just child success.
 
 ## Failure, validation, and stopping
 
@@ -54,4 +54,4 @@ Check requirements, correctness, repository checks and reproduction. New tests a
 
 Read each reference once at its trigger; reread when stale or lost after compaction: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/guarded shell; [quality.md](references/quality.md) for checkpointing/recovery/disputed evidence.
 
-Keep reads narrow and logs on disk. Do not preload docs/hooks or copy the router into children; send contract and role. Use one permitted checkpoint for long work. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Never invent identity, savings or enforcement. Reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.
+Keep reads narrow and logs on disk. Do not preload docs/hooks or copy the router into children; send contract and role. Use one permitted checkpoint for long work. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity, savings or enforcement. Reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.

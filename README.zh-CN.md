@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.6 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.7 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -31,6 +31,15 @@ $env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
 CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
+## v0.7.0-rc.7：处理档位不匹配并保留关键上下文
+
+发现实际模型或档位不匹配后，在安全边界核对配置、副作用并复核受影响的验收结果；
+保留有效修改和尝试记录，后续一次匹配记录不能自动清除待复核问题。UNKNOWN 本身
+不等于已确认配置错误。精简交接必须保留适用规则路径、关键决定及理由；所有角色
+读取项目规则，关键上下文缺失时暂停受影响的工作。
+独占所有权的父 Astra 可以继续同一合格修复单元，其他写入者仍会阻止例外。
+需要对比费用和质量时复用既有任务日志，不增加探测或轮询。
 
 ## v0.7.0-rc.6：修复边界与按任务显式调档
 

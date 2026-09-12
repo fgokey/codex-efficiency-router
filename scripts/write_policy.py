@@ -141,8 +141,9 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
             return WriteDecision('defer', 'writer slots occupied; do not become a third writer')
         return WriteDecision('local_write', 'known authorized non-read-only owner; normal checks still apply')
     astra_patch = (operation == 'local_patch' and is_astra(model) and not read_only
-                   and scope.local_owner and not owners
-                   and not any(w.state == 'active' for w in scope.writers)
+                   and scope.local_owner and (not owners or continuing_owner)
+                   and not any(w.state == 'active' and not (continuing_owner and w.agent_id == scope.actor_id)
+                               for w in scope.writers)
                    and scope.astra_write.qualifies())
     if astra_patch:
         return WriteDecision('local_write',

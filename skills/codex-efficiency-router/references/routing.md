@@ -2,14 +2,6 @@
 
 All three core gates apply; counts or prerequisite gaps alone never qualify.
 
-| Open judgment | Settled alternative |
-| --- | --- |
-| API/format/ownership tradeoffs | Accepted contract |
-| Ambiguous trust/data/production invariant | Checked rule |
-| Conflicting causal hypotheses | Discriminating check |
-| Migration order/rollback/recovery | Authorized fixture |
-| Novel algorithm/protocol/state | Known pattern |
-| Consequential arbitration | Routine review |
-| Qualified Sol reasoning failure | Missing dependency |
+Use Astra for open consequential API/ownership tradeoffs, trust/data invariants, competing causes, migration/recovery order, novel algorithms/protocols or qualified Sol reasoning failure. Settled contracts/checks stay with executors.
 
-Return evidence, experiments and precise fixes, never invented causes. Admission grants no writes; only the root repair-unit exception can. Leaves stay read-only. Plans grant no rollout authority. Reopen decisions on contrary evidence. Offline routing proves neither quality nor savings.
+Return evidence and precise fixes. Leaves stay read-only; plans grant no rollout authority. Reopen decisions on contrary evidence. Offline routing proves neither quality nor savings.

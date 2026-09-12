@@ -25,6 +25,14 @@ Full-history forks cannot carry effort overrides; omission must not inherit root
 Fixed fallback omits the override because its verified role pins the exact pair.
 This helper never calls a model and is not runtime enforcement.
 
+A confirmed mismatch sets a pending unit review, including when automatic low is off.
+`plan` returns prerequisite/defer before local shortcuts, reuse or dispatch; read-only
+investigation remains available. `resolve_observation` requires a safe boundary, reconciled
+binding/effects and scoped acceptance evidence. It records the parent's reason, preserves
+observations and attempts, and never restarts work. Later VERIFIED/UNKNOWN metadata cannot
+clear pending review. Retain sufficient checked work; correct deficient bindings before
+reuse. These remain declared offline inputs, not authenticated host evidence.
+
 ## Defaults and overrides
 
 Medium for ordinary implementation; high for deeper suitable reasoning; automatic Astra high. Auto-low remains separately opt-in for strong-check mechanical Luna work with low consequences and no unresolved issues/prior failure. Explicit preferences never waive quality or authority. No-escalation constrains model and effort separately; keep-model may allow effort changes. No forced capability ladder, no automatic xhigh/max. A disabled or unsupported route never certifies a weak parent as sufficient.

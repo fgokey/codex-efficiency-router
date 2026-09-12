@@ -279,6 +279,17 @@ class CapacityRegressionTests(unittest.TestCase):
         self.assertEqual(before_action('mutation','future-unknown',scope(local_owner=True)).action,'blocked')
 
 class ContinuingOwnerTests(unittest.TestCase):
+    def test_root_can_continue_its_owned_exception_unit(self):
+        ws=(Writer('root','unit-a','gpt-6-astra','active',effort='high'),)
+        c=host(operation='local_patch',write_scope=scope(writers=ws,local_owner=True,actor_id='root',
+                astra_write=astra_write(reason='critical_context_loss',qualified_attempts=0)))
+        self.assertEqual(plan(S(),c).action,'local')
+        self.assertNotEqual(plan(S(),replace(c,write_scope=replace(c.write_scope,actor_id='impostor'))).action,'local')
+        other=Writer('other','different','gpt-5.6-sol','active')
+        self.assertNotEqual(plan(S(),replace(c,write_scope=replace(c.write_scope,writers=ws+(other,)))).action,'local')
+        for kind in ('environment','specification','observability'):
+            self.assertEqual(plan(S(),replace(c,failure_kind=kind)).action,'prerequisite')
+
     def test_existing_writer_can_continue_without_consuming_third_slot(self):
         ws=(Writer('a','unit-a','gpt-5.6-sol','active'),Writer('b','other','gpt-5.6-sol','active'))
         d=before_action('mutation','gpt-5.6-sol',scope(writers=ws,local_owner=True,actor_id='a'))

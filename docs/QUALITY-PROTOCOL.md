@@ -47,3 +47,5 @@ Reviewed 2026-09-07; original design synthesis, no copied third-party code:
 | [Anthropic skill-creator](https://github.com/anthropics/skills/blob/main/skills/skill-creator/SKILL.md) | Realistic positive/negative prompts, optional independent grading | No Claude CLI invocation, auto-eval spending or blind score claims |
 
 [User acceptance](ACCEPTANCE.md) · [Offline audit](../evaluation/README.md) · [Broader references](PRIOR-ART.md)
+
+Compact handoffs carry applicable repository-rule paths, critical decisions and reasons, current diff, invariants, failed approaches and acceptance. Receivers read current rules and reconcile conflicts before affected work; full-history inheritance is not proof of complete context.
