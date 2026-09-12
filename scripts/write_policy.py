@@ -70,7 +70,7 @@ class AstraWriteEvidence:
         context_ready = self.reason == 'critical_context_loss'
         return (self.root_actor and self.scope_bounded and self.target_in_workspace
                 and self.verification_defined and self.prior_exception_writes == 0
-                and self.guard_status == 'inactive' and (failure_ready or context_ready))
+                and self.guard_status != 'active' and (failure_ready or context_ready))
 
 
 @dataclass(frozen=True)
@@ -147,7 +147,8 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
     if astra_patch:
         return WriteDecision('local_write',
                              'one bounded root-Astra patch is justified by recorded exception evidence; '
-                             'ordinary implementation and side-effecting verification remain executor work',
+                             'an unobserved strict Guard may still deny it; ordinary implementation and '
+                             'side-effecting verification remain executor work',
                              exception='bounded_astra_patch')
     if sum(w.state == 'active' for w in scope.writers) >= scope.writer_limit:
         return WriteDecision('defer', 'writer slots occupied; do not create an extra writer')

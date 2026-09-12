@@ -17,7 +17,7 @@ Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-v
 
 Authority precedes shortcuts. Unknown identity/effects grant no writes. Reuse an authorized Terra/Sol owner; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits for review; never auto-revert.
 
-Astra leaves and read-only roles NEVER write. Root Astra defaults read-only, but may apply one bounded local code patch only when two qualified executor attempts failed on an implementation/capability/unexplained issue OR handoff would materially lose critical reasoning, and authorization, exact scope, current-workspace target, ownership, safe boundary and verification are established. No writer or prior exception may exist; strict Guard must be confirmed inactive. The exception excludes shell/build/format/side-effecting tests and publish/deploy; executors handle those.
+Astra leaves and read-only roles NEVER write. Root Astra defaults read-only. It may apply one bounded local code patch only after two qualified executor attempts failed on an implementation/capability/unexplained issue OR handoff would materially lose critical reasoning. Authorization, exact scope, current-workspace target, ownership, safe boundary and verification must be known. No writer/prior exception may exist; observed active strict Guard disables it. Unknown Guard may deny at runtime. Shell/build/format/side-effecting tests/publish/deploy stay with executors.
 
 Astra diagnoses hard judgments and qualified failures; already-Astra reasons locally. Exhaustion stops blind edits, not diagnosis.
 

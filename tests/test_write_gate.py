@@ -56,7 +56,7 @@ class WriteGateTests(unittest.TestCase):
             astra_write(root_actor=False), astra_write(scope_bounded=False),
             astra_write(target_in_workspace=False), astra_write(verification_defined=False),
             astra_write(qualified_attempts=1), astra_write(prior_exception_writes=1),
-            astra_write(guard_status='active'), astra_write(guard_status='unknown'),
+            astra_write(guard_status='active'),
             astra_write(failure_kind='environment'), astra_write(failure_kind='specification'),
             astra_write(failure_kind='observability'),
         )
@@ -65,6 +65,11 @@ class WriteGateTests(unittest.TestCase):
                 d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=evidence),
                                 host_supports_routing=True)
                 self.assertNotEqual(d.action,'local_write')
+
+    def test_unknown_guard_layer_does_not_make_policy_exception_impossible(self):
+        evidence=astra_write(guard_status='unknown')
+        d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=evidence))
+        self.assertEqual(d.action,'local_write');self.assertIn('may still deny',d.reason)
 
     def test_exception_is_only_for_explicit_local_patch(self):
         for operation in ('mutation','unknown'):

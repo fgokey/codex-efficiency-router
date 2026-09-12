@@ -17,7 +17,8 @@ but can apply **one bounded local code patch** when every condition below is obs
 2. The user authorized the change; exact files/scope, verification and safe boundary are
    known; the target repository is the current task workspace.
 3. Ownership is exclusive, no writer is active, and no earlier root exception was used.
-4. The optional strict Guard is confirmed inactive for this task; UNKNOWN blocks.
+4. An observed active strict Guard is absent. UNKNOWN does not grant host permission:
+   the policy may request the patch, but an unobserved active Hook can still deny it.
 
 This exception covers the patch only. It does not cover arbitrary shell, formatting,
 builds, side-effecting tests, Git mutation, publishing or deployment. Sol/Terra performs
@@ -66,7 +67,8 @@ Business-specific agent names and file counts are not hardcoded in this Skill.
    lane-only planner results describe reasoning recommendations, never write permission.
 3. **Optional strict native Hook:** `hooks/astra_write_guard.py` emits documented
    `PreToolUse` denial for every covered Astra/unknown-model side effect, so it disables
-   the bounded root exception in its scope. It acts on the host's
+   the bounded root exception in its scope. Unknown Hook state remains a runtime outcome,
+   not proof of denial or success. It acts on the host's
    `model`, not prompt text, `tool_input.model`, or the parent's shared `session_id`.
 4. **Host acceptance:** trust, event delivery and actual prevention must be checked in
    the intended Codex version. A synthetic-host test is NOT that live acceptance.

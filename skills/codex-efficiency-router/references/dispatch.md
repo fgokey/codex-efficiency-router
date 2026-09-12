@@ -8,7 +8,7 @@ Before write routing, compare every target repository with task workspace roots.
 
 Writers return every repository root, exact changed paths/status and owned vs pre-existing dirt. Parent verifies status/diff per repository and opens unstaged review. Never touch/reapply files only for attribution.
 
-The optional strict PreToolUse Guard denies every Astra/unknown shell, patch and unknown tool. The root exception requires confirmed inactive status; unknown/active blocks it. Reads/coordination work.
+The optional strict PreToolUse Guard denies every Astra/unknown shell, patch and unknown tool. Observed active disables the root exception; UNKNOWN may still deny at runtime, so claim no write until observed. Reads/coordination work.
 
 Astra NEVER inputs to existing shells: `write_stdin` is UNPROTECTED. Only the original executor continues. Hosted paths are UNPROTECTED; specialized paths UNKNOWN.
 

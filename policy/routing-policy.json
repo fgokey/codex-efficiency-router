@@ -94,7 +94,7 @@
       "verification_defined",
       "no_active_writer",
       "no_prior_exception",
-      "strict_guard_inactive"
+      "strict_guard_not_observed_active"
     ],
     "excluded": [
       "arbitrary_shell",

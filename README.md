@@ -39,7 +39,8 @@ Astra remains the primary reasoner for hard diagnosis and arbitration. Astra lea
 read-only roles never write. A root Astra may apply one bounded local code patch only after
 qualified executor failure or when handoff would materially lose critical reasoning, with
 authorization, exact scope, current-workspace ownership, a safe boundary, defined checks,
-no active writer or prior exception, and a confirmed-inactive strict Guard. Shell/build/test and
+no active writer or prior exception, and no observed active strict Guard. Unknown Hook layers
+may still deny the patch at runtime. Shell/build/test and
 publish/deploy work remains with Sol/Terra. Missing evidence falls back to delegation or a
 blocked/deferred result. The optional native Guard deliberately remains stricter and denies
 all Astra writes.

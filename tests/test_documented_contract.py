@@ -121,10 +121,10 @@ class DocumentedContractTests(unittest.TestCase):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         for phrase in ('one bounded local code patch', 'two qualified executor attempts failed',
-                       'current-workspace target', 'strict Guard must be confirmed inactive'):
+                       'current-workspace target', 'observed active strict Guard disables it'):
             self.assertIn(phrase, core)
         self.assertIn('optional strict PreToolUse Guard denies every Astra', dispatch)
-        self.assertIn('unknown/active blocks it', dispatch)
+        self.assertIn('UNKNOWN may still deny at runtime', dispatch)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
