@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.9 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.10 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,13 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.10: reviewable mutation admission
+
+The policy now requires a parent check of the host-observed Terra/Sol binding before each write tool.
+Mutation calls use one exact manifest and one bounded action class; forward copies,
+configuration rewrites and destructive recovery stay separate. A host policy denial stops
+equivalent replay or repackaging until policy changes, including when approval is disabled.
 
 ## v0.7.0-rc.9: fewer long-context round trips
 

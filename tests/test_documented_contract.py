@@ -123,8 +123,20 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('one bounded local repair unit', 'two qualified executor attempts failed',
                        'current-workspace target', 'observed active strict Guard disables it'):
             self.assertIn(phrase, core)
-        self.assertIn('optional strict PreToolUse Guard denies every Astra', dispatch)
+        self.assertIn('Optional strict PreToolUse Guard denies every Astra', dispatch)
         self.assertIn('UNKNOWN may still deny at runtime', dispatch)
+
+    def test_write_binding_and_reviewable_mutation_are_mandatory(self):
+        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        for text in (core, dispatch):
+            for phrase in ('Before each write tool', 'host-observed', 'child claims do not count',
+                           'UNKNOWN/MISMATCH reroutes', 'exact manifest', 'bounded mutation class',
+                           'destructive recovery'):
+                self.assertIn(phrase, text)
+        for phrase in ('Policy denial', 'no exact/equivalent replay or repackaging',
+                       'approval=never', 'manual-action boundary', 'separately reviewed recovery'):
+            self.assertIn(phrase, dispatch)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.

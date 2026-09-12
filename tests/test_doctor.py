@@ -59,6 +59,9 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("model_roundtrips_are_budgeted_even_with_cached_input", policy["principles"])
         self.assertIn("tool_discovery_reused_until_invalidation", policy["principles"])
         self.assertIn("worker_monitoring_uses_backoff_and_delta_cursors", policy["principles"])
+        self.assertIn("host_observed_writer_binding_precedes_every_write_tool", policy["principles"])
+        self.assertIn("forward_mutation_is_separate_from_destructive_recovery", policy["principles"])
+        self.assertIn("policy_denial_stops_equivalent_replay", policy["principles"])
         self.assertEqual(policy["context_efficiency"], {
             "mandatory_rules": "one file per output envelope",
             "unknown_size": "index before content",
@@ -67,6 +70,12 @@ class DoctorTests(unittest.TestCase):
             "tool_discovery": "reuse known schemas until host or state invalidation",
             "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
             "worker_progress": "compact native wait with backoff; after two unchanged snapshots read one bounded rollout delta from a saved offset, never both paths",
+        })
+        self.assertEqual(policy["mutation_admission"], {
+            "writer_binding": "parent verifies host-observed Terra/Sol model, effort and non-read-only role before every write tool",
+            "command_shape": "one exact manifest and one bounded mutation class per tool call",
+            "recovery": "forward copy, config rewrite and destructive recovery are separate reviewed units",
+            "policy_denial": "stop exact or equivalent replay until host or user policy changes",
         })
 
     def test_shipped_core_budget(self):

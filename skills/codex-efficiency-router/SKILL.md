@@ -5,19 +5,21 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.9 -->
+<!-- CER version: 0.7.0-rc.10 -->
 
-Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
+Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
 
 Installation: fixed; automatic low: disabled.
 
-Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not loaded proof; guarded is not enforced. Live-verified needs a current scoped native Canary. Reload at safe boundaries.
+Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk/guarded is not live proof; live-verified needs a current Canary. Reload at safe boundaries.
 
 ## Before any side effect
 
-Authority precedes shortcuts. Unknown identity/effects grant no writes. Reuse authorized Terra/Sol; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits; never auto-revert.
+Unknown identity/effects grant no writes. Reuse authorized Terra/Sol; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits; never auto-revert.
 
-Astra leaves and read-only roles NEVER write. Root Astra defaults read-only. Allow one bounded local repair unit after two qualified executor attempts failed on implementation/capability/unexplained work OR material reasoning loss in handoff. Require authorization, exact scope, current-workspace target, ownership, safe boundary, verification and no competing writer/completed exception unit; observed active strict Guard disables it. Unknown Guard may deny. Multiple patches may finish within prerequisites, capability/effort floors and absolute retry ceiling. Shell/build/format/side-effecting tests/publish/deploy stay with executors.
+Before each write tool, parent verifies host-observed Terra/Sol binding; child claims do not count. UNKNOWN/MISMATCH reroutes. Dispatch defines exact manifest, bounded mutation class, separate destructive recovery and policy-denial stop.
+
+Astra leaves and read-only roles NEVER write. Root Astra defaults read-only. Allow one bounded local repair unit only after two qualified executor attempts failed on implementation/capability/unexplained work or material reasoning loss. Require authorization, bounded scope, current-workspace target, exclusive ownership and checks; observed active strict Guard disables it. Unknown Guard may deny; the attempt ceiling applies. Shell/build/test/publish/deploy stay with executors.
 
 Astra diagnoses hard judgments and qualified failures; Astra reasons locally. Exhaustion stops blind edits, not diagnosis.
 

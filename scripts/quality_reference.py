@@ -14,6 +14,7 @@ ReadAction = Literal['INDEX', 'SEPARATE_FULL', 'BATCH', 'RANGE', 'RESUME', 'LOCA
 ToolAction = Literal['REUSE', 'DISCOVER']
 RoundtripAction = Literal['DEFER', 'BATCH', 'SINGLE']
 ProgressAction = Literal['COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
+MutationAction = Literal['ADMIT', 'REROUTE', 'DECOMPOSE', 'BLOCKED']
 
 
 def text(value: str, field: str) -> None:
@@ -71,6 +72,30 @@ def progress_action(*, worker_active: bool, progress_changed: bool,
     if progress_changed or unchanged_polls < 2:
         return 'WAIT_COMPACT'
     return 'BACKOFF' if tail_cursor_current else 'TAIL_DELTA'
+
+
+def mutation_action(*, observed_model: str | None, read_only: bool, binding_match: bool,
+                    exact_manifest: bool, bounded: bool, action_classes: int,
+                    destructive_rollback: bool, policy_denied: bool) -> MutationAction:
+    """Admit one reviewable mutation class only after observed writer binding."""
+    for value in (read_only, binding_match, exact_manifest, bounded,
+                  destructive_rollback, policy_denied):
+        flag(value)
+    if observed_model is not None and (not isinstance(observed_model, str) or not observed_model.strip()):
+        raise ValueError('observed model must be nonempty text or None')
+    if type(action_classes) is not int or action_classes < 1:
+        raise ValueError('action classes must be a positive integer')
+    if policy_denied:
+        return 'BLOCKED'
+    if observed_model is None:
+        return 'BLOCKED'
+    executor = any(observed_model == model or observed_model.startswith(model + '-')
+                   for model in ('gpt-5.6-sol', 'gpt-5.6-terra'))
+    if read_only or not binding_match or not executor:
+        return 'REROUTE'
+    if not exact_manifest or not bounded or action_classes != 1 or destructive_rollback:
+        return 'DECOMPOSE'
+    return 'ADMIT'
 
 
 @dataclass(frozen=True)

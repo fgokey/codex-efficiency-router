@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-rc.10 — 2026-09-13 (candidate, not published)
+
+- Verify the host-observed Terra/Sol binding immediately before every write tool; child claims cannot authorize writes.
+- Admit one exact, bounded mutation class per call and separate forward copies, configuration rewrites and destructive recovery.
+- Treat host policy denial as an environment failure and stop equivalent replay or repackaging until policy changes.
+- Add strict offline admission and negative tests without increasing instruction budgets or claiming live enforcement.
+
 ## 0.7.0-rc.9 — 2026-09-13 (candidate, not published)
 
 - Reuse known tool schemas until invalidation and admit long-context model/tool rounds only for changed state or due checkpoints.

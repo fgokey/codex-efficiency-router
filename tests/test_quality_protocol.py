@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from quality_reference import (Contract, Evidence, Failure, Unit, completion, handoff,
-                               progress_action, read_action, retry, roundtrip_action,
+                               mutation_action, progress_action, read_action, retry, roundtrip_action,
                                resume, tool_action)
 
 
@@ -72,6 +72,35 @@ class QualityProtocolTests(unittest.TestCase):
                                          unchanged_polls=2, tail_cursor_current=True), 'COLLECT')
         with self.assertRaises(ValueError):
             progress_action(**common, unchanged_polls=True, tail_cursor_current=False)
+
+    def test_mutation_requires_observed_matching_sol_or_terra(self):
+        safe = {'observed_model': 'gpt-5.6-terra', 'read_only': False, 'binding_match': True,
+                'exact_manifest': True, 'bounded': True, 'action_classes': 1,
+                'destructive_rollback': False, 'policy_denied': False}
+        self.assertEqual(mutation_action(**safe), 'ADMIT')
+        self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-5.6-sol-2026-09-01'}), 'ADMIT')
+        for change in ({'observed_model': 'gpt-6-astra'}, {'observed_model': 'gpt-5.6-luna'},
+                       {'read_only': True}, {'binding_match': False}):
+            self.assertEqual(mutation_action(**{**safe, **change}), 'REROUTE')
+        self.assertEqual(mutation_action(**{**safe, 'observed_model': None}), 'BLOCKED')
+
+    def test_mutation_decomposes_mixed_or_destructive_transaction(self):
+        safe = {'observed_model': 'gpt-5.6-sol', 'read_only': False, 'binding_match': True,
+                'exact_manifest': True, 'bounded': True, 'action_classes': 1,
+                'destructive_rollback': False, 'policy_denied': False}
+        for change in ({'exact_manifest': False}, {'bounded': False}, {'action_classes': 2},
+                       {'destructive_rollback': True}):
+            self.assertEqual(mutation_action(**{**safe, **change}), 'DECOMPOSE')
+
+    def test_policy_denial_blocks_replay_or_repackaging(self):
+        denied = {'observed_model': 'gpt-5.6-sol', 'read_only': False, 'binding_match': True,
+                  'exact_manifest': True, 'bounded': True, 'action_classes': 1,
+                  'destructive_rollback': False, 'policy_denied': True}
+        self.assertEqual(mutation_action(**denied), 'BLOCKED')
+        for bad in ({'action_classes': 0}, {'action_classes': True}, {'observed_model': ''},
+                    {'policy_denied': 1}):
+            with self.assertRaises(ValueError):
+                mutation_action(**{**denied, **bad})
 
     def test_missing_requirement_cannot_pass(self):
         self.assertEqual(completion(self.contract, self.evidence[:1]).status, 'PARTIAL')

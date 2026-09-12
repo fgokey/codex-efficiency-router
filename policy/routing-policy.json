@@ -1,5 +1,5 @@
 {
-  "schema_version": 10,
+  "schema_version": 11,
   "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
@@ -54,7 +54,10 @@
     "bounded_output_envelope_before_batch_reads",
     "model_roundtrips_are_budgeted_even_with_cached_input",
     "tool_discovery_reused_until_invalidation",
-    "worker_monitoring_uses_backoff_and_delta_cursors"
+    "worker_monitoring_uses_backoff_and_delta_cursors",
+    "host_observed_writer_binding_precedes_every_write_tool",
+    "forward_mutation_is_separate_from_destructive_recovery",
+    "policy_denial_stops_equivalent_replay"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -110,7 +113,7 @@
     ],
     "missing_evidence": "reuse_delegate_defer_or_block"
   },
-  "version": "0.7.0-rc.9",
+  "version": "0.7.0-rc.10",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -147,6 +150,12 @@
     "tool_discovery": "reuse known schemas until host or state invalidation",
     "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
     "worker_progress": "compact native wait with backoff; after two unchanged snapshots read one bounded rollout delta from a saved offset, never both paths"
+  },
+  "mutation_admission": {
+    "writer_binding": "parent verifies host-observed Terra/Sol model, effort and non-read-only role before every write tool",
+    "command_shape": "one exact manifest and one bounded mutation class per tool call",
+    "recovery": "forward copy, config rewrite and destructive recovery are separate reviewed units",
+    "policy_denial": "stop exact or equivalent replay until host or user policy changes"
   },
   "effort_policy": {
     "installation_default": "auto",

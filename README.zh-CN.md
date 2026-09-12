@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.9 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.10 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -31,6 +31,13 @@ $env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
 CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
+## v0.7.0-rc.10：可审查的写入准入
+
+策略要求父代理在每次写入工具调用前核对宿主实际观测到的 Terra/Sol 绑定。每个写入调用
+只允许一份精确清单和一种有界操作；正向复制、配置改写和破坏性恢复相互分离。
+宿主策略拒绝后，在策略改变前不得原样重试、等价重放或换壳执行；禁用审批时明确
+报告需要用户手动处理的边界。
 
 ## v0.7.0-rc.9：减少长上下文工具往返
 
