@@ -1,4 +1,4 @@
-# Astra write boundary and active diagnostic participation (v0.7.0-rc.5)
+# Astra write boundary and active diagnostic participation (v0.7.0-rc.6)
 
 ## Two independent decisions
 
@@ -8,7 +8,7 @@ and consider cost. The gate outranks tiny-task, sufficient-parent, unavailable-b
 and exhausted-slot fallbacks. Unknown effect/identity is not permission.
 
 All Astra leaves and read-only roles stay read-only. Root Astra also defaults read-only,
-but can apply **one bounded local code patch** when every condition below is observed:
+but can apply **one bounded local repair unit** when every condition below is observed:
 
 1. Two qualified executor attempts failed on the same task/unit/failure signature for a
    classified implementation, capability or unexplained issue, or a handoff would
@@ -16,11 +16,11 @@ but can apply **one bounded local code patch** when every condition below is obs
    specification and observability gaps do not qualify.
 2. The user authorized the change; exact files/scope, verification and safe boundary are
    known; the target repository is the current task workspace.
-3. Ownership is exclusive, no writer is active, and no earlier root exception was used.
+3. Ownership is exclusive, no writer is active, and no earlier root exception unit was completed.
 4. An observed active strict Guard is absent. UNKNOWN does not grant host permission:
    the policy may request the patch, but an unobserved active Hook can still deny it.
 
-This exception covers the patch only. It does not cover arbitrary shell, formatting,
+This exception covers the local repair unit only. It does not cover arbitrary shell, formatting,
 builds, side-effecting tests, Git mutation, publishing or deployment. Sol/Terra performs
 those steps. Missing evidence fails closed to reuse/delegation/defer/BLOCKED. High risk,
 task size, an Astra model selection, or a no-subagent request alone does not grant it.
@@ -42,6 +42,8 @@ An exhausted repair budget does NOT forbid a separately scoped diagnosis and doe
 get reset by that diagnosis. An explicit bounded parent reassessment is needed for more
 repairs. Missing observations may justify an instrumentation-design subtask, not an
 invented root cause. User no-escalation/no-subagent constraints still apply.
+
+Multiple code/test patches may complete the same unit. Shared prerequisite, capability/effort and safe-boundary checks still apply. Exhausted attempts require a justified absolute ceiling, not just an extension reason. Sol/Terra may deliver only under explicit handoff of existing user authority, exact repository/ref/destination and required checks.
 
 ## Existing edits and writers
 

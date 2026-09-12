@@ -18,6 +18,13 @@ Missing alias, lack of native effort, and bad configuration can select the verif
 
 `Decision.requested_role` identifies the actual binding. `recommended` and `requested` contain capability pairs; their conceptual role property is not necessarily the dispatched alias. `binding_kind` is advisory selection, not proof a model ran. Host metadata verifies actual identity; role self-description does not. UNKNOWN/MISMATCH keep auto-low suspended for the task.
 
+For a native schema exposing these fields, `dispatch_arguments(decision)` returns
+`agent_type`, `fork_turns="none"`, and explicit `reasoning_effort` for adaptive bindings.
+The caller supplies a self-contained contract and task name; the role binds the model.
+Full-history forks cannot carry effort overrides; omission must not inherit root max.
+Fixed fallback omits the override because its verified role pins the exact pair.
+This helper never calls a model and is not runtime enforcement.
+
 ## Defaults and overrides
 
 Medium for ordinary implementation; high for deeper suitable reasoning; automatic Astra high. Auto-low remains separately opt-in for strong-check mechanical Luna work with low consequences and no unresolved issues/prior failure. Explicit preferences never waive quality or authority. No-escalation constrains model and effort separately; keep-model may allow effort changes. No forced capability ladder, no automatic xhigh/max. A disabled or unsupported route never certifies a weak parent as sufficient.

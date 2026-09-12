@@ -232,7 +232,7 @@ class EffortPolicyTests(unittest.TestCase):
         self.assertEqual(plan(s, c, ADAPTIVE, explicit_effort='max').action, 'blocked')
         self.assertEqual(plan(s, replace(c, diagnosis_only=True), ADAPTIVE,
                               deep_reasoning=True).action, 'delegate')
-        self.assertEqual(plan(s, replace(c, repair_extension_reason='parent: new evidence narrows repair'),
+        self.assertEqual(plan(s, replace(c, repair_extension_reason='parent: new evidence narrows repair', repair_attempt_limit=3),
                               ADAPTIVE, deep_reasoning=True).action, 'delegate')
         self.assertEqual(s.failed_attempts, 2)
 

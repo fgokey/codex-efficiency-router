@@ -34,7 +34,7 @@ class Writer:
 
 @dataclass(frozen=True)
 class AstraWriteEvidence:
-    """Caller-observed evidence for one exceptional root-Astra local patch.
+    """Caller-observed evidence for one exceptional root-Astra repair unit.
 
     This is an offline policy input, not a permission token or runtime ledger.
     """
@@ -45,7 +45,7 @@ class AstraWriteEvidence:
     verification_defined: bool = False
     failure_kind: str = 'none'
     qualified_attempts: int = 0
-    prior_exception_writes: int = 0
+    prior_exception_units: int = 0  # Completed units, not patch/tool-call count.
     guard_status: str = 'unknown'  # unknown, inactive, active
 
     def validate(self):
@@ -60,7 +60,7 @@ class AstraWriteEvidence:
         if self.failure_kind not in ('none', 'capability', 'unexplained', 'implementation',
                                      'environment', 'specification', 'observability'):
             raise ValueError('invalid Astra write failure kind')
-        for value in (self.qualified_attempts, self.prior_exception_writes):
+        for value in (self.qualified_attempts, self.prior_exception_units):
             if type(value) is not int or value < 0:
                 raise ValueError('Astra write evidence counts must be nonnegative integers')
 
@@ -69,7 +69,7 @@ class AstraWriteEvidence:
                          and self.failure_kind in ('capability', 'unexplained', 'implementation'))
         context_ready = self.reason == 'critical_context_loss'
         return (self.root_actor and self.scope_bounded and self.target_in_workspace
-                and self.verification_defined and self.prior_exception_writes == 0
+                and self.verification_defined and self.prior_exception_units == 0
                 and self.guard_status != 'active' and (failure_ready or context_ready))
 
 
@@ -146,7 +146,7 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
                    and scope.astra_write.qualifies())
     if astra_patch:
         return WriteDecision('local_write',
-                             'one bounded root-Astra patch is justified by recorded exception evidence; '
+                             'one bounded root-Astra repair unit is justified by recorded exception evidence; '
                              'an unobserved strict Guard may still deny it; ordinary implementation and '
                              'side-effecting verification remain executor work',
                              exception='bounded_astra_patch')

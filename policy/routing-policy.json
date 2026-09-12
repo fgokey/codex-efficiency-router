@@ -47,7 +47,7 @@
     "no_silent_unsupported_effort_mapping",
     "write_authority_before_local_shortcuts",
     "astra_leaf_and_readonly_roles_no_local_mutation",
-    "astra_root_default_readonly_single_bounded_patch_exception",
+    "astra_root_default_readonly_single_bounded_repair_unit_exception",
     "strict_guard_disables_astra_patch_exception",
     "retry_exhaustion_does_not_disable_readonly_diagnosis",
     "existing_edits_preserved_for_owner_review"
@@ -83,7 +83,7 @@
     "missing_requirements_or_permissions"
   ],
   "astra_write_exception": {
-    "operation": "one bounded local code patch only",
+    "operation": "one bounded local repair unit; multiple code/test patches within retained attempt ceiling",
     "actor": "root Astra only; leaves and read-only roles excluded",
     "trigger": "two qualified same-signature implementation/capability/unexplained executor failures or material critical-context handoff loss",
     "required": [
@@ -93,8 +93,11 @@
       "exclusive_ownership_and_safe_boundary",
       "verification_defined",
       "no_active_writer",
-      "no_prior_exception",
-      "strict_guard_not_observed_active"
+      "no_prior_completed_exception_unit",
+      "strict_guard_not_observed_active",
+      "prerequisites_ready",
+      "current_capability_and_effort_sufficient",
+      "absolute_attempt_ceiling_not_exhausted"
     ],
     "excluded": [
       "arbitrary_shell",
@@ -103,7 +106,7 @@
     ],
     "missing_evidence": "reuse_delegate_defer_or_block"
   },
-  "version": "0.7.0-rc.5",
+  "version": "0.7.0-rc.6",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -128,7 +131,8 @@
     "default_implementation_attempts_per_failure_signature": 2,
     "attempt_budget_scope": "task/unit/canonical failure across workers and compaction",
     "runtime_enforcement": "instruction policy only; offline helpers do not enforce host behavior",
-    "checkpoint": "one task-scoped record only when needed and permitted"
+    "checkpoint": "one task-scoped record only when needed and permitted",
+    "attempt_extension": "justified parent reassessment plus absolute attempt ceiling; reason alone never renews budget"
   },
   "effort_policy": {
     "installation_default": "auto",
@@ -163,6 +167,7 @@
     "legacy_upgrade": "ordinary update backs up and migrates pre-profile_schema=2 installs; later explicit overrides preserved",
     "no_probe_calls": true,
     "no_runtime_config_writes": true,
-    "automatic_low_default": false
+    "automatic_low_default": false,
+    "spawn_context": "compact self-contained contract; fork_turns=none with explicit reasoning_effort; no inherited root effort"
   }
 }

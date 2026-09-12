@@ -6,7 +6,7 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from effort_reference import Configuration as C, Context, RoleBinding, plan, PRESETS
+from effort_reference import Configuration as C, Context, RoleBinding, plan, PRESETS, dispatch_arguments
 from policy_reference import TaskSignals as S
 from profiles import Profile
 
@@ -25,6 +25,31 @@ def host(**kwargs):
 
 
 class AutomaticBindingTests(unittest.TestCase):
+    def test_task_difficulty_selects_model_and_explicit_effort_without_root_inheritance(self):
+        cases=(
+            (S(mechanical=True,uncertainty=0,verifiability=3),C('luna','medium')),
+            (S(),C('terra','medium')),
+            (SOL,C('sol','medium')),
+            (S(uncertainty=2,coupling=2,risk=1),C('sol','high')),
+            (S(uncertainty=1,coupling=1,risk=2),C('sol','high')),
+            (S(risk=3,uncertainty=3),C('astra','high')),
+        )
+        for signals,expected in cases:
+            with self.subTest(expected=expected):
+                d=plan(signals,host(current=C('astra','max')),AUTO)
+                self.assertEqual(d.requested,expected)
+                args=dispatch_arguments(d)
+                self.assertEqual(args,dict(agent_type='cer_auto_'+expected.role,
+                                          reasoning_effort=expected.effort,fork_turns='none'))
+
+    def test_explicit_spawn_fields_only_for_admitted_delegation(self):
+        fixed=plan(S(),host(host_can_set_effort=False),AUTO)
+        self.assertEqual(dispatch_arguments(fixed),dict(agent_type='terra_executor',fork_turns='none'))
+        for d in (plan(S(),host(worker_active=True),AUTO),
+                  plan(S(no_subagents=True),host(),AUTO),
+                  plan(S(failed_attempts=2),host(),AUTO)):
+            with self.assertRaises(ValueError):dispatch_arguments(d)
+
     def test_native_effort_chooses_alias_and_explicit_pair(self):
         d = plan(S(), host(), AUTO)
         self.assertEqual((d.action, d.requested_role, d.binding_kind, d.requested),

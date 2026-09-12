@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0-rc.6 — 2026-09-12 (candidate, not published)
+
+- Apply prerequisites, current capability/effort checks, safe boundaries and absolute retry ceilings before root repairs or owner reuse. A justification alone cannot renew repairs.
+- Scope the root exception to one repair unit, allowing code/test patches without treating tool calls as attempts. Read-only roles and strict Guard remain unchanged.
+- Select explicit model/effort pairs and compact spawn arguments by task difficulty; prevent full-history effort inheritance and reuse below the effort floor.
+- Allow Sol/Terra delivery only under explicit handoff of existing user authority and exact repository/ref/destination/checks.
+- Preserve instruction budgets; require host attribution evidence for the changed-files badge, not parent model identity. No live compliance or savings claim.
+
 ## 0.7.0-rc.5 — 2026-09-12 (candidate, not published)
 
 - Keep Astra leaves and read-only roles strictly read-only, while allowing a root Astra one bounded local code patch after qualified executor failure or material handoff-context loss when every authority, scope, ownership, workspace, verification and concurrency gate is satisfied.

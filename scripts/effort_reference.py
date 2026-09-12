@@ -73,6 +73,7 @@ class Context:
     failure_kind: str = "none"  # Classified evidence, not just an error counter.
     diagnosis_only: bool = False
     repair_extension_reason: str | None = None
+    repair_attempt_limit: int = 2  # Absolute unit/signature ceiling, never a fresh allowance.
     unavailable_roles: frozenset[str] = frozenset()  # Task-local confirmed failures; never probe in a loop.
 
     def validate(self) -> None:
@@ -93,6 +94,10 @@ class Context:
         if self.repair_extension_reason is not None and (not isinstance(self.repair_extension_reason, str)
                 or not self.repair_extension_reason.strip()):
             raise ValueError("repair extension needs a justified parent reassessment")
+        if type(self.repair_attempt_limit) is not int or self.repair_attempt_limit < 2:
+            raise ValueError("repair attempt limit must be an integer >= 2")
+        if self.repair_attempt_limit > 2 and self.repair_extension_reason is None:
+            raise ValueError("extended absolute limit requires a parent reassessment")
         if self.last_observation not in ("NOT_CHECKED", "VERIFIED", "UNKNOWN", "MISMATCH"):
             raise ValueError("invalid observed configuration status")
         if not isinstance(self.roles, Mapping) or not isinstance(self.catalog, Mapping):
@@ -187,13 +192,26 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
 
     if write_intent and gate.action in ("blocked", "defer"):
         return Decision(rec, None, gate.action, gate.reason, owner_id=gate.owner)
+    if write_intent:
+        if not (s.spec_complete and s.authority_ready and s.environment_ready and s.observability_ready) or s.cheap_check_available:
+            return result("prerequisite", "repair prerequisites or run a safe discriminating check")
+        if context.worker_active or not context.safe_boundary:
+            return result("defer", "wait for a safe task boundary; no in-flight hot switch")
+        if s.failed_attempts >= context.repair_attempt_limit:
+            return result("blocked", "write budget exhausted; reuse/diagnosis labels cannot renew repairs")
+    minimum = "high" if needs_deeper_reasoning(s, deep_reasoning) or (
+        rec is not None and rec.lane == "astra" and choose_lane(replace(s, force_astra=False)) == "astra") else "low" if low_eligible(s) else "medium"
     if write_intent and gate.exception == "bounded_astra_patch":
+        if not context.current_sufficient:
+            return result("blocked", "root repair requires current capability evidence")
+        if context.current.effort == "low" or (explicit_effort is not None and context.current.effort != explicit_effort) or EFFORTS.index(context.current.effort) < EFFORTS.index(minimum):
+            return result("blocked", "root repair cannot change local effort or bypass the quality floor")
+        if context.write_scope.astra_write.qualified_attempts > s.failed_attempts:
+            return result("blocked", "reconcile qualified failures with retained unit history")
         return Decision(rec, None, "local", gate.reason)
     if write_intent and rec is not None and rec.lane == "astra":
         return result("blocked", "split out Astra read-only diagnosis, then assign settled writes to Terra/Sol")
 
-    if write_intent and s.failed_attempts >= 2 and context.repair_extension_reason is None:
-        return result("blocked", "write budget exhausted; reuse/diagnosis labels cannot renew repairs")
     if write_intent and gate.action == "reuse":
         owner = next(w for w in context.write_scope.writers if w.agent_id == gate.owner)
         owner_lane = next((lane for lane, (_, model, _) in PRESETS.items() if model == owner.model), None)
@@ -202,6 +220,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
             return result("blocked", "existing owner does not satisfy the model lock")
         if explicit_effort is not None and owner.effort != explicit_effort:
             return result("blocked", "existing owner does not confirm the explicitly requested effort")
+        if owner.effort is None or EFFORTS.index(owner.effort) < EFFORTS.index(minimum):
+            return result("blocked", "existing owner does not confirm the required effort floor; reassess at a safe boundary")
         if context.no_escalation or context.no_effort_escalation:
             if current is None or owner.effort is None:
                 return result("blocked", "unknown owner configuration cannot verify upgrade limits")
@@ -214,15 +234,13 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
         return result("local", "Astra participates directly in read-only diagnosis; exhausted write budget remains exhausted")
     if rec is None:
         return result("prerequisite", "repair prerequisites or run a safe discriminating check")
-    if s.failed_attempts >= 2 and not context.diagnosis_only and context.repair_extension_reason is None:
+    if s.failed_attempts >= context.repair_attempt_limit and not context.diagnosis_only:
         return result("blocked", "repair budget exhausted; changing model/effort never renews it")
     current = context.current
     candidate = Configuration(rec.lane, explicit_effort or rec.effort)
     # Explicit preferences are not permission to ignore an identified quality floor.
     if explicit_effort == "low" and (not low_eligible(s) or deep_reasoning or rec.lane == "astra"):
         return result("blocked", "explicit low does not satisfy the scoped quality floor")
-    minimum = "high" if needs_deeper_reasoning(s, deep_reasoning) or (
-        rec.lane == "astra" and choose_lane(replace(s, force_astra=False)) == "astra") else "low" if low_eligible(s) else "medium"
     if EFFORTS.index(candidate.effort) < EFFORTS.index(minimum):
         return result("blocked", "requested effort is below the identified quality floor")
     if s.no_subagents:
@@ -290,6 +308,20 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     if candidate.effort not in context.catalog.get(candidate.model, ()):
         return unavailable("catalog does not confirm requested model/effort; no remapping")
     return result("delegate", "explicit supported configuration at a safe boundary; retain attempts", candidate, candidate.role, profile.mode)
+
+
+def dispatch_arguments(decision: Decision) -> dict[str, str]:
+    """Native spawn selection fields; caller supplies the scoped message/task name.
+
+    No call is made. A compact contract avoids inherited history and permits an
+    explicit effort override; fixed bindings already pin the verified pair.
+    """
+    if decision.action != "delegate" or decision.requested is None or decision.requested_role is None or decision.binding_kind not in ("fixed", "adaptive"):
+        raise ValueError("a verified delegation decision is required")
+    args = {"agent_type": decision.requested_role, "fork_turns": "none"}
+    if decision.binding_kind == "adaptive":
+        args["reasoning_effort"] = decision.requested.effort
+    return args
 
 
 def check_observation(requested: Configuration, model: str | None,

@@ -4,12 +4,12 @@ All three core gates apply; counts or prerequisite gaps alone never qualify.
 
 | Open judgment | Settled alternative |
 | --- | --- |
-| API/format/ownership/compatibility tradeoffs | Accepted contract |
-| Ambiguous trust/data/billing/production invariant | Specified checked rule |
-| Conflicting evidence or causal hypotheses | Discriminating check |
-| Migration coexistence/order/rollback/recovery | Authorized fixture steps |
-| Novel algorithm/protocol/state/scheduling | Documented pattern |
-| Consequential independent arbitration | Sufficient routine review |
+| API/format/ownership tradeoffs | Accepted contract |
+| Ambiguous trust/data/production invariant | Checked rule |
+| Conflicting causal hypotheses | Discriminating check |
+| Migration order/rollback/recovery | Authorized fixture |
+| Novel algorithm/protocol/state | Known pattern |
+| Consequential arbitration | Routine review |
 | Qualified Sol reasoning failure | Missing dependency |
 
-Investigate evidence; arbitrate hypotheses; return experiments/precise fixes. Astra admission does not grant writes. A root may apply one local patch only under the dispatch exception; leaves stay read-only. Instrument gaps; don't invent causes. Plans don't authorize rollout. New evidence/requirements reopen decisions; changed errors matter only when narrowing causes. More effort need not win. Offline routing is not quality proof.
+Return evidence, experiments and precise fixes, never invented causes. Admission grants no writes; only the root repair-unit exception can. Leaves stay read-only. Plans grant no rollout authority. Reopen decisions on contrary evidence. Offline routing proves neither quality nor savings.

@@ -94,9 +94,9 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('every repository root', 'exact changed paths/status',
                        'pre-existing dirt', 'status/diff per repository',
                        'Native review/open-review', 'unstaged review',
-                       'task workspace roots', 'write-capable Sol/Terra parent',
-                       'Astra as a read-only child', 'Before write routing',
-                       'fully qualified bounded local-patch exception',
+                       'task workspace roots', 'native file-change attribution',
+                       'model name alone proves neither', 'Before write routing',
+                       'support unknown',
                        'A required parent badge', 'stop before writes',
                        'does not populate that badge',
                        'Never touch/reapply files only for attribution'):
@@ -120,7 +120,7 @@ class DocumentedContractTests(unittest.TestCase):
     def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('one bounded local code patch', 'two qualified executor attempts failed',
+        for phrase in ('one bounded local repair unit', 'two qualified executor attempts failed',
                        'current-workspace target', 'observed active strict Guard disables it'):
             self.assertIn(phrase, core)
         self.assertIn('optional strict PreToolUse Guard denies every Astra', dispatch)
@@ -130,6 +130,16 @@ class DocumentedContractTests(unittest.TestCase):
         # The existing function tests exercise restore separately and owned-only deletion.
         import inspect
         self.assertNotIn('restore(', inspect.getsource(uninstall.main))
+
+    def test_delivery_owner_requires_existing_user_authority(self):
+        for name in ('sol-engineer.toml','terra-executor.toml'):
+            text=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions']
+            self.assertIn('Commit/push/deploy/publish requires explicit parent handoff of user authority',text)
+            self.assertIn('exact repo/ref/destination and checks',text)
+        luna=tomllib.loads((ROOT/'agents/luna-worker.toml').read_text())['developer_instructions']
+        self.assertIn('No spawning, nested CLI/API, model/effort changes, commit/push/deploy/publish',luna)
+        dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
+        self.assertIn('Handoff grants no new authority',dispatch)
 
 
 if __name__ == '__main__':

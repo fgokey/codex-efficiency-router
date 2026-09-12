@@ -55,7 +55,7 @@ class WriteGateTests(unittest.TestCase):
         cases=(
             astra_write(root_actor=False), astra_write(scope_bounded=False),
             astra_write(target_in_workspace=False), astra_write(verification_defined=False),
-            astra_write(qualified_attempts=1), astra_write(prior_exception_writes=1),
+            astra_write(qualified_attempts=1), astra_write(prior_exception_units=1),
             astra_write(guard_status='active'),
             astra_write(failure_kind='environment'), astra_write(failure_kind='specification'),
             astra_write(failure_kind='observability'),
@@ -146,19 +146,66 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual((d.action,d.requested.lane),('delegate','terra'))
 
     def test_joint_planner_retains_root_astra_for_qualified_bounded_patch(self):
-        c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()))
+        c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()),
+               repair_extension_reason='parent: root diagnosis identified cause',repair_attempt_limit=3)
         d=plan(S(risk=3,uncertainty=3,failed_attempts=2,prior_lane='sol'),c)
-        self.assertEqual(d.action,'local');self.assertIn('bounded root-Astra patch',d.reason)
+        self.assertEqual(d.action,'local');self.assertIn('bounded root-Astra repair unit',d.reason)
 
     def test_joint_planner_no_route_blocks_even_sufficient_astra(self):
         for c in (host(host_supports_routing=False),host(roles={}),host(catalog={})):
             self.assertEqual(plan(S(),c).action,'blocked')
 
+    def test_root_exception_preserves_shared_admission_checks(self):
+        c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()),
+               repair_extension_reason='parent: cause now isolated',repair_attempt_limit=3)
+        s=S(failed_attempts=2)
+        self.assertEqual(plan(s,c).action,'local')
+        for flag in ('spec_complete','authority_ready','environment_ready','observability_ready'):
+            with self.subTest(flag=flag):
+                self.assertEqual(plan(replace(s,**{flag:False}),c).action,'prerequisite')
+        self.assertEqual(plan(replace(s,cheap_check_available=True),c).action,'prerequisite')
+        for changes, action in ((dict(worker_active=True),'defer'), (dict(safe_boundary=False),'defer'),
+                                (dict(current_sufficient=False),'blocked'),
+                                (dict(current=C('astra','low')),'blocked')):
+            with self.subTest(changes=changes):
+                self.assertEqual(plan(s,replace(c,**changes)).action,action)
+        for effort in ('low','medium','max'):
+            self.assertEqual(plan(s,c,explicit_effort=effort).action,'blocked')
+        self.assertEqual(plan(s,replace(c,keep_model=True,no_escalation=True),explicit_effort='high').action,'local')
+        self.assertEqual(plan(replace(s,failed_attempts=1),c).action,'blocked')
+
+    def test_exception_unit_allows_multiple_patches_but_not_unbounded_repairs(self):
+        c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()),
+               repair_extension_reason='parent: new diagnosis',repair_attempt_limit=3)
+        # Implementation and test patches in one attempt do not consume another unit.
+        for _ in range(2):
+            self.assertEqual(plan(S(failed_attempts=2),c).action,'local')
+        self.assertEqual(plan(S(failed_attempts=3),c).action,'blocked')
+        self.assertEqual(plan(S(failed_attempts=2),replace(c,repair_attempt_limit=2)).action,'blocked')
+        completed=replace(c.write_scope,astra_write=astra_write(prior_exception_units=1))
+        self.assertNotEqual(plan(S(failed_attempts=2),replace(c,write_scope=completed)).action,'local')
+
+    def test_reuse_preserves_prerequisites_boundary_and_effort_floor(self):
+        c=host(write_scope=scope(writers=(Writer('old','unit-a','gpt-5.6-sol','idle',effort='medium'),)))
+        self.assertEqual(plan(S(),c).action,'reuse')
+        self.assertEqual(plan(S(environment_ready=False),c).action,'prerequisite')
+        self.assertEqual(plan(S(),replace(c,worker_active=True)).action,'defer')
+        self.assertEqual(plan(S(uncertainty=2,coupling=2),c).action,'blocked')
+
+    def test_extension_is_an_absolute_ceiling_not_a_reason_string(self):
+        c=host(repair_extension_reason='parent: new evidence')
+        self.assertEqual(plan(S(failed_attempts=2),c).action,'blocked')
+        for limit in (True,1,2.5):
+            with self.assertRaises(ValueError):
+                plan(S(),replace(c,repair_attempt_limit=limit))
+        with self.assertRaises(ValueError):
+            plan(S(),host(repair_attempt_limit=3))
+
     def test_joint_planner_opt_out_cannot_fall_back_to_local_write(self):
         self.assertEqual(plan(S(no_subagents=True),host()).action,'blocked')
 
     def test_joint_planner_reuse_returns_existing_id_without_spawn(self):
-        c=host(write_scope=scope(writers=(Writer('existing','unit-a','gpt-5.6-sol','idle'),)))
+        c=host(write_scope=scope(writers=(Writer('existing','unit-a','gpt-5.6-sol','idle',effort='medium'),)))
         d=plan(S(),c)
         self.assertEqual((d.action,d.owner_id,d.requested_role),('reuse','existing',None))
 

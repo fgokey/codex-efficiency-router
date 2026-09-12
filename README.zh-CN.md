@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.6 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -32,7 +32,20 @@ CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
 
-## v0.7.0-rc.5：父 Astra 的受限修复
+## v0.7.0-rc.6：修复边界与按任务显式调档
+
+父 Astra 修复例外和执行者复用都必须通过前置条件、能力/档位、安全边界及绝对重试上限
+检查。一个受限修复单元可包含代码、测试等多次补丁；仅给理由不能续期。
+Sol/Terra 可在父代理明确移交已有用户授权、仓库/分支/目标及必要检查后负责交付。
+
+自动联合选择模型与档位：实现 Terra/medium，诊断 Sol/medium，耦合或高后果推理
+Sol/high，特别困难的判断 Astra/high。显式传入自动角色、思考档位和 `fork_turns="none"`，
+通过精简完整的契约交接，避免继承父代理 max。优先复用足够能力的空闲执行者，
+保留 fixed/low 偏好。离线测试不能证明运行时已加载或节省。原生修改文件徽标以宿主
+归属证据为准，不能凭模型名称或 Review 入口断言生效。这取代 rc.4 的模型限制和
+rc.5 的单补丁限制；严格 Guard 仍禁止 Astra 写入。
+
+## v0.7.0-rc.5（历史）：父 Astra 的受限修复
 
 Astra 继续负责困难诊断和裁决。Astra 子代理及只读角色始终禁止写入。父 Astra 仅在
 执行者经过合格尝试仍失败，或移交会实质丢失修复所需的关键推理时，才可直接完成一次
@@ -42,7 +55,7 @@ Astra 继续负责困难诊断和裁决。Astra 子代理及只读角色始终�
 Shell、构建、有副作用测试及发布仍由 Sol/Terra 执行。证据不完整就委派、等待或阻塞。
 可选原生 Guard 有意保持更严格，会禁止所有 Astra 写入。
 
-## v0.7.0-rc.4：原生修改汇总预检
+## v0.7.0-rc.4（历史）：原生修改汇总预检
 
 写入派发前，Router 现在会检查目标 Git 仓库是否属于当前任务工作区，以及修改是否
 由同一个具备写权限的父线程完成，避免再把 Review 入口描述成原生“修改文件”徽标的

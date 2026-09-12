@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.5 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.6 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -33,7 +33,22 @@ validated.** CI success is offline evidence, not a native Canary or real-task sa
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
 
-## v0.7.0-rc.5: bounded root-Astra repair
+## v0.7.0-rc.6: repair admission and explicit task-based effort
+
+Root repair exceptions and owner reuse retain prerequisite, capability/effort, boundary and
+absolute retry-ceiling checks. One repair unit may contain multiple code/test patches;
+a reason string alone cannot renew attempts. Sol/Terra can deliver only with explicit handoff
+of existing user authority, exact repository/ref/destination and checks.
+
+Auto selects both model and effort: implementation Terra/medium; diagnosis Sol/medium;
+coupled or consequential reasoning Sol/high; exceptional judgment Astra/high. Use the unpinned
+alias, explicit effort and a compact contract with `fork_turns="none"`, avoiding root max
+inheritance. Reuse sufficient idle owners; preserve fixed/low preferences. Offline checks
+prove neither runtime loading nor savings. Badge eligibility needs host attribution evidence.
+These rules supersede rc.4's model-specific restriction and rc.5's single-patch limit;
+strict Guard still disables the root exception.
+
+## v0.7.0-rc.5 (historical): bounded root-Astra repair
 
 Astra remains the primary reasoner for hard diagnosis and arbitration. Astra leaves and
 read-only roles never write. A root Astra may apply one bounded local code patch only after
@@ -45,7 +60,7 @@ publish/deploy work remains with Sol/Terra. Missing evidence falls back to deleg
 blocked/deferred result. The optional native Guard deliberately remains stricter and denies
 all Astra writes.
 
-## v0.7.0-rc.4: native change-summary preflight
+## v0.7.0-rc.4 (historical): native change-summary preflight
 
 Before write delegation, the Router now checks whether the target Git repository belongs
 to the current task workspace and whether the same write-capable parent will own the edits.

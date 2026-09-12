@@ -20,7 +20,7 @@ Evidence applies to relevant final state: code/diff, test definitions, dependenc
 
 ## Recovery and bounded retry
 
-An implementation failure allows one targeted repair, shared across workers for that task/unit/failure signature. Worker/model changes and compaction do not renew the budget. Preserve approaches that failed and evidence that ruled them out. Exhaustion triggers diagnosis, a discriminating experiment or escalation; a bounded extension needs an explicit justified parent reassessment, not renaming the failure.
+An implementation failure allows one targeted repair, shared across workers for that task/unit/failure signature. Worker/model changes and compaction do not renew the budget. Preserve approaches that failed and evidence that ruled them out. Exhaustion triggers diagnosis, a discriminating experiment or escalation; a bounded extension needs an explicit justified parent reassessment and an absolute attempt ceiling, not renaming the failure. A reason alone cannot renew attempts. Code and test patches within one attempt are not separate retries.
 
 Only long work or recovery needs a task-scoped checkpoint in a permitted location. Reuse an existing project mechanism when suitable. One parent owns it; no per-turn ledger or separate daemon. Reconcile the record with actual files and worker state, reuse valid completed units and preserve retries. Unknown in-flight work or external side effects must be reconciled before replay. Never overwrite another task's record or persist secrets.
 
