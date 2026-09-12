@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.3 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.4 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,14 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.4: native change-summary preflight
+
+Before write delegation, the Router now checks whether the target Git repository belongs
+to the current task workspace and whether the same write-capable parent will own the edits.
+This prevents Review fallback from being presented as a fix for the native changed-files
+badge. Mutation-heavy tasks that require the badge should use a Sol/Terra parent rooted at
+the target repository, with Astra reserved for read-only hard judgments.
 
 ## v0.7.0-rc.3: explicit auto-effort dispatch
 
@@ -166,7 +174,7 @@ Complete this task using suitable model/effort choices and the required acceptan
 
 Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local; Astra writes always go to an executor. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
 
-When child executors modify files, each writer returns repository-rooted exact paths and status. After all writers finish, the read-only parent verifies each repository, lists the paths in its final response and opens supported native unstaged reviews. Some Codex hosts do not aggregate child `fileChange` events into the parent task's changed-files panel; this workflow makes the changes reviewable without having Astra touch them again, but it cannot claim that native panel was populated.
+The native changed-files badge belongs to the task workspace and its own file-change events. If that badge is required, start mutation work in the target repository with a write-capable Sol/Terra parent; use Astra only as a read-only child for hard judgments. An Astra parent, a repository outside the task workspace, or a host that does not aggregate child `fileChange` events cannot guarantee the badge. The Router detects this before delegation instead of treating an unstaged Review as equivalent. When the badge is optional, writers still return repository-rooted exact paths; the parent verifies each repository, lists the paths and opens supported Reviews.
 
 ## Uninstall and restore
 

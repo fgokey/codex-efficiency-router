@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.3 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.4 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -31,6 +31,13 @@ $env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
 CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
+## v0.7.0-rc.4：原生修改汇总预检
+
+写入派发前，Router 现在会检查目标 Git 仓库是否属于当前任务工作区，以及修改是否
+由同一个具备写权限的父线程完成，避免再把 Review 入口描述成原生“修改文件”徽标的
+修复。必须保留徽标的写任务应在目标仓库中使用 Sol/Terra 父线程，Astra 只承担困难
+判断的只读子任务。
 
 ## v0.7.0-rc.3：显式自动档位派发
 
@@ -152,7 +159,7 @@ $codex-efficiency-router
 
 支持相关任务的隐式触发；显式调用更明确。父线程模型不改变。简单且有权限的工作直接执行；Astra 写入仍交执行者，不默认多 Agent。不叠加多个 Router；“禁用路由”“不要子 Agent”“不要升级”仍有效。必要要求逐项对应当前证据，区分 PASS/PARTIAL/BLOCKED；换绑定、模型或上下文不重置重试次数。
 
-子执行者修改文件时，每个写入者必须按仓库根目录返回精确路径和状态。所有写入者结束后，只读父线程逐仓库核对、在最终回复中列出路径，并在宿主支持时打开各仓库的未暂存 Review。部分 Codex 宿主不会把子线程的 `fileChange` 事件汇总到父任务“修改文件”面板；此流程无需让 Astra 再次触碰文件即可提供审阅入口，但不能宣称已填充原生面板。
+原生“修改文件”徽标归属于任务工作区及该任务自己的文件变更事件。必须保留徽标时，应在目标仓库中使用具备写权限的 Sol/Terra 父线程执行修改，Astra 只作为困难判断的只读子线程。Astra 父线程、任务工作区外仓库或不汇总子线程 `fileChange` 的宿主都不能保证徽标。Router 必须在派发前识别这一点，不能再把未暂存 Review 当成徽标修复。徽标非必需时，写入者仍返回仓库根目录和精确路径，父线程逐仓库核对、列出路径并打开受支持的 Review。
 
 ## 卸载与恢复
 

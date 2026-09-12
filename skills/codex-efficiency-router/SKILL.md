@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; reserve Astra fo
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.3 -->
+<!-- CER version: 0.7.0-rc.4 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
 
@@ -40,7 +40,7 @@ Default one leaf; at most two concurrent writers, the third waits. Require disjo
 
 ## Handoff without losing the decision
 
-Pass contract/outcomes, revision/dirty state/paths, facts vs assumptions/evidence, invariants, allowed writes/non-goals, checks, pair/binding and attempts; no transcripts/secrets. Receiver checks completeness/state/assumptions/conflicts. Requirements outrank plans; block affected scope, and contrary evidence reopens decisions. Parent verifies integration and completes the writer review handoff in dispatch, not just child success.
+Pass contract/outcomes, revision/dirty state/paths, facts vs assumptions/evidence, invariants, allowed writes/non-goals, checks, pair/binding and attempts; no transcripts/secrets. Receiver checks completeness/state/assumptions/conflicts. Requirements outrank plans; block affected scope, and contrary evidence reopens decisions. Parent completes the native change-summary preflight in dispatch and verifies integration, not just child success.
 
 ## Failure, validation, and stopping
 

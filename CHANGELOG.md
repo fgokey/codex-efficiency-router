@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.0-rc.4 — 2026-09-12 (candidate, not published)
+
+- Preflight native changed-files badge ownership before write delegation. A required badge now needs a target-repository task with a write-capable Sol/Terra parent; Astra and cross-workspace child writes are reported as ineligible before mutation, and Review is no longer presented as equivalent.
+
 ## 0.7.0-rc.3 — 2026-09-12 (candidate, not published)
 
 - Mark generated `cer_auto_*` roles in native discovery, require their use with an explicit effort when available, and treat an unnecessary fixed-role dispatch as a mismatch.

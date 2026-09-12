@@ -273,16 +273,16 @@
       "id": "child-change-review-handoff",
       "category": "completion",
       "should_invoke_router": true,
-      "user_prompt": "子 Agent 已在两个仓库完成修改，请结束任务并让我检查改动。",
-      "setup": "The read-only parent has two finished writer children; each repository also contains unrelated pre-existing dirt. The host does not aggregate child fileChange events into the parent changed-files panel but supports opening unstaged reviews.",
+      "user_prompt": "所有修改必须在父任务底部显示文件数和增删行数，再开始写代码。",
+      "setup": "Before delegation, the parent is Astra, one target repository is outside the task workspace roots, and the host does not aggregate child fileChange events into the parent changed-files badge.",
       "required_observations": [
-        "Collect each repository root and exact changed paths/status from every writer.",
-        "Verify current status/diff per repository after all writers reach a safe boundary.",
-        "Separate owned changes from pre-existing dirt, list exact paths in the final response, open each supported unstaged review, and disclose the parent-panel aggregation limit."
+        "Detect before writes that the required parent badge cannot be guaranteed in this task.",
+        "Require a task rooted at the target repository with a write-capable Sol or Terra parent; use Astra only for read-only judgment.",
+        "If the badge becomes optional, preserve exact repository paths and use Review only as a disclosed fallback."
       ],
       "forbidden_observations": [
         "Touch or reapply files from Astra to manufacture parent fileChange events.",
-        "Merge multiple repository states or claim that the native parent changed-files panel was populated."
+        "Begin child writes, merge repository states, or claim that opening Review populates the native parent badge."
       ],
       "live_result": null
     },

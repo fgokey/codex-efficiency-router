@@ -1,17 +1,19 @@
 # Native dispatch and guard
 
-Wait for compatible owners; Astra may diagnose. Never interrupt writer reloads. Leaves never spawn/publish.
+Wait for owners; Astra may diagnose. Never interrupt writers or let leaves spawn/publish.
 
-## Writer review handoff
+## Native change summary and review
 
-Writers stop safely; return every repository root, exact changed paths/status, and owned vs pre-existing dirt. After all stop, read-only parent verifies status/diff per repository, lists exact paths in final, and opens each unstaged review via native review/open-review when available. If the host does not aggregate child `fileChange` events, report an incomplete parent panel. Astra never touches or reapplies files for attribution.
+Before write delegation, compare every target repository with task workspace roots. A required parent badge needs that repository as task workspace and the same write-capable Sol/Terra parent to own writes; use Astra as a read-only child for hard judgments. Astra parent, outside repository or missing child `fileChange` aggregation makes the badge unavailable: stop before writes until an eligible repository-root task is used. Native review/open-review does not populate that badge.
 
-The optional trusted synchronous PreToolUse guard denies Astra/unknown shell, patches and unknown tools on covered paths; native reads/coordination work. Registration, trust and live interception differ. Installation removes no permissions; opt-out forfeits claimed protection.
+Writers return every repository root, exact changed paths/status and owned vs pre-existing dirt. Parent verifies status/diff per repository, lists paths and opens unstaged review. Astra never touches or reapplies files for attribution.
 
-Astra NEVER inputs to existing shell sessions: `write_stdin` is UNPROTECTED. Only its original Sol/Terra owner continues; reconcile unknown ownership. Hosted paths are UNPROTECTED; specialized paths UNKNOWN. Guardrail, not isolation; two-writer capacity is policy, not runtime lock.
+Optional trusted PreToolUse guard denies Astra/unknown shell, patches and unknown covered tools; reads/coordination work. Trust/interception differ; installation removes no permissions.
 
-With an active guard, read using `cer-read {"op":"read","path":"src/file","start":1,"lines":120}`; list/search/diff/status and `{"op":"batch","requests":[<operations>]}` also work. This guard rewrite protocol is NOT a shell binary; never replay it inactive or bypass it. Shell/build/test belongs to executors.
+Astra NEVER inputs to existing shells: `write_stdin` is UNPROTECTED. Only the original Sol/Terra owner continues. Hosted paths are UNPROTECTED; specialized paths UNKNOWN. Guardrail, not isolation.
 
-Batch: 1-16 flat requests; 16 KiB input, 16 MiB reads, 128 KiB output. Preflight all paths; invalid batch has no partial output. Search is literal within one file. No arbitrary commands.
+With an active guard, `cer-read` supports read/list/search/diff/status and flat batch operations. It is a guard rewrite protocol, NOT a shell binary; never replay it inactive or bypass it. Shell/build/test belongs to executors.
 
-Count agents/retries; parallel time is wall-clock. Cached input is not zero.
+Batch: 1-16 requests; 16 KiB input, 16 MiB reads, 128 KiB output. Preflight paths; invalid batch has no partial output. Search is one-file literal. No commands.
+
+Count agents/retries; parallel time differs. Cached input is not zero.

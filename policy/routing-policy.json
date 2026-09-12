@@ -80,7 +80,7 @@
     "missing_tests_or_observability",
     "missing_requirements_or_permissions"
   ],
-  "version": "0.7.0-rc.3",
+  "version": "0.7.0-rc.4",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
