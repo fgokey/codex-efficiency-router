@@ -6,7 +6,7 @@ from itertools import product
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from quality_reference import Contract, Evidence, Failure, Unit, completion, handoff, retry, resume
+from quality_reference import Contract, Evidence, Failure, Unit, completion, handoff, read_action, retry, resume
 
 
 class QualityProtocolTests(unittest.TestCase):
@@ -21,6 +21,26 @@ class QualityProtocolTests(unittest.TestCase):
 
     def test_complete_current_required_evidence_passes(self):
         self.assertEqual(completion(self.contract, self.evidence).status, 'PASS')
+
+    def test_read_shape_bounds_output_before_content(self):
+        cases = (
+            ({'mandatory_full': True, 'size_known': False, 'aggregate_fits': False}, 'SEPARATE_FULL'),
+            ({'mandatory_full': False, 'size_known': False, 'aggregate_fits': False}, 'INDEX'),
+            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': True}, 'BATCH'),
+            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': False}, 'RANGE'),
+        )
+        for inputs, expected in cases:
+            with self.subTest(expected=expected):
+                self.assertEqual(read_action(**inputs), expected)
+
+    def test_truncation_continues_only_the_missing_range(self):
+        common = {'mandatory_full': False, 'size_known': True, 'aggregate_fits': False, 'truncated': True}
+        self.assertEqual(read_action(**common, continuation_known=True), 'RESUME')
+        self.assertEqual(read_action(**common, continuation_known=False), 'LOCATE_GAP')
+
+    def test_read_shape_rejects_truthy_non_boolean_flags(self):
+        with self.assertRaises(ValueError):
+            read_action(mandatory_full='yes', size_known=True, aggregate_fits=True)
 
     def test_missing_requirement_cannot_pass(self):
         self.assertEqual(completion(self.contract, self.evidence[:1]).status, 'PARTIAL')

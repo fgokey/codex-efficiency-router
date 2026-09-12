@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.7 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.8 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -32,6 +32,14 @@ Plugin hooks have separate runtime discovery requirements; this launcher does no
 validated.** CI success is offline evidence, not a native Canary or real-task savings
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
+
+## v0.7.0-rc.8: bounded reads without repeated prefixes
+
+Mandatory rules are read in separate output envelopes. Other unknown-size files are indexed
+before relevant ranges are fetched; only known-small slices are batched. If output truncates,
+the next read resumes the missing range instead of rereading captured prefixes. The same
+contract is embedded in every role, with executable offline decision tests and unchanged
+instruction budgets. This is policy behavior, not proof that an existing task loaded it.
 
 ## v0.7.0-rc.7: reconcile mismatches and retain critical context
 

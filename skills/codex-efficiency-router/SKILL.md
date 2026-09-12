@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.7 -->
+<!-- CER version: 0.7.0-rc.8 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, per-turn scripts, hidden CLI/API or config changes.
 
@@ -54,4 +54,4 @@ Check requirements, correctness, repository checks and reproduction. New tests a
 
 Read each reference once at its trigger; reread when stale or lost after compaction: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/guarded shell; [quality.md](references/quality.md) for checkpointing/recovery/disputed evidence.
 
-Keep reads narrow and logs on disk. Do not preload docs/hooks or copy the router into children; send contract and role. Use one permitted checkpoint for long work. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity, savings or enforcement. Reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.
+Read mandatory rule files in separate outputs. Index other unknown-size files; batch only known-small slices. After truncation continue missing ranges, never reread captured text. Keep logs on disk. Do not preload docs/hooks or copy the router into children. One checkpoint for long work. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement. Reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.

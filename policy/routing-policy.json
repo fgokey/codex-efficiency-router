@@ -1,5 +1,5 @@
 {
-  "schema_version": 8,
+  "schema_version": 9,
   "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
@@ -50,7 +50,8 @@
     "astra_root_default_readonly_single_bounded_repair_unit_exception",
     "strict_guard_disables_astra_patch_exception",
     "retry_exhaustion_does_not_disable_readonly_diagnosis",
-    "existing_edits_preserved_for_owner_review"
+    "existing_edits_preserved_for_owner_review",
+    "bounded_output_envelope_before_batch_reads"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -106,7 +107,7 @@
     ],
     "missing_evidence": "reuse_delegate_defer_or_block"
   },
-  "version": "0.7.0-rc.7",
+  "version": "0.7.0-rc.8",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -134,6 +135,12 @@
     "checkpoint": "one task-scoped record only when needed and permitted",
     "attempt_extension": "justified parent reassessment plus absolute attempt ceiling; reason alone never renews budget",
     "handoff_context": "applicable rule paths and decision rationale; receiver reads rules before affected work"
+  },
+  "context_efficiency": {
+    "mandatory_rules": "one file per output envelope",
+    "unknown_size": "index before content",
+    "batch": "known-small relevant slices within aggregate output budget",
+    "truncation": "resume missing ranges; never reread captured prefixes"
   },
   "effort_policy": {
     "installation_default": "auto",

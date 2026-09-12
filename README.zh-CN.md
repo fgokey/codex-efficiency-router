@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.7 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.8 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -31,6 +31,13 @@ $env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
 CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
+## v0.7.0-rc.8：限制读取输出并避免重复前缀
+
+强制规则文件分别读取；其他大小未知的文件先看索引，再读取相关范围；只有已知较小且
+合计不超输出预算的片段才能批量读取。输出被截断后，只续读缺失范围，不再重复已取得
+的前缀。所有角色都携带同一约束，并增加了可执行的离线决策测试，现有指令预算不变。
+这是策略行为，不证明旧任务已经加载。
 
 ## v0.7.0-rc.7：处理档位不匹配并保留关键上下文
 

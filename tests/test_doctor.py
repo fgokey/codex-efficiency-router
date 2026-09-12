@@ -55,6 +55,13 @@ class DoctorTests(unittest.TestCase):
         actual = {(v["model"], v["effort"]) for v in policy["models"].values()}
         self.assertEqual(actual, {(m, e) for _, m, e in EXPECTED.values()})
         self.assertIn("benefit_gated_deescalation", policy["principles"])
+        self.assertIn("bounded_output_envelope_before_batch_reads", policy["principles"])
+        self.assertEqual(policy["context_efficiency"], {
+            "mandatory_rules": "one file per output envelope",
+            "unknown_size": "index before content",
+            "batch": "known-small relevant slices within aggregate output budget",
+            "truncation": "resume missing ranges; never reread captured prefixes",
+        })
 
     def test_shipped_core_budget(self):
         core = (ROOT / "skills" / PROJECT / "SKILL.md").read_bytes()

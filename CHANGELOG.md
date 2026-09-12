@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0-rc.8 — 2026-09-12 (candidate, not published)
+
+- Read mandatory rules in separate output envelopes; index unknown-size files and batch only known-small relevant slices that fit the aggregate output budget.
+- Continue only missing ranges after truncation instead of rereading captured prefixes. Apply the same contract to Astra, Sol, Terra and Luna.
+- Add an offline read-shape decision reference with negative coverage. Keep all instruction budgets unchanged; make no live-runtime or savings claim.
+
 ## 0.7.0-rc.7 — 2026-09-12 (candidate, not published)
 
 - Hold continuation after a confirmed model/effort mismatch until safe-boundary reconciliation and scoped acceptance review. Later matching metadata cannot erase pending review; resolution preserves observations, user limits and retry history.
