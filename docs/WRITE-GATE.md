@@ -1,4 +1,4 @@
-# Astra write boundary and active diagnostic participation (v0.7.0-rc.8)
+# Astra write boundary and active diagnostic participation (v0.7.0-rc.9)
 
 ## Two independent decisions
 

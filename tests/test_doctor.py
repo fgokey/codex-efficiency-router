@@ -56,11 +56,17 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(actual, {(m, e) for _, m, e in EXPECTED.values()})
         self.assertIn("benefit_gated_deescalation", policy["principles"])
         self.assertIn("bounded_output_envelope_before_batch_reads", policy["principles"])
+        self.assertIn("model_roundtrips_are_budgeted_even_with_cached_input", policy["principles"])
+        self.assertIn("tool_discovery_reused_until_invalidation", policy["principles"])
+        self.assertIn("worker_monitoring_uses_backoff_and_delta_cursors", policy["principles"])
         self.assertEqual(policy["context_efficiency"], {
             "mandatory_rules": "one file per output envelope",
             "unknown_size": "index before content",
             "batch": "known-small relevant slices within aggregate output budget",
             "truncation": "resume missing ranges; never reread captured prefixes",
+            "tool_discovery": "reuse known schemas until host or state invalidation",
+            "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
+            "worker_progress": "compact native wait with backoff; after two unchanged snapshots read one bounded rollout delta from a saved offset, never both paths",
         })
 
     def test_shipped_core_budget(self):

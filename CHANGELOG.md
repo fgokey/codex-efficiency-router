@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0-rc.9 — 2026-09-13 (candidate, not published)
+
+- Reuse known tool schemas until invalidation and admit long-context model/tool rounds only for changed state or due checkpoints.
+- Batch bounded independent checks; monitor workers with compact waits, backoff and one saved-offset rollout delta after two unchanged native snapshots.
+- Add strict offline state-machine and negative tests. Keep instruction budgets unchanged; make no live-runtime or savings claim.
+
 ## 0.7.0-rc.8 — 2026-09-12 (candidate, not published)
 
 - Read mandatory rules in separate output envelopes; index unknown-size files and batch only known-small relevant slices that fit the aggregate output budget.

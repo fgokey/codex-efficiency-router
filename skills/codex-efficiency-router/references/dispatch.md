@@ -1,19 +1,17 @@
 # Native dispatch and guard
 
-Wait for writers; leaves never spawn. Sol/Terra delivery needs explicit parent handoff of user authority, repository/ref/destination and checks. Handoff grants no new authority.
+Wait for writers; leaves never spawn. Sol/Terra delivery needs explicit parent handoff of user authority, repo/ref/destination/checks. Handoff grants no new authority.
 
 ## Native change summary and review
 
-Before write routing, compare target repositories with task workspace roots. A required parent badge needs native file-change attribution. Verify parent-write or child-aggregation support; model name alone proves neither. If support unknown, stop before writes and report the gap. Native review/open-review does not populate that badge.
+Before write routing, compare target repositories with task workspace roots. A required parent badge needs native file-change attribution. Check parent-write/child-aggregation support; model name alone proves neither. With support unknown, stop before writes. Native review/open-review does not populate that badge.
 
-Return every repository root, exact changed paths/status and owned vs pre-existing dirt. Parent verifies status/diff per repository and opens unstaged review. Fetch full logs only on discrepancy. Never touch/reapply files only for attribution.
+Return every repository root, exact changed paths/status and owned vs pre-existing dirt. Parent checks status/diff per repository and opens unstaged review. Never touch/reapply files only for attribution.
 
-Read mandatory rules alone. Index other unknown-size files, then read ranges. Batch known-small slices that fit. After truncation resume missing ranges; never reread captured text.
+Read rules alone. Index unknown-size files; batch only known-small ranges that fit. Resume missing ranges after truncation; never reread captured text.
 
-The optional strict PreToolUse Guard denies every Astra/unknown shell, patch and unknown tool. Active disables the root exception; UNKNOWN may still deny at runtime. Reads/coordination work.
+Reuse known tool schemas until invalidated. Even cached input makes each model/tool turn costly: act on change/due checkpoint; batch bounded independent checks.
 
-Astra NEVER inputs to shells: `write_stdin` is UNPROTECTED. Original executor only. Hosted paths UNPROTECTED; specialized paths UNKNOWN.
+Wait compactly; back off unchanged workers. After two unchanged native snapshots, read one bounded rollout delta by saved offset only if native progress is absent/inconsistent. Never poll both paths or reread it.
 
-With active Guard, `cer-read` supports read/list/search/diff/status and flat batches. It is a rewrite protocol; never replay it inactive. Shell/build/test belongs to executors.
-
-Batch: 1-16 requests; 16 KiB input, 16 MiB reads, 128 KiB output. Preflight paths; invalid batch has no partial output. Search is one-file literal.
+The optional strict PreToolUse Guard denies every Astra/unknown shell, patch and unknown tool; active disables root exception; UNKNOWN may still deny at runtime. Reads work. Astra NEVER uses `write_stdin` (UNPROTECTED). Guarded `cer-read` only reads; shell/build/test stays with executors. Hosted paths are UNPROTECTED; specialized paths UNKNOWN.

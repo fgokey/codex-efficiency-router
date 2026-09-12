@@ -6,7 +6,9 @@ from itertools import product
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from quality_reference import Contract, Evidence, Failure, Unit, completion, handoff, read_action, retry, resume
+from quality_reference import (Contract, Evidence, Failure, Unit, completion, handoff,
+                               progress_action, read_action, retry, roundtrip_action,
+                               resume, tool_action)
 
 
 class QualityProtocolTests(unittest.TestCase):
@@ -41,6 +43,35 @@ class QualityProtocolTests(unittest.TestCase):
     def test_read_shape_rejects_truthy_non_boolean_flags(self):
         with self.assertRaises(ValueError):
             read_action(mandatory_full='yes', size_known=True, aggregate_fits=True)
+
+    def test_known_tool_contract_is_reused_until_invalidated(self):
+        self.assertEqual(tool_action(known=True, invalidated=False), 'REUSE')
+        self.assertEqual(tool_action(known=False, invalidated=False), 'DISCOVER')
+        self.assertEqual(tool_action(known=True, invalidated=True), 'DISCOVER')
+        with self.assertRaises(ValueError):
+            tool_action(known=1, invalidated=False)
+
+    def test_roundtrip_requires_due_work_and_bounded_batch(self):
+        batch = {'work_due': True, 'checks': 3, 'independent': True,
+                 'known_small': True, 'aggregate_fits': True}
+        self.assertEqual(roundtrip_action(**batch), 'BATCH')
+        self.assertEqual(roundtrip_action(**{**batch, 'work_due': False}), 'DEFER')
+        for change in ({'checks': 1}, {'independent': False}, {'known_small': False},
+                       {'aggregate_fits': False}):
+            self.assertEqual(roundtrip_action(**{**batch, **change}), 'SINGLE')
+        for checks in (0, -1, True):
+            with self.assertRaises(ValueError):
+                roundtrip_action(**{**batch, 'checks': checks})
+
+    def test_progress_waits_then_reads_one_delta_and_backs_off(self):
+        common = {'worker_active': True, 'progress_changed': False}
+        self.assertEqual(progress_action(**common, unchanged_polls=0, tail_cursor_current=False), 'WAIT_COMPACT')
+        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=False), 'TAIL_DELTA')
+        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=True), 'BACKOFF')
+        self.assertEqual(progress_action(worker_active=False, progress_changed=False,
+                                         unchanged_polls=2, tail_cursor_current=True), 'COLLECT')
+        with self.assertRaises(ValueError):
+            progress_action(**common, unchanged_polls=True, tail_cursor_current=False)
 
     def test_missing_requirement_cannot_pass(self):
         self.assertEqual(completion(self.contract, self.evidence[:1]).status, 'PARTIAL')

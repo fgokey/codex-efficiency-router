@@ -11,6 +11,9 @@ from typing import Literal
 Verdict = Literal['PASS', 'FAIL', 'UNKNOWN']
 Status = Literal['PASS', 'PARTIAL', 'BLOCKED']
 ReadAction = Literal['INDEX', 'SEPARATE_FULL', 'BATCH', 'RANGE', 'RESUME', 'LOCATE_GAP']
+ToolAction = Literal['REUSE', 'DISCOVER']
+RoundtripAction = Literal['DEFER', 'BATCH', 'SINGLE']
+ProgressAction = Literal['COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
 
 
 def text(value: str, field: str) -> None:
@@ -35,6 +38,39 @@ def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
     if not size_known:
         return 'INDEX'
     return 'BATCH' if aggregate_fits else 'RANGE'
+
+
+def tool_action(*, known: bool, invalidated: bool) -> ToolAction:
+    """Reuse a known native tool contract until caller-observed invalidation."""
+    flag(known)
+    flag(invalidated)
+    return 'DISCOVER' if invalidated or not known else 'REUSE'
+
+
+def roundtrip_action(*, work_due: bool, checks: int, independent: bool,
+                     known_small: bool, aggregate_fits: bool) -> RoundtripAction:
+    """Avoid a model/tool round with no due work; batch only bounded checks."""
+    for value in (work_due, independent, known_small, aggregate_fits):
+        flag(value)
+    if type(checks) is not int or checks < 1:
+        raise ValueError('checks must be a positive integer')
+    if not work_due:
+        return 'DEFER'
+    return 'BATCH' if checks > 1 and independent and known_small and aggregate_fits else 'SINGLE'
+
+
+def progress_action(*, worker_active: bool, progress_changed: bool,
+                    unchanged_polls: int, tail_cursor_current: bool) -> ProgressAction:
+    """Use compact waits, one delta-tail fallback, then back off until change."""
+    for value in (worker_active, progress_changed, tail_cursor_current):
+        flag(value)
+    if type(unchanged_polls) is not int or unchanged_polls < 0:
+        raise ValueError('unchanged polls must be a nonnegative integer')
+    if not worker_active:
+        return 'COLLECT'
+    if progress_changed or unchanged_polls < 2:
+        return 'WAIT_COMPACT'
+    return 'BACKOFF' if tail_cursor_current else 'TAIL_DELTA'
 
 
 @dataclass(frozen=True)

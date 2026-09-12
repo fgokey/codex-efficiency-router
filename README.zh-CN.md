@@ -2,7 +2,7 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.8 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.9 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 
@@ -31,6 +31,13 @@ $env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
 CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
 `enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
 见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
+
+## v0.7.0-rc.9：减少长上下文工具往返
+
+已发现的工具结构会复用到失效为止。长上下文只在状态变化或检查点到期时继续工作，
+并只批量执行有界、独立的检查。监控子代理时使用紧凑等待和退避；连续两次原生快照
+无变化后，只按已保存偏移读取一次有限的 rollout 增量，随后等待进展，不同时轮询两条
+路径。离线状态机测试覆盖工具重查、工具往返准入和增量读取行为。
 
 ## v0.7.0-rc.8：限制读取输出并避免重复前缀
 
