@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.10 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.11 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 
@@ -33,7 +33,19 @@ validated.** CI success is offline evidence, not a native Canary or real-task sa
 claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
 host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
 
-## v0.7.0-rc.10: reviewable mutation admission
+## v0.7.0-rc.11: scoped repair and parent acceptance
+
+A host-observed writer binding is checked once and reused through a scoped repair unit,
+including implementation, source/build configuration, formatting and targeted checks.
+Identity, effort, role, permission, owner, session resume or contradictory evidence invalidates it.
+Binary copy, runtime/permission configuration, deployment and destructive recovery stay separate.
+An actual policy denial stops equivalent replay; `approval=never` alone is not a manual boundary.
+
+The Astra parent remains accountable for the whole result: it reviews every delivered diff and
+actual validation result, gives concrete corrections, rechecks affected areas, closes blocking
+findings and accepts final integration. A child PASS is unit evidence, not parent PASS.
+
+## v0.7.0-rc.10 (historical, superseded by rc.11): per-call mutation admission
 
 The policy now requires a parent check of the host-observed Terra/Sol binding before each write tool.
 Mutation calls use one exact manifest and one bounded action class; forward copies,

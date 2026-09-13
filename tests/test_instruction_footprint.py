@@ -66,16 +66,17 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in ('effort', 'routing', 'dispatch', 'quality'):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
-        for phrase in ('once at its trigger', 'stale or lost after compaction',
-                       'before dispatch', 'before delegation/guarded shell',
-                       'for checkpointing/recovery/disputed evidence'):
+        for phrase in ('once at its trigger', 'stale/lost',
+                       'before dispatch', 'before delegation/writes',
+                       'for recovery/disputed evidence'):
             self.assertIn(phrase, text)
 
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = SKILL.read_text()
         self.assertIn('Do not preload docs/hooks or copy the router into children', text)
         self.assertIn('Report once:', text)
-        self.assertIn('No unobserved cleanup claims or repeated routing banners', text)
+        self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
+        self.assertIn('No repeated routing banners', text)
 
     def test_child_instructions_remain_self_contained(self):
         for name in EXPECTED:
@@ -96,9 +97,9 @@ class InstructionFootprintTests(unittest.TestCase):
         text = SKILL.read_text()
         for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
                        'one bounded local repair unit', 'Unknown identity/effects grant no writes',
-                       'never auto-revert', 'two concurrent writers', 'the third waits',
+                       'never auto-revert', 'two disjoint writers', 'the third waits',
                        'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
-                       'never renews attempts', 'independent acceptance'):
+                       'never renews attempts', 'accepts integration'):
             self.assertIn(phrase, text)
 
 

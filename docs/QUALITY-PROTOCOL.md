@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is still one Codex Skill, four role responsibilities (auto supplies two native bindings each) and offline maintenance tools. No Claude/Roo/Cline runtime, foreign configuration, proxy, model classifier, mandatory reviewer agent or online calibration is added. Model/effort presets and parent selection are unchanged. The installer remains offline and does not edit global config. Source instruction budgets remain 6,500 core / 12,000 full-reference UTF-8 bytes, not platform limits.
+This is still one Codex Skill, four role responsibilities (auto supplies two native bindings each) and offline maintenance tools. No Claude/Roo/Cline runtime, foreign configuration, proxy, model classifier, mandatory reviewer agent or online calibration is added. Model/effort presets and parent selection are unchanged. The installer remains offline and does not edit global config. Source instruction budgets remain 5,200 core / 9,600 full-reference UTF-8 bytes, not platform limits.
 
 ## Contract before execution
 
@@ -14,7 +14,7 @@ Frozen decisions reduce repeated reasoning; they are not immune to contrary evid
 
 Map each required outcome to current check/review evidence. Include mandated integration and residual-risk review as requirements rather than treating unit success as project success. Review missing/extra/misread behavior and implementation correctness in one bounded pass; separate agents only when independent judgment adds value.
 
-PASS requires all required outcomes supported and no blocking finding. PARTIAL preserves useful output but acknowledges missing work/evidence. BLOCKED names a prerequisite or decision preventing continuation. Optional disclosed risks can coexist with PASS; missing required work cannot. A plausible narrative or schema-valid report is not evidence. Read-only design tasks can use reasoned review against explicit criteria; there is no mandatory build for prose.
+PASS requires all required outcomes supported and no blocking finding. Child PASS is unit evidence, never parent completion. The parent reviews the complete delivered diff and actual validation evidence, gives concrete corrections, rechecks the affected final state, closes blocking findings and accepts integration. PARTIAL preserves useful output but acknowledges missing work/evidence. BLOCKED names a prerequisite or decision preventing continuation. Optional disclosed risks can coexist with PASS; missing required work cannot. A plausible narrative or schema-valid report is not evidence. Read-only design tasks can use reasoned review against explicit criteria; there is no mandatory build for prose.
 
 Evidence applies to relevant final state: code/diff, test definitions, dependencies and environment. Matching HEAD alone does not prove freshness. Reuse unaffected checks; revalidate changed or uncertain parts. Do not rerun everything by default or accept stale green results.
 
@@ -26,9 +26,9 @@ Only long work or recovery needs a task-scoped checkpoint in a permitted locatio
 
 ## Offline references and real acceptance
 
-`scripts/quality_reference.py` provides pure completion, handoff, retry and resume helpers. They consume declared conditions; they do not inspect code, authenticate authority, read actual checkpoints, invoke Codex or enforce the host. `tests/test_quality_protocol.py` and selected mutations guard those finite semantics, not model reasoning.
+`scripts/quality_reference.py` provides pure completion, mutation, patch-failure, handoff, retry and resume helpers. Final review data is explicitly caller-declared offline evidence, never a required runtime ledger. The helpers do not inspect code, authenticate authority, read checkpoints, invoke Codex or enforce the host. `tests/test_quality_protocol.py` and selected mutations guard those finite semantics, not model reasoning.
 
-`evaluation/behavior_cases.json` contains 20 user-run prompts with setup, expected observations and prohibited behavior. CI checks structure and keeps `live_result=null`. For real evaluation, give the agent the task/setup, not the grader's answer. Grade traces, changes and outcomes independently; preserve failures and unknowns. No keyword classifier or same-model self-score substitutes for execution. Actual model-pair calibration is deferred until usable task evidence exists.
+`evaluation/behavior_cases.json` contains 22 user-run prompts with setup, expected observations and prohibited behavior. CI checks structure and keeps `live_result=null`. For real evaluation, give the agent the task/setup, not the grader's answer. Grade traces, changes and outcomes independently; preserve failures and unknowns. No keyword classifier or same-model self-score substitutes for execution. Actual model-pair calibration is deferred until usable task evidence exists.
 
 The paired-run comparator now distinguishes no relative regression from completed acceptance. Two failures cannot produce a successful CLI exit; missing usage cannot authorize an efficiency claim. Descriptive sample results still do not establish future quality or statistical non-inferiority.
 

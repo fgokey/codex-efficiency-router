@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-rc.11 — 2026-09-13 (candidate, not published)
+
+- Reuse a verified writer binding through one scoped repair unit, including source/build configuration, formatting and targeted checks; invalidate it on identity, permission, ownership, resume or contradictory evidence.
+- Keep binary copy, runtime/permission configuration, deployment and destructive recovery separately bounded; actual policy denial stops equivalent replay, while `approval=never` alone does not create a manual boundary.
+- Make the Astra parent accountable for the complete delivered diff, current validation, concrete corrections, affected rechecks, blocking findings and final integration acceptance. Child PASS remains unit evidence.
+- Add strict offline completion, mutation and patch-failure cases without increasing instruction budgets or claiming live enforcement.
+
 ## 0.7.0-rc.10 — 2026-09-13 (candidate, not published)
 
 - Verify the host-observed Terra/Sol binding immediately before every write tool; child claims cannot authorize writes.

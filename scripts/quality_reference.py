@@ -15,6 +15,14 @@ ToolAction = Literal['REUSE', 'DISCOVER']
 RoundtripAction = Literal['DEFER', 'BATCH', 'SINGLE']
 ProgressAction = Literal['COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
 MutationAction = Literal['ADMIT', 'REROUTE', 'DECOMPOSE', 'BLOCKED']
+PatchAction = Literal['INSPECT', 'REPAIR', 'DIAGNOSE']
+MUTATION_CLASSES = frozenset(('implementation', 'build_config', 'format', 'targeted_test',
+                              'self_check', 'binary_copy', 'runtime_config', 'deploy',
+                              'destructive_recovery'))
+REPAIR_CLASSES = frozenset(('implementation', 'build_config', 'format', 'targeted_test',
+                            'self_check'))
+BINDING_INVALIDATORS = frozenset(('model', 'effort', 'role', 'permission', 'owner',
+                                  'session_resume', 'contradictory_evidence'))
 
 
 def text(value: str, field: str) -> None:
@@ -75,27 +83,53 @@ def progress_action(*, worker_active: bool, progress_changed: bool,
 
 
 def mutation_action(*, observed_model: str | None, read_only: bool, binding_match: bool,
-                    exact_manifest: bool, bounded: bool, action_classes: int,
-                    destructive_rollback: bool, policy_denied: bool) -> MutationAction:
-    """Admit one reviewable mutation class only after observed writer binding."""
+                    exact_manifest: bool, bounded: bool, actions: tuple[str, ...],
+                    destructive_rollback: bool, policy_denied: bool,
+                    binding_invalidators: tuple[str, ...] = ()) -> MutationAction:
+    """Admit one bounded unit while separating sensitive mutation classes."""
     for value in (read_only, binding_match, exact_manifest, bounded,
                   destructive_rollback, policy_denied):
         flag(value)
     if observed_model is not None and (not isinstance(observed_model, str) or not observed_model.strip()):
         raise ValueError('observed model must be nonempty text or None')
-    if type(action_classes) is not int or action_classes < 1:
-        raise ValueError('action classes must be a positive integer')
+    if (not isinstance(actions, tuple) or not actions
+            or any(not isinstance(action, str) or action not in MUTATION_CLASSES for action in actions)
+            or len(set(actions)) != len(actions)):
+        raise ValueError('actions must be unique known mutation classes')
+    if (not isinstance(binding_invalidators, tuple)
+            or any(not isinstance(item, str) or item not in BINDING_INVALIDATORS
+                   for item in binding_invalidators)):
+        raise ValueError('unknown binding invalidator')
     if policy_denied:
         return 'BLOCKED'
     if observed_model is None:
         return 'BLOCKED'
     executor = any(observed_model == model or observed_model.startswith(model + '-')
                    for model in ('gpt-5.6-sol', 'gpt-5.6-terra'))
-    if read_only or not binding_match or not executor:
+    if read_only or not binding_match or binding_invalidators or not executor:
         return 'REROUTE'
-    if not exact_manifest or not bounded or action_classes != 1 or destructive_rollback:
+    if not exact_manifest or not bounded:
         return 'DECOMPOSE'
-    return 'ADMIT'
+    action_set = frozenset(actions)
+    if action_set <= REPAIR_CLASSES and not destructive_rollback:
+        return 'ADMIT'
+    if len(actions) == 1:
+        destructive = actions[0] == 'destructive_recovery'
+        return 'ADMIT' if destructive == destructive_rollback else 'DECOMPOSE'
+    return 'DECOMPOSE'
+
+
+def patch_action(*, same_signature_failures: int, expected_and_current_checked: bool,
+                 encoding_checked: bool, line_endings_checked: bool) -> PatchAction:
+    """Inspect one patch mismatch, allow one justified repair, then diagnose."""
+    for value in (expected_and_current_checked, encoding_checked, line_endings_checked):
+        flag(value)
+    if type(same_signature_failures) is not int or same_signature_failures < 1:
+        raise ValueError('same-signature failures must be a positive integer')
+    if same_signature_failures >= 2:
+        return 'DIAGNOSE'
+    return ('REPAIR' if expected_and_current_checked and encoding_checked and line_endings_checked
+            else 'INSPECT')
 
 
 @dataclass(frozen=True)
@@ -131,8 +165,33 @@ class Completion:
     gaps: tuple[str, ...]
 
 
-def completion(contract: Contract, evidence: tuple[Evidence, ...], *, blocked: bool = False) -> Completion:
-    """Require current supporting evidence for each predeclared required outcome."""
+@dataclass(frozen=True)
+class FinalReview:
+    """Caller-declared offline parent review evidence, not a runtime ledger."""
+    contract_revision: str
+    state: str
+    delivered_diff: str
+    reviewed_diff: str
+    validated_requirements: tuple[str, ...]
+    open_blocking_findings: tuple[str, ...] = ()
+
+    def validate(self) -> None:
+        for value, field in ((self.contract_revision, 'review contract'), (self.state, 'review state'),
+                             (self.delivered_diff, 'delivered diff'), (self.reviewed_diff, 'reviewed diff')):
+            text(value, field)
+        if (not isinstance(self.validated_requirements, tuple)
+                or any(not isinstance(item, str) or not item.strip() for item in self.validated_requirements)
+                or len(set(self.validated_requirements)) != len(self.validated_requirements)):
+            raise ValueError('validated requirements must be unique nonempty IDs')
+        if (not isinstance(self.open_blocking_findings, tuple)
+                or any(not isinstance(item, str) or not item.strip()
+                       for item in self.open_blocking_findings)):
+            raise ValueError('open blocking findings must be nonempty text records')
+
+
+def completion(contract: Contract, evidence: tuple[Evidence, ...], *,
+               final_review: FinalReview | None = None, blocked: bool = False) -> Completion:
+    """Require current evidence and parent review of the complete delivered state."""
     contract.validate()
     flag(blocked)
     records = {}
@@ -158,6 +217,20 @@ def completion(contract: Contract, evidence: tuple[Evidence, ...], *, blocked: b
             gaps.append(f'{required}: assertion alone is not evidence')
         elif item.contract_revision != contract.revision or item.state != contract.state:
             gaps.append(f'{required}: evidence does not match contract/final state')
+    if final_review is None:
+        gaps.append('parent final review missing')
+    elif not isinstance(final_review, FinalReview):
+        raise ValueError('expected FinalReview')
+    else:
+        final_review.validate()
+        if final_review.contract_revision != contract.revision or final_review.state != contract.state:
+            gaps.append('parent review does not match contract/final state')
+        if final_review.delivered_diff != final_review.reviewed_diff:
+            gaps.append('parent did not review the complete delivered diff')
+        if set(final_review.validated_requirements) != set(contract.required):
+            gaps.append('parent did not review all required validation evidence')
+        if final_review.open_blocking_findings:
+            gaps.append('parent review has open blocking findings')
     if blocked:
         gaps.append('blocking finding or prerequisite remains')
         return Completion('BLOCKED', tuple(gaps))
@@ -238,7 +311,9 @@ def retry(key: Unit, failures: tuple[Failure, ...], *, history_known: bool,
 
 def resume(contract: Contract, evidence: tuple[Evidence, ...], *,
            saved_contract_revision: str, worker_state: Literal['idle', 'active', 'unknown'],
-           side_effect_state: Literal['none', 'confirmed', 'unknown'], blocked: bool = False) -> Literal['WAIT', 'RECONCILE', 'REVALIDATE', 'REUSE', 'CONTINUE', 'BLOCKED']:
+           side_effect_state: Literal['none', 'confirmed', 'unknown'],
+           final_review: FinalReview | None = None,
+           blocked: bool = False) -> Literal['WAIT', 'RECONCILE', 'REVALIDATE', 'REUSE', 'CONTINUE', 'BLOCKED']:
     """Reconcile ownership first; never redispatch unknown in-flight work."""
     contract.validate()
     flag(blocked)
@@ -251,7 +326,7 @@ def resume(contract: Contract, evidence: tuple[Evidence, ...], *,
         return 'WAIT'
     if saved_contract_revision != contract.revision:
         return 'REVALIDATE'
-    result = completion(contract, evidence, blocked=blocked)
+    result = completion(contract, evidence, final_review=final_review, blocked=blocked)
     if result.status == 'BLOCKED':
         return 'BLOCKED'
     if result.status == 'PASS':

@@ -8,7 +8,7 @@ def run_mutations(root: Path, output: Path) -> list[dict]:
     source = (root / 'scripts/effort_reference.py').read_text(encoding='utf-8')
     specs = [
         ('forget_sticky_low_suspension', 'allow_low=profile.allow_low and not context.automatic_low_suspended and', 'allow_low=profile.allow_low and'),
-        ('renew_repair_budget_on_effort_change', 'if s.failed_attempts >= 2 and not context.diagnosis_only and context.repair_extension_reason is None:', 'if False:'),
+        ('renew_repair_budget_on_effort_change', 'if s.failed_attempts >= context.repair_attempt_limit and not context.diagnosis_only:', 'if False:'),
         ('auto_low_without_opt_in', 'if allow_low and lane == "luna"', 'if lane == "luna"'),
         ('low_after_failed_attempt', 'and not s.capability_failure and s.failed_attempts == 0)', 'and not s.capability_failure)'),
         ('ignore_no_subagents', '    if s.no_subagents:', '    if False:'),
@@ -20,7 +20,8 @@ def run_mutations(root: Path, output: Path) -> list[dict]:
         ('skip_selected_pair_support', 'if candidate.effort not in context.catalog.get(candidate.model, ()):', 'if False:'),
         ('unknown_claimed_verified', 'if model is None or effort is None:', 'if False:'),
         ('medium_high_treated_identical', 'if current == candidate:', 'if current is not None and current.lane == candidate.lane:'),
-        ('unsafe_hot_change', 'if context.worker_active or not context.safe_boundary:', 'if False:'),
+        ('unsafe_hot_change', '    if context.worker_active or not context.safe_boundary:\n        return result("defer", "wait for a safe task boundary; no in-flight hot switch")',
+         '    if False:\n        return result("defer", "wait for a safe task boundary; no in-flight hot switch")'),
         ('ignore_quality_floor', 'if EFFORTS.index(candidate.effort) < EFFORTS.index(minimum):', 'if False:'),
         ('allow_per_tool_churn', 'if context.change_event == "none":', 'if False:'),
         ('ignore_unknown_low_stop', 'allow_low=profile.allow_low and not context.automatic_low_suspended and context.last_observation not in ("UNKNOWN", "MISMATCH")', 'allow_low=profile.allow_low'),

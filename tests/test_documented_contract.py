@@ -92,21 +92,19 @@ class DocumentedContractTests(unittest.TestCase):
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         self.assertIn('native change-summary preflight in dispatch', core)
         for phrase in ('every repository root', 'exact changed paths/status',
-                       'pre-existing dirt', 'status/diff per repository',
+                       'pre-existing dirt', 'Parent checks each status/diff',
                        'Native review/open-review', 'unstaged review',
                        'task workspace roots', 'native file-change attribution',
-                       'model name alone proves neither', 'Before write routing',
-                       'support unknown',
-                       'A required parent badge', 'stop before writes',
+                       'model name proves neither', 'requires the native parent badge',
+                       'support is missing/unknown',
                        'does not populate that badge',
-                       'Never touch/reapply files only for attribution'):
+                       'Never touch files only for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
             instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
-            self.assertIn('every repository root and exact changed paths/status', instructions)
-            self.assertIn('owned from prior dirt', instructions)
-            self.assertIn('current requirement-to-check/review evidence', instructions)
-            self.assertIn('not parent completion', instructions)
+            for phrase in ('roots', 'exact paths/status/diff', 'owned/prior dirt',
+                           'current evidence', 'never parent completion'):
+                self.assertIn(phrase, instructions)
 
     def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
@@ -123,20 +121,20 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('one bounded local repair unit', 'two qualified executor attempts failed',
                        'current-workspace target', 'observed active strict Guard disables it'):
             self.assertIn(phrase, core)
-        self.assertIn('Optional strict PreToolUse Guard denies every Astra', dispatch)
-        self.assertIn('UNKNOWN may still deny at runtime', dispatch)
+        self.assertIn('Strict PreToolUse Guard denies every Astra', dispatch)
+        self.assertIn('UNKNOWN may deny at runtime', dispatch)
 
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for text in (core, dispatch):
-            for phrase in ('Before each write tool', 'host-observed', 'child claims do not count',
-                           'UNKNOWN/MISMATCH reroutes', 'exact manifest', 'bounded mutation class',
-                           'destructive recovery'):
-                self.assertIn(phrase, text)
-        for phrase in ('Policy denial', 'no exact/equivalent replay or repackaging',
-                       'approval=never', 'manual-action boundary', 'separately reviewed recovery'):
+        for phrase in ('host-observed', 'once per repair unit', 'No per-command parent reauthorization',
+                       'child claims do not count', 'UNKNOWN/MISMATCH blocks writes',
+                       'source/build config', 'destructive recovery'):
             self.assertIn(phrase, dispatch)
+        for phrase in ('policy denial', 'equivalent replay/repackaging',
+                       'approval=never', 'no manual boundary'):
+            self.assertIn(phrase, dispatch)
+        self.assertIn('Read dispatch before delegation/writes', core)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
@@ -146,8 +144,8 @@ class DocumentedContractTests(unittest.TestCase):
     def test_delivery_owner_requires_existing_user_authority(self):
         for name in ('sol-engineer.toml','terra-executor.toml'):
             text=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions']
-            self.assertIn('Commit/push/deploy/publish requires explicit parent handoff of user authority',text)
-            self.assertIn('exact repo/ref/destination and checks',text)
+            self.assertIn('Commit/push/deploy/publish needs user authority',text)
+            self.assertIn('exact repo/ref/destination/checks',text)
         luna=tomllib.loads((ROOT/'agents/luna-worker.toml').read_text())['developer_instructions']
         self.assertIn('No spawning, nested CLI/API, model/effort changes, commit/push/deploy/publish',luna)
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
@@ -155,7 +153,7 @@ class DocumentedContractTests(unittest.TestCase):
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
-        for phrase in ('rule paths','decision rationale','missing critical context blocks affected work'):
+        for phrase in ('rule paths','rationale','missing critical context blocks affected work'):
             self.assertIn(phrase,core)
         for name in EXPECTED:
             role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
@@ -167,7 +165,7 @@ class DocumentedContractTests(unittest.TestCase):
         effort=(ROOT/'skills'/PROJECT/'references/effort.md').read_text()
         self.assertIn('Resolve MISMATCH before continuation',core)
         for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase pending review',
-                       'UNKNOWN alone is not a confirmed failure','preserving attempts and user limits'):
+                       'UNKNOWN alone is not a confirmed failure','Preserve attempts/user limits'):
             self.assertIn(phrase,effort)
 
 

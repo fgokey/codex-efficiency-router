@@ -1,13 +1,13 @@
 # Effort and binding
 
-Use the core model roles with medium effort. Reasoning-bound coupled uncertainty, consequential ambiguity or conflicting evidence needs high; Astra defaults high. Reassess both on phase changes.
+Medium fits ordinary work. High fits reasoning-bound coupling, concurrency/lifetime, consequential ambiguity or conflicting evidence; Astra defaults high. State the basis. Mechanical patch failure alone does not raise effort. Reassess on phase change.
 
-In auto, an exposed effort field plus valid `cer_auto_<role>` requires that alias and explicit effort; a base role is MISMATCH. Fallback needs unavailable alias/field and an exact pinned pair; record why. Pins win; omission inherits/defaults. Inspect schema, roles and pair support once; refresh on invalidation. No silent remapping.
+In auto, an exposed effort field plus valid `cer_auto_<role>` requires that alias and explicit effort; a base role is MISMATCH. Fallback needs unavailable alias/field and an exact pinned pair. Pins win; omission inherits. Inspect schema/roles/pair support once; refresh on invalidation. No silent remapping.
 
 Spawn with `agent_type=cer_auto_<role>`, `reasoning_effort=<selected>`, `fork_turns="none"` and the scoped contract. Role binds model; full-history forks cannot override effort. Host metadata alone confirms the pair.
 
-Reuse sufficient idle owners without effort churn; changes need host support and retained attempts. Cache failed bindings; no paid probes or unsafe replay.
+Reuse sufficient idle owners; changes need host support and retained attempts. Cache failed bindings; no paid probes/replay.
 
-Auto-low: opt-in mechanical Luna with strong checks and low consequences, no novelty/conflict/failure. Explicit low obeys the floor; Astra medium is explicit-only for nonexceptional work. xhigh/max require intent/support. Effort is neither a token cap nor a quality guarantee.
+Auto-low: opt-in mechanical Luna with strong checks, low consequences and no novelty/conflict/failure. Explicit low obeys the floor; Astra medium is explicit-only. xhigh/max require intent/support. Effort is no token cap or quality guarantee.
 
-MISMATCH: wait for a safe boundary; reconcile actual binding/effects and review affected checks. Retain valid work; correct deficient bindings before reuse. Record the scoped decision, preserving attempts and user limits. Later VERIFIED does not erase pending review. UNKNOWN alone is not a confirmed failure.
+MISMATCH: at a safe boundary reconcile binding/effects and review affected checks. Retain valid work; correct binding before reuse. Preserve attempts/user limits. Later VERIFIED does not erase pending review. UNKNOWN alone is not a confirmed failure.

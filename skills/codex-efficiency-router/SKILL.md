@@ -5,27 +5,25 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.10 -->
+<!-- CER version: 0.7.0-rc.11 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
 
 Installation: fixed; automatic low: disabled.
 
-Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk/guarded is not live proof; live-verified needs a current Canary. Reload at safe boundaries.
+Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
 
 ## Before any side effect
 
-Unknown identity/effects grant no writes. Reuse authorized Terra/Sol; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits; never auto-revert.
+Unknown identity/effects grant no writes. Reuse authorized Terra/Sol; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits; never auto-revert. Read dispatch before delegation/writes.
 
-Before each write tool, parent verifies host-observed Terra/Sol binding; child claims do not count. UNKNOWN/MISMATCH reroutes. Dispatch defines exact manifest, bounded mutation class, separate destructive recovery and policy-denial stop.
-
-Astra leaves and read-only roles NEVER write. Root Astra defaults read-only. Allow one bounded local repair unit only after two qualified executor attempts failed on implementation/capability/unexplained work or material reasoning loss. Require authorization, bounded scope, current-workspace target, exclusive ownership and checks; observed active strict Guard disables it. Unknown Guard may deny; the attempt ceiling applies. Shell/build/test/publish/deploy stay with executors.
+Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; host permissions may allow bounded read-only shell/diff/source/log review. Its one bounded local repair unit requires two qualified executor attempts failed or material critical-context loss, authorization, current-workspace target, exclusive ownership and checks; observed active strict Guard disables it. Multiple patches may finish that unit within retained attempts/absolute ceiling. Side-effecting shell, build, test, publish and deploy stay with executors.
 
 Astra diagnoses hard judgments and qualified failures; Astra reasons locally. Exhaustion stops blind edits, not diagnosis.
 
 ## Route once per meaningful decision
 
-Route on phase/evidence changes, classified failures or user requests, not each tool. Preserve requirement/unit IDs; repair prerequisites before escalating.
+Route on phase/evidence changes, classified failures or user requests, not each tool. Preserve requirement/unit IDs; repair prerequisites first.
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
@@ -34,26 +32,26 @@ Route on phase/evidence changes, classified failures or user requests, not each 
 | `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
-Select sufficient model AND explicit effort via `cer_auto_<role>`; an avoidable base role is MISMATCH. Fallback needs unavailable alias/field evidence and an exact pinned pair. Never auto-select `max`/xhigh/Ultra; low needs opt-in. Astra needs useful stronger reasoning, consequentially hard judgment AND no cheap falsification.
+Select sufficient model AND explicit effort via `cer_auto_<role>` with a concise difficulty basis; read effort. An avoidable base role is MISMATCH; fallback needs evidence and an exact pinned pair. Never auto-select `max`/xhigh/Ultra; low needs opt-in. Exceptional Astra escalation needs consequential hard judgment AND no cheap falsification; parent acceptance still applies to Astra.
 
 ## Decide whether delegation is worth it
 
-Keep sufficient authorized work local. Delegate only for capability, ownership or net benefit after coordination/rework. Same-model delegation needs contextual value AND a net benefit. Never weaken unresolved execution.
-
-Default one leaf; at most two concurrent writers, the third waits. Require disjoint writes/resources and independent acceptance. No agent per file, recursive workers, ritual reviewers or permission bypasses.
+Keep sufficient authorized work local. Delegation needs capability, ownership or net benefit. Same-model delegation needs contextual value AND a net benefit. Default one leaf; at most two disjoint writers, the third waits. No agent per file, recursive workers or permission bypasses.
 
 ## Handoff without losing the decision
 
-Pass outcomes, revision/dirty state/paths, rule paths, decision rationale, invariants, write scope, checks, binding and attempts. Read applicable rules; missing critical context blocks affected work. Requirements win; contrary evidence reopens decisions. Parent completes the native change-summary preflight in dispatch and verifies integration, not just child success.
+Pass outcomes, revision/dirty state/paths, rule paths, rationale, invariants, scope, checks, binding and attempts. Read rules separately; missing critical context blocks affected work. Before implementation confirm platform/macros, reachable consumers and validation entry. Requirements win; contrary evidence reopens decisions. Complete the native change-summary preflight in dispatch.
+
+Child reports compact evidence, roots, paths/status, diff, checks/gaps; reuse it without repeating the investigation. Child PASS is unit evidence, never parent PASS. Parent inspects every delivered diff and actual validation, corrects and rechecks affected areas, closes blocking findings and accepts integration.
 
 ## Failure, validation, and stopping
 
-Classify prerequisite/environment/observability/implementation/capability failures. Allow one targeted repair after initial failure per task/unit/signature across ALL owners. Worker/model/effort/compaction never renews attempts. Exhaustion needs diagnosis or a justified absolute attempt ceiling; a reason string or patch never resets history.
+Classify failures. Patch failure: inspect expected/current context, encoding and line endings; after one justified repair, a second same-signature failure stops blind retry. Attempts stay per task/unit/signature across ALL owners; worker/model/effort/compaction never renews attempts. Exhaustion needs diagnosis and a justified absolute ceiling; no magic reset.
 
-Check requirements, correctness, repository checks and reproduction. New tests are not independent proof. Do not weaken assertions or waive acceptance. Reuse evidence still valid for final code/environment. Unrun is UNKNOWN, not PASS. PASS needs every outcome; else PARTIAL/BLOCKED. Stop after acceptance.
+Check requirements, correctness, repository checks and reproduction. New tests are not independent proof. Do not weaken assertions. Reuse current evidence. Unrun is UNKNOWN, not PASS. Every outcome is required for PASS; else PARTIAL/BLOCKED.
 
 ## Context and reporting
 
-Read each reference once at its trigger; reread when stale or lost after compaction: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/guarded shell; [quality.md](references/quality.md) for checkpointing/recovery/disputed evidence.
+Read each reference once at its trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Read rules separately; index unknown-size files and batch known-small slices. Resume missing ranges after truncation. Reuse known tools until invalidated. In long context act on change/due checkpoint; batch bounded independent checks. Back off waits; after two unchanged native snapshots read one rollout delta by saved offset. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement. Reconcile unknown effects before replay. No unobserved cleanup claims or repeated routing banners.
+Index unknown-size files; batch small slices; resume missing ranges after truncation. Reuse tools until invalidated. Act on change/due checkpoint; batch checks. Back off waits; after two unchanged snapshots read one saved-offset rollout delta. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.

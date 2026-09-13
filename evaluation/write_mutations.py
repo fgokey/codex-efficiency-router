@@ -8,7 +8,8 @@ def run(root: Path, output: Path) -> list[dict]:
     source=(root/'scripts/write_policy.py').read_text(encoding='utf-8')
     specs=[
         ('astra_can_write','known_executor and not is_astra(model) and not read_only', 'model is not None and not read_only'),
-        ('readonly_role_ignored','and not read_only',''),
+        ('readonly_role_ignored','known_executor and not is_astra(model) and not read_only',
+         'known_executor and not is_astra(model)'),
         ('identity_not_checked','known_executor and not is_astra(model)', 'not is_astra(model)'),
         ('optout_ignored','if no_subagents:', 'if False:'),
         ('writer_capacity_ignored',"    if sum(w.state == 'active' for w in scope.writers) >= scope.writer_limit:", '    if False:'),
