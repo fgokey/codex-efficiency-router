@@ -28,23 +28,40 @@ class QualityProtocolTests(unittest.TestCase):
 
     def test_read_shape_bounds_output_before_content(self):
         cases = (
-            ({'mandatory_full': True, 'size_known': False, 'aggregate_fits': False}, 'SEPARATE_FULL'),
-            ({'mandatory_full': False, 'size_known': False, 'aggregate_fits': False}, 'INDEX'),
-            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': True}, 'BATCH'),
-            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': False}, 'RANGE'),
+            ({'mandatory_full': True, 'size_known': False, 'aggregate_fits': False,
+              'members_bounded': True}, 'SEPARATE_FULL'),
+            ({'mandatory_full': False, 'size_known': False, 'aggregate_fits': False,
+              'members_bounded': True}, 'INDEX'),
+            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': True,
+              'members_bounded': True}, 'BATCH'),
+            ({'mandatory_full': False, 'size_known': True, 'aggregate_fits': False,
+              'members_bounded': True}, 'RANGE'),
         )
         for inputs, expected in cases:
             with self.subTest(expected=expected):
                 self.assertEqual(read_action(**inputs), expected)
 
     def test_truncation_continues_only_the_missing_range(self):
-        common = {'mandatory_full': False, 'size_known': True, 'aggregate_fits': False, 'truncated': True}
+        common = {'mandatory_full': False, 'size_known': True, 'aggregate_fits': False,
+                  'members_bounded': True, 'truncated': True}
         self.assertEqual(read_action(**common, continuation_known=True), 'RESUME')
         self.assertEqual(read_action(**common, continuation_known=False), 'LOCATE_GAP')
 
+    def test_mixed_command_does_not_hide_an_unbounded_full_read(self):
+        self.assertEqual(read_action(mandatory_full=False, size_known=True,
+                                     aggregate_fits=True, members_bounded=False), 'INDEX')
+        self.assertEqual(read_action(mandatory_full=True, size_known=True,
+                                     aggregate_fits=True, members_bounded=False), 'SEPARATE_FULL')
+
     def test_read_shape_rejects_truthy_non_boolean_flags(self):
+        with self.assertRaises(TypeError):
+            read_action(mandatory_full=False, size_known=True, aggregate_fits=True)
         with self.assertRaises(ValueError):
-            read_action(mandatory_full='yes', size_known=True, aggregate_fits=True)
+            read_action(mandatory_full='yes', size_known=True, aggregate_fits=True,
+                        members_bounded=True)
+        with self.assertRaises(ValueError):
+            read_action(mandatory_full=False, size_known=True, aggregate_fits=True,
+                        members_bounded='yes')
 
     def test_known_tool_contract_is_reused_until_invalidated(self):
         self.assertEqual(tool_action(known=True, invalidated=False), 'REUSE')

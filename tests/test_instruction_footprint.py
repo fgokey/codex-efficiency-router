@@ -78,6 +78,19 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
         self.assertIn('No repeated routing banners', text)
 
+    def test_mixed_commands_cannot_hide_unbounded_reads(self):
+        text = SKILL.read_text()
+        for phrase in ('Shape unknown files before content',
+                       'Every member of a batched command must be bounded',
+                       'tool caps do not bound a full-file read',
+                       'Resume only missing ranges'):
+            self.assertIn(phrase, text)
+        for name in EXPECTED:
+            role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
+            for phrase in ('Shape unknown files', 'read bounded ranges',
+                           'Mixed output/caps never bound a full read'):
+                self.assertIn(phrase, role, name)
+
     def test_child_instructions_remain_self_contained(self):
         for name in EXPECTED:
             text = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']

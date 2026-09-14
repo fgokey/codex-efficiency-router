@@ -63,10 +63,12 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("forward_mutation_is_separate_from_destructive_recovery", policy["principles"])
         self.assertIn("policy_denial_stops_equivalent_replay", policy["principles"])
         self.assertIn("parent_reviews_complete_diff_validation_and_blocking_findings", policy["principles"])
+        self.assertIn("every_batched_read_member_is_bounded_before_content", policy["principles"])
         self.assertEqual(policy["context_efficiency"], {
             "mandatory_rules": "one file per output envelope",
-            "unknown_size": "index before content",
-            "batch": "known-small relevant slices within aggregate output budget",
+            "unknown_size": "shape or index before content",
+            "batch": "every member is a known-small relevant slice within aggregate output budget",
+            "mixed_command": "other bounded output and tool caps do not bound a full-file read",
             "truncation": "resume missing ranges; never reread captured prefixes",
             "tool_discovery": "reuse known schemas until host or state invalidation",
             "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",

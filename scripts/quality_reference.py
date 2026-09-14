@@ -36,15 +36,17 @@ def flag(value: bool) -> None:
 
 
 def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
-                truncated: bool = False, continuation_known: bool = False) -> ReadAction:
+                members_bounded: bool, truncated: bool = False,
+                continuation_known: bool = False) -> ReadAction:
     """Choose a bounded read shape from caller-declared output-envelope facts."""
-    for value in (mandatory_full, size_known, aggregate_fits, truncated, continuation_known):
+    for value in (mandatory_full, size_known, aggregate_fits, members_bounded,
+                  truncated, continuation_known):
         flag(value)
     if truncated:
         return 'RESUME' if continuation_known else 'LOCATE_GAP'
     if mandatory_full:
         return 'SEPARATE_FULL'
-    if not size_known:
+    if not size_known or not members_bounded:
         return 'INDEX'
     return 'BATCH' if aggregate_fits else 'RANGE'
 

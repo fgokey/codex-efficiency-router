@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.11 -->
+<!-- CER version: 0.7.0-rc.12 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
 
@@ -54,4 +54,4 @@ Check requirements, correctness, repository checks and reproduction. New tests a
 
 Read each reference once at its trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Index unknown-size files; batch small slices; resume missing ranges after truncation. Reuse tools until invalidated. Act on change/due checkpoint; batch checks. Back off waits; after two unchanged snapshots read one saved-offset rollout delta. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.
+Shape unknown files before content; read bounded relevant ranges. Every member of a batched command must be bounded: mixed outputs and tool caps do not bound a full-file read. Resume only missing ranges after truncation. Reuse tools until invalidated. Act on change/due checkpoint; batch checks. Back off waits; after two unchanged snapshots read one saved-offset rollout delta. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.

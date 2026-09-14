@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0-rc.12 — 2026-09-14 (candidate, not published)
+
+- Require every member of a batched read to be bounded before content is fetched; unrelated bounded output and tool output caps cannot hide an unbounded full-file read.
+- Carry the rule in the parent Skill and every role, and add offline decision, policy and mutation checks for the observed long-report failure.
+
 ## 0.7.0-rc.11 — 2026-09-13 (candidate, not published)
 
 - Reuse a verified writer binding through one scoped repair unit, including source/build configuration, formatting and targeted checks; invalidate it on identity, permission, ownership, resume or contradictory evidence.
