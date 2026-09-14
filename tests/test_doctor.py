@@ -65,14 +65,14 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("parent_reviews_complete_diff_validation_and_blocking_findings", policy["principles"])
         self.assertIn("every_batched_read_member_is_bounded_before_content", policy["principles"])
         self.assertEqual(policy["context_efficiency"], {
-            "mandatory_rules": "one file per output envelope",
-            "unknown_size": "shape or index before content",
-            "batch": "every member is a known-small relevant slice within aggregate output budget",
-            "mixed_command": "other bounded output and tool caps do not bound a full-file read",
-            "truncation": "resume missing ranges; never reread captured prefixes",
+            "mandatory_rules": "separate bounded chunks until the required text is complete",
+            "unknown_size": "index, summarize or split before combining; line count alone does not bound content volume",
+            "batch": "all shell, web and nested-tool results plus headroom fit the smallest enclosing output cap",
+            "mixed_command": "every result counts against the outer envelope",
+            "truncation": "recover only the missing relevant range from its cursor without replaying effects",
             "tool_discovery": "reuse known schemas until host or state invalidation",
             "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
-            "worker_progress": "compact native wait with backoff; after two unchanged snapshots read one bounded rollout delta from a saved offset, never both paths",
+            "worker_progress": "after two unchanged snapshots read one saved-offset delta, then back off until change or due; no overlapping tails, status nudges or short polls",
         })
         self.assertEqual(policy["mutation_admission"], {
             "writer_binding": "parent verifies host-observed model, effort, role, permission and owner once per scoped repair unit; reuse until invalidated by those fields, session resume or contradictory evidence",

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.7.0-rc.13 — 2026-09-14 (candidate, not published)
+
+- Budget all shell, web and nested-tool output inside the smallest enclosing output cap with headroom; unknown volume is indexed, summarized or split before combination, while mandatory rules remain complete through bounded chunks.
+- Recover only the missing cursor range after truncation without replaying effects; after one saved-offset delta, back off while state remains unchanged.
+- Add negative offline coverage for outer-envelope overflow and repeated delta tails. Keep instruction budgets unchanged; make no live-runtime or savings claim.
+
 ## 0.7.0-rc.12 — 2026-09-14 (candidate, not published)
 
 - Require every member of a batched read to be bounded before content is fetched; unrelated bounded output and tool output caps cannot hide an unbounded full-file read.

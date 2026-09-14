@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.12 -->
+<!-- CER version: 0.7.0-rc.13 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
 
@@ -23,7 +23,7 @@ Astra diagnoses hard judgments and qualified failures; Astra reasons locally. Ex
 
 ## Route once per meaningful decision
 
-Route on phase/evidence changes, classified failures or user requests, not each tool. Preserve requirement/unit IDs; repair prerequisites first.
+Route on phase/evidence changes, failures or user requests, not each tool. Preserve requirement/unit IDs; repair prerequisites first.
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
@@ -36,13 +36,13 @@ Select sufficient model AND explicit effort via `cer_auto_<role>` with a concise
 
 ## Decide whether delegation is worth it
 
-Keep sufficient authorized work local. Delegation needs capability, ownership or net benefit. Same-model delegation needs contextual value AND a net benefit. Default one leaf; at most two disjoint writers, the third waits. No agent per file, recursive workers or permission bypasses.
+Keep sufficient authorized work local. Delegate for capability, ownership or net benefit. Same-model delegation needs contextual value AND a net benefit. Default one leaf; at most two disjoint writers, the third waits. No agent per file, recursive workers or permission bypasses.
 
 ## Handoff without losing the decision
 
 Pass outcomes, revision/dirty state/paths, rule paths, rationale, invariants, scope, checks, binding and attempts. Read rules separately; missing critical context blocks affected work. Before implementation confirm platform/macros, reachable consumers and validation entry. Requirements win; contrary evidence reopens decisions. Complete the native change-summary preflight in dispatch.
 
-Child reports compact evidence, roots, paths/status, diff, checks/gaps; reuse it without repeating the investigation. Child PASS is unit evidence, never parent PASS. Parent inspects every delivered diff and actual validation, corrects and rechecks affected areas, closes blocking findings and accepts integration.
+Child reports compact evidence, roots, exact paths/status, diff and checks/gaps; reuse it without repeating the investigation. Child PASS is unit evidence, never parent PASS. Parent inspects every delivered diff and actual validation, corrects and rechecks affected areas, closes blocking findings and accepts integration.
 
 ## Failure, validation, and stopping
 
@@ -54,4 +54,4 @@ Check requirements, correctness, repository checks and reproduction. New tests a
 
 Read each reference once at its trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Shape unknown files before content; read bounded relevant ranges. Every member of a batched command must be bounded: mixed outputs and tool caps do not bound a full-file read. Resume only missing ranges after truncation. Reuse tools until invalidated. Act on change/due checkpoint; batch checks. Back off waits; after two unchanged snapshots read one saved-offset rollout delta. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested vs observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.
+Bound each batch member; fit total shell/web/nested-tool output+margin in smallest outer cap. Shape unknowns by index/summarize/split; line counts don't bound it. Read required rules fully in chunks. Recover cursor gaps without replaying effects. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; while unchanged avoid repeat tails/polls/nudges. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.

@@ -188,6 +188,8 @@ def quality_mutation_checks() -> list[dict]:
         ('trust_self_claim', "elif item.kind == 'claim':", 'elif False:'),
         ('ignore_final_state', "elif item.contract_revision != contract.revision or item.state != contract.state:", 'elif False:'),
         ('hide_unbounded_batch_member', 'if not size_known or not members_bounded:', 'if not size_known:'),
+        ('ignore_outer_output_envelope', "return 'BATCH' if aggregate_fits else 'RANGE'", "return 'BATCH'"),
+        ('repeat_delta_tail', "return 'BACKOFF' if tail_cursor_current else 'TAIL_DELTA'", "return 'TAIL_DELTA'"),
         ('ignore_parent_review', "        gaps.append('parent final review missing')", '        pass'),
         ('ignore_parent_review_state', 'if final_review.contract_revision != contract.revision or final_review.state != contract.state:', 'if False:'),
         ('ignore_complete_diff', 'if final_review.delivered_diff != final_review.reviewed_diff:', 'if False:'),

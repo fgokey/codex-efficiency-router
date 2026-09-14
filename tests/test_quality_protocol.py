@@ -53,6 +53,10 @@ class QualityProtocolTests(unittest.TestCase):
         self.assertEqual(read_action(mandatory_full=True, size_known=True,
                                      aggregate_fits=True, members_bounded=False), 'SEPARATE_FULL')
 
+    def test_mandatory_rule_stays_separate_even_when_one_chunk_fits(self):
+        self.assertEqual(read_action(mandatory_full=True, size_known=True,
+                                     aggregate_fits=True, members_bounded=True), 'SEPARATE_FULL')
+
     def test_read_shape_rejects_truthy_non_boolean_flags(self):
         with self.assertRaises(TypeError):
             read_action(mandatory_full=False, size_known=True, aggregate_fits=True)
@@ -87,6 +91,9 @@ class QualityProtocolTests(unittest.TestCase):
         self.assertEqual(progress_action(**common, unchanged_polls=0, tail_cursor_current=False), 'WAIT_COMPACT')
         self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=False), 'TAIL_DELTA')
         self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=True), 'BACKOFF')
+        self.assertEqual(progress_action(**common, unchanged_polls=3, tail_cursor_current=True), 'BACKOFF')
+        self.assertEqual(progress_action(worker_active=True, progress_changed=True,
+                                         unchanged_polls=3, tail_cursor_current=True), 'WAIT_COMPACT')
         self.assertEqual(progress_action(worker_active=False, progress_changed=False,
                                          unchanged_polls=2, tail_cursor_current=True), 'COLLECT')
         with self.assertRaises(ValueError):

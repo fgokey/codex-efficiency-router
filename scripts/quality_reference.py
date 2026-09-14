@@ -38,7 +38,7 @@ def flag(value: bool) -> None:
 def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
                 members_bounded: bool, truncated: bool = False,
                 continuation_known: bool = False) -> ReadAction:
-    """Choose a bounded read shape from caller-declared output-envelope facts."""
+    """Choose from caller-declared facts for the smallest enclosing output cap."""
     for value in (mandatory_full, size_known, aggregate_fits, members_bounded,
                   truncated, continuation_known):
         flag(value)
@@ -72,7 +72,7 @@ def roundtrip_action(*, work_due: bool, checks: int, independent: bool,
 
 def progress_action(*, worker_active: bool, progress_changed: bool,
                     unchanged_polls: int, tail_cursor_current: bool) -> ProgressAction:
-    """Use compact waits, one delta-tail fallback, then back off until change."""
+    """After two unchanged snapshots, use one saved-offset delta then back off."""
     for value in (worker_active, progress_changed, tail_cursor_current):
         flag(value)
     if type(unchanged_polls) is not int or unchanged_polls < 0:

@@ -78,18 +78,25 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
         self.assertIn('No repeated routing banners', text)
 
-    def test_mixed_commands_cannot_hide_unbounded_reads(self):
+    def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
-        for phrase in ('Shape unknown files before content',
-                       'Every member of a batched command must be bounded',
-                       'tool caps do not bound a full-file read',
-                       'Resume only missing ranges'):
+        for phrase in ('Bound each batch member', 'total shell/web/nested-tool output',
+                       'smallest outer cap', 'Shape unknowns by index/summarize/split',
+                       "line counts don't bound it", 'Read required rules fully in chunks',
+                       'Recover cursor gaps without replaying effects'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            for phrase in ('Shape unknown files', 'read bounded ranges',
-                           'Mixed output/caps never bound a full read'):
+            for phrase in ('Bound reads', 'total shell/web/tool output', 'outer caps',
+                           'Unknown: index/split', 'Read rules fully',
+                           'recover missing output only'):
                 self.assertIn(phrase, role, name)
+
+    def test_monitoring_uses_one_delta_then_backoff(self):
+        text = SKILL.read_text()
+        for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
+                       'while unchanged avoid repeat tails/polls/nudges'):
+            self.assertIn(phrase, text)
 
     def test_child_instructions_remain_self_contained(self):
         for name in EXPECTED:
