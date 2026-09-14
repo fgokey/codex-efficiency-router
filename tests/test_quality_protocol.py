@@ -162,6 +162,34 @@ class QualityProtocolTests(unittest.TestCase):
             evidence[index] = replace(evidence[index], verdict='FAIL')
             self.assertEqual(completion(self.contract, tuple(evidence), final_review=self.review).status, 'PARTIAL')
 
+    def test_unsafe_event_loss_is_partial_declared_evidence(self):
+        contract = Contract('events-r1', 'generic-eviction', ('business-effects', 'recovery-path'))
+        evidence = (
+            Evidence('business-effects', 'UNKNOWN', contract.revision, contract.state, 'review',
+                     'No reply callback, gray or static score proves evicted events have no effect'),
+            Evidence('recovery-path', 'FAIL', contract.revision, contract.state, 'review',
+                     'No supported discard, replay or rebuild path covers normal initialization'),
+        )
+        review = FinalReview(contract.revision, contract.state, 'event-diff', 'event-diff', contract.required)
+        self.assertEqual(completion(contract, evidence, final_review=review).status, 'PARTIAL')
+
+    def test_rebuildable_cache_can_pass_declared_semantic_contract(self):
+        contract = Contract('cache-r1', 'bounded-cache+complete-db', ('business-effects', 'affected-states'))
+        evidence = (
+            Evidence('business-effects', 'PASS', contract.revision, contract.state, 'review',
+                     'Eviction drops derived cache entries only; complete database remains authoritative'),
+            Evidence('affected-states', 'PASS', contract.revision, contract.state, 'command',
+                     'Caller-declared offline result: rebuild covered normal initialization and recovery'),
+        )
+        review = FinalReview(contract.revision, contract.state, 'cache-diff', 'cache-diff', contract.required)
+        self.assertEqual(completion(contract, evidence, final_review=review).status, 'PASS')
+
+    def test_open_semantic_gap_blocks_declared_completion(self):
+        review = replace(self.review, open_blocking_findings=(
+            'Hypothesis: recovery does not cover coalesced events; before/after effect remains unverified',))
+        self.assertEqual(completion(self.contract, self.evidence, final_review=review,
+                                    blocked=True).status, 'BLOCKED')
+
     def test_schema_valid_claim_is_not_observed_evidence(self):
         evidence = tuple(replace(item, kind='claim', detail='I verified everything') for item in self.evidence)
         self.assertEqual(completion(self.contract, evidence, final_review=self.review).status, 'PARTIAL')

@@ -64,15 +64,20 @@ class DoctorTests(unittest.TestCase):
         self.assertIn("policy_denial_stops_equivalent_replay", policy["principles"])
         self.assertIn("parent_reviews_complete_diff_validation_and_blocking_findings", policy["principles"])
         self.assertIn("every_batched_read_member_is_bounded_before_content", policy["principles"])
+        self.assertIn("semantic_invariants_checked_before_implementation", policy["principles"])
+        self.assertIn("loss_requires_preserved_effects_or_supported_recovery", policy["principles"])
+        self.assertIn("review_findings_trace_changed_behavior_or_requirements", policy["principles"])
+        self.assertIn("long_command_continuation_owned_by_executor", policy["principles"])
         self.assertEqual(policy["context_efficiency"], {
             "mandatory_rules": "separate bounded chunks until the required text is complete",
             "unknown_size": "index, summarize or split before combining; line count alone does not bound content volume",
-            "batch": "all shell, web and nested-tool results plus headroom fit the smallest enclosing output cap",
+            "batch": "one global byte or character cap fits all shell, web and nested-tool output plus margin within the smallest outer tool cap",
             "mixed_command": "every result counts against the outer envelope",
-            "truncation": "recover only the missing relevant range from its cursor without replaying effects",
+            "truncation": "recover only the missing relevant range from its cursor without replaying effects; disclose omitted evidence",
             "tool_discovery": "reuse known schemas until host or state invalidation",
             "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
             "worker_progress": "after two unchanged snapshots read one saved-offset delta, then back off until change or due; no overlapping tails, status nudges or short polls",
+            "search_limits": "rg -m and line counts limit each file's matches or lines, not total bytes",
         })
         self.assertEqual(policy["mutation_admission"], {
             "writer_binding": "parent verifies host-observed model, effort, role, permission and owner once per scoped repair unit; reuse until invalidated by those fields, session resume or contradictory evidence",

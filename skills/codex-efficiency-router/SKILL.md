@@ -5,7 +5,7 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.13 -->
+<!-- CER version: 0.7.0-rc.14 -->
 
 Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
 
@@ -40,18 +40,18 @@ Keep sufficient authorized work local. Delegate for capability, ownership or net
 
 ## Handoff without losing the decision
 
-Pass outcomes, revision/dirty state/paths, rule paths, rationale, invariants, scope, checks, binding and attempts. Read rules separately; missing critical context blocks affected work. Before implementation confirm platform/macros, reachable consumers and validation entry. Requirements win; contrary evidence reopens decisions. Complete the native change-summary preflight in dispatch.
+Pass outcomes, revision/dirty paths, rule paths, rationale/invariants, scope/checks, binding/attempts. Read rules separately; missing critical context blocks affected work. Before implementation identify changed semantic invariants, platform/macros, consumers and validation. Loss/eviction/coalescing: preserve effects or support discard/replay/rebuild across affected states; else PARTIAL/BLOCKED. Requirements win; contrary evidence reopens decisions. Run native change-summary preflight in dispatch.
 
-Child reports compact evidence, roots, exact paths/status, diff and checks/gaps; reuse it without repeating the investigation. Child PASS is unit evidence, never parent PASS. Parent inspects every delivered diff and actual validation, corrects and rechecks affected areas, closes blocking findings and accepts integration.
+Child reports evidence, roots, paths/status/diff, checks/gaps, owned/prior dirt. Child PASS is unit evidence, never parent PASS. Parent reviews every diff/actual validation, rechecks corrections, closes blockers and accepts integration.
 
 ## Failure, validation, and stopping
 
-Classify failures. Patch failure: inspect expected/current context, encoding and line endings; after one justified repair, a second same-signature failure stops blind retry. Attempts stay per task/unit/signature across ALL owners; worker/model/effort/compaction never renews attempts. Exhaustion needs diagnosis and a justified absolute ceiling; no magic reset.
+Classify failures. Patch mismatch: inspect expected/current context, encoding and line endings; after one justified repair, a second same-signature failure stops blind retry. Retries persist per task/unit/signature across ALL owners, models, efforts and compaction. Exhaustion needs diagnosis and a justified absolute ceiling.
 
-Check requirements, correctness, repository checks and reproduction. New tests are not independent proof. Do not weaken assertions. Reuse current evidence. Unrun is UNKNOWN, not PASS. Every outcome is required for PASS; else PARTIAL/BLOCKED.
+Check requirements/correctness, repo checks/reproduction; new tests are not independent proof. Do not weaken assertions. Reuse evidence. Unrun is UNKNOWN, not PASS; required gaps mean PARTIAL/BLOCKED.
 
 ## Context and reporting
 
 Read each reference once at its trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Bound each batch member; fit total shell/web/nested-tool output+margin in smallest outer cap. Shape unknowns by index/summarize/split; line counts don't bound it. Read required rules fully in chunks. Recover cursor gaps without replaying effects. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; while unchanged avoid repeat tails/polls/nudges. Do not preload docs/hooks or copy the router into children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.
+Set a global byte/character cap within the smallest outer tool cap; include all shell/web/nested-tool output and margin. `rg -m` and line counts limit per-file matches/lines, not total bytes. Index/split unknowns; resume missing cursor/ranges only without replaying effects; disclose omissions. Read required rules fully in chunks. Reuse tools; act on change/due. Two unchanged snapshots: read one saved-offset delta then back off; no repeat tails/polls/nudges until change. Do not preload docs/hooks or copy router into children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.

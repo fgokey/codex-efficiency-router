@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-rc.14 — 2026-09-14 (candidate, not published)
+
+- Require changed semantic invariants before implementation. Loss, eviction or coalescing must preserve business effects or have a supported discard, replay or rebuild path across affected states; otherwise the unit stays PARTIAL/BLOCKED.
+- Tie review findings to changed before/after behavior or actual requirements, label hypotheses, and retain newly exposed preexisting hazards without charging unchanged baseline behavior to the diff.
+- Give executors ownership of long commands and continuation/polling while Astra uses bounded persisted evidence. Set one global byte/character output cap within the smallest outer tool cap, clarify `rg -m` and line-count limits, and disclose omitted evidence.
+- Add declared-input offline scenarios for unsafe event loss, a database-rebuildable cache and semantic blockers. Keep Guard behavior and instruction budgets unchanged; live enforcement remains unverified.
+
 ## 0.7.0-rc.13 — 2026-09-14 (candidate, not published)
 
 - Budget all shell, web and nested-tool output inside the smallest enclosing output cap with headroom; unknown volume is indexed, summarized or split before combination, while mandatory rules remain complete through bounded chunks.

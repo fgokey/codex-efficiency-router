@@ -1,5 +1,5 @@
 {
-  "schema_version": 13,
+  "schema_version": 14,
   "checked_against_openai_docs": "2026-09-08",
   "models": {
     "luna": {
@@ -59,7 +59,11 @@
     "forward_mutation_is_separate_from_destructive_recovery",
     "policy_denial_stops_equivalent_replay",
     "parent_reviews_complete_diff_validation_and_blocking_findings",
-    "every_batched_read_member_is_bounded_before_content"
+    "every_batched_read_member_is_bounded_before_content",
+    "semantic_invariants_checked_before_implementation",
+    "loss_requires_preserved_effects_or_supported_recovery",
+    "review_findings_trace_changed_behavior_or_requirements",
+    "long_command_continuation_owned_by_executor"
   ],
   "astra_preconditions": [
     "reasoning_can_materially_reduce_current_uncertainty",
@@ -115,7 +119,7 @@
     ],
     "missing_evidence": "reuse_delegate_defer_or_block"
   },
-  "version": "0.7.0-rc.13",
+  "version": "0.7.0-rc.14",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -143,17 +147,20 @@
     "checkpoint": "one task-scoped record only when needed and permitted",
     "attempt_extension": "justified parent reassessment plus absolute attempt ceiling; reason alone never renews budget",
     "handoff_context": "applicable rule paths and decision rationale; receiver reads rules before affected work",
-    "final_acceptance": "parent reviews the complete delivered diff and current validation evidence; blocking findings prevent PASS"
+    "final_acceptance": "parent reviews the complete delivered diff and current validation evidence; blocking findings prevent PASS",
+    "semantic_loss": "loss, eviction or coalescing preserves business effects or has supported discard, replay or rebuild across affected states",
+    "review_findings": "cite changed before/after behavior or an actual requirement violation; label hypotheses and retain exposed preexisting hazards"
   },
   "context_efficiency": {
     "mandatory_rules": "separate bounded chunks until the required text is complete",
     "unknown_size": "index, summarize or split before combining; line count alone does not bound content volume",
-    "batch": "all shell, web and nested-tool results plus headroom fit the smallest enclosing output cap",
+    "batch": "one global byte or character cap fits all shell, web and nested-tool output plus margin within the smallest outer tool cap",
     "mixed_command": "every result counts against the outer envelope",
-    "truncation": "recover only the missing relevant range from its cursor without replaying effects",
+    "truncation": "recover only the missing relevant range from its cursor without replaying effects; disclose omitted evidence",
     "tool_discovery": "reuse known schemas until host or state invalidation",
     "roundtrip": "act only on changed state or a due checkpoint; batch bounded independent checks",
-    "worker_progress": "after two unchanged snapshots read one saved-offset delta, then back off until change or due; no overlapping tails, status nudges or short polls"
+    "worker_progress": "after two unchanged snapshots read one saved-offset delta, then back off until change or due; no overlapping tails, status nudges or short polls",
+    "search_limits": "rg -m and line counts limit each file's matches or lines, not total bytes"
   },
   "mutation_admission": {
     "writer_binding": "parent verifies host-observed model, effort, role, permission and owner once per scoped repair unit; reuse until invalidated by those fields, session resume or contradictory evidence",

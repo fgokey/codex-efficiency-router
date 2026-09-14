@@ -73,17 +73,18 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = SKILL.read_text()
-        self.assertIn('Do not preload docs/hooks or copy the router into children', text)
+        self.assertIn('Do not preload docs/hooks or copy router into children', text)
         self.assertIn('Report once:', text)
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
         self.assertIn('No repeated routing banners', text)
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
-        for phrase in ('Bound each batch member', 'total shell/web/nested-tool output',
-                       'smallest outer cap', 'Shape unknowns by index/summarize/split',
-                       "line counts don't bound it", 'Read required rules fully in chunks',
-                       'Recover cursor gaps without replaying effects'):
+        for phrase in ('global byte/character cap', 'smallest outer tool cap',
+                       'all shell/web/nested-tool output', '`rg -m` and line counts',
+                       'not total bytes', 'Index/split unknowns',
+                       'Read required rules fully in chunks', 'without replaying effects',
+                       'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
@@ -95,7 +96,7 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_monitoring_uses_one_delta_then_backoff(self):
         text = SKILL.read_text()
         for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
-                       'while unchanged avoid repeat tails/polls/nudges'):
+                       'no repeat tails/polls/nudges until change'):
             self.assertIn(phrase, text)
 
     def test_child_instructions_remain_self_contained(self):
@@ -119,7 +120,8 @@ class InstructionFootprintTests(unittest.TestCase):
                        'one bounded local repair unit', 'Unknown identity/effects grant no writes',
                        'never auto-revert', 'two disjoint writers', 'the third waits',
                        'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
-                       'never renews attempts', 'accepts integration'):
+                       'Retries persist per task/unit/signature across ALL owners',
+                       'accepts integration'):
             self.assertIn(phrase, text)
 
 

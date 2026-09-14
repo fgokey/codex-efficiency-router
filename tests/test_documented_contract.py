@@ -82,10 +82,27 @@ class DocumentedContractTests(unittest.TestCase):
         # Wording sentinels prevent accidental deletion, not semantic-quality proof.
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
-                       'Do not weaken assertions', 'contrary evidence', 'revision/dirty state',
+                       'Do not weaken assertions', 'contrary evidence', 'revision/dirty paths',
                        'Same-model delegation', 'AND a net benefit', 'missing authority/ownership/capacity',
                        'No extra LLM classifier', 'No agent per file', 'Never auto-select `max`'):
             self.assertIn(phrase, core)
+
+    def test_semantic_loss_and_review_evidence_are_required(self):
+        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        quality = (ROOT / 'skills' / PROJECT / 'references/quality.md').read_text()
+        for phrase in ('changed semantic invariants', 'Loss/eviction/coalescing',
+                       'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
+            self.assertIn(phrase, core)
+        for phrase in ('changed before/after behavior', 'requirement violation', 'label hypotheses',
+                       'No reply callback/gray/static score proves event loss safe',
+                       'preexisting hazards', 'unchanged baseline'):
+            self.assertIn(phrase, quality)
+
+    def test_astra_does_not_own_long_command_continuations(self):
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        for phrase in ('Astra NEVER uses write_stdin', 'Executors own long commands',
+                       'continuation/polling', 'bounded persisted evidence'):
+            self.assertIn(phrase, dispatch)
 
     def test_native_change_summary_is_preflighted_before_delegation(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
@@ -97,7 +114,7 @@ class DocumentedContractTests(unittest.TestCase):
                        'task workspace roots', 'native file-change attribution',
                        'model name proves neither', 'requires the native parent badge',
                        'support is missing/unknown',
-                       'does not populate that badge',
+                       'does not populate it',
                        'Never touch files only for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
