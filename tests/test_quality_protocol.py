@@ -104,8 +104,9 @@ class QualityProtocolTests(unittest.TestCase):
                 'exact_manifest': True, 'bounded': True, 'actions': ('implementation',),
                 'destructive_rollback': False, 'policy_denied': False}
         self.assertEqual(mutation_action(**safe), 'ADMIT')
-        self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-5.6-sol-2026-09-01'}), 'ADMIT')
-        for change in ({'observed_model': 'gpt-6-astra'}, {'observed_model': 'gpt-5.6-luna'},
+        self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-6-sol'}), 'ADMIT')
+        self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-6-luna'}), 'ADMIT')
+        for change in ({'observed_model': 'gpt-6-astra'}, {'observed_model': 'gpt-6-sol-lookalike'},
                        {'read_only': True}, {'binding_match': False}):
             self.assertEqual(mutation_action(**{**safe, **change}), 'REROUTE')
         self.assertEqual(mutation_action(**{**safe, 'observed_model': None}), 'BLOCKED')

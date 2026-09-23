@@ -153,7 +153,7 @@ def verify(run: Path) -> dict:
         elapsed = item['elapsed_ms']
         if type(elapsed) not in (int, float) or not math.isfinite(elapsed) or elapsed < 0:
             raise ValueError('record nonnegative measured elapsed_ms')
-        models = ('gpt-5.6-sol', 'gpt-5.6-terra') if name.startswith('executor') else ('gpt-6-astra',)
+        models = ('gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna') if name.startswith('executor') else ('gpt-6-astra',)
         allowed_tools = ('read_file', 'Bash') if name == 'astra_read_allowed' else (tool,)
         passed = (item['model'] in models and item['tool'] in allowed_tools
                   and item['result'] == expected and item['hook_invoked'] is True
@@ -228,7 +228,7 @@ def evaluate_saved_report(status: dict, report: dict, codex_version=None) -> dic
         if valid:
             for item in items:
                 name = item['id']; tool, expected = CASES[name]
-                models = ('gpt-5.6-sol', 'gpt-5.6-terra') if name.startswith('executor') else ('gpt-6-astra',)
+                models = ('gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna') if name.startswith('executor') else ('gpt-6-astra',)
                 tools = ('read_file', 'Bash') if name == 'astra_read_allowed' else (tool,)
                 elapsed = item.get('elapsed_ms')
                 valid = valid and (item.get('expected') == expected and item.get('actual') == expected

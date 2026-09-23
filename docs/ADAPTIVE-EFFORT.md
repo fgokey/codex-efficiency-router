@@ -35,7 +35,7 @@ reuse. These remain declared offline inputs, not authenticated host evidence.
 
 ## Defaults and overrides
 
-Medium for ordinary implementation; high for deeper suitable reasoning; automatic Astra high. Auto-low remains separately opt-in for strong-check mechanical Luna work with low consequences and no unresolved issues/prior failure. Explicit preferences never waive quality or authority. No-escalation constrains model and effort separately; keep-model may allow effort changes. No forced capability ladder, no automatic xhigh/max. A disabled or unsupported route never certifies a weak parent as sufficient.
+Sol medium is ordinary; Luna high is focused low-risk code, while deterministic conversion may use Luna medium; Astra defaults high. Auto-low stays opt-in. Parent-selected XHigh/Max needs reviewed bottleneck, High-limit and value evidence without a forced lower trial. Ultra also requires exact Sol/Astra support and one authorized coordinator for 2+ independent disjoint units, capacity, benefit and shared subtree limits; explicit Ultra grants no authority. Preferences never waive quality/authority. No-escalation constrains both axes; keep-model preserves exact identity. Unsupported routes never certify a weak parent.
 
 New installations and ordinary upgrades from old manifests use auto. Pre-v0.5 manifests cannot prove whether fixed/adaptive was an explicit preference; migration is printed before mutation, with backups and customization checks. New manifests use `profile_schema=2`; explicit advanced overrides made with this version survive later plain updates. Existing low choices are preserved unless switching to fixed. Restore reads old profiles literally and never performs migration. These are package fields, not Codex configuration keys.
 

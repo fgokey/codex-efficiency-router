@@ -58,7 +58,7 @@ class InstructionFootprintTests(unittest.TestCase):
             for role in ('sol_engineer', 'cer_auto_sol_engineer'):
                 text = path.read_text().replace('name = "sol_engineer"', f'name = "{role}"')
                 path.write_text(text)
-                errors = doctor.validate_agent(path, (role, 'gpt-5.6-sol', 'medium'), Profile())
+                errors = doctor.validate_agent(path, (role, 'gpt-6-sol', 'medium'), Profile())
                 self.assertTrue(any('role instructions exceed' in e for e in errors))
 
     def test_reference_load_triggers_remain_reachable(self):
@@ -118,7 +118,7 @@ class InstructionFootprintTests(unittest.TestCase):
         text = SKILL.read_text()
         for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
                        'one bounded local repair unit', 'Unknown identity/effects grant no writes',
-                       'never auto-revert', 'two disjoint writers', 'the third waits',
+                       'no auto-revert', 'Two writers max',
                        'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
                        'Retries persist per task/unit/signature across ALL owners',
                        'accepts integration'):

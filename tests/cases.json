@@ -19,7 +19,7 @@
       "coupling": 1,
       "verifiability": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "cross-module state flow",
@@ -84,7 +84,7 @@
       "coupling": 1,
       "verifiability": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "frozen migration execution",
@@ -95,7 +95,7 @@
       "verifiability": 3,
       "irreversibility": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "missing requirements are not astra",
@@ -239,13 +239,13 @@
     "expected": "local"
   },
   {
-    "name": "luna proven capability failure only one step",
+    "name": "luna proven capability failure upgrades directly to sol",
     "signals": {
       "capability_failure": true,
       "failed_attempts": 1,
       "prior_lane": "luna"
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "terra qualified capability failure",
@@ -262,7 +262,7 @@
       "failed_attempts": 9,
       "prior_lane": "terra"
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "ordinary known compiler repair",
@@ -271,7 +271,7 @@
       "failed_attempts": 1,
       "prior_lane": "terra"
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "strong verification and no uncertainty prevent premium",
@@ -282,7 +282,7 @@
       "coupling": 1,
       "evidence_conflict": true
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "no compulsory cheap attempt for hard decision",
@@ -303,7 +303,7 @@
       "irreversibility": 3,
       "verifiability": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "cheap check does not bypass environment",
@@ -322,7 +322,7 @@
       "coupling": 0,
       "verifiability": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "ordinary bounded diagnosis",
@@ -353,7 +353,7 @@
       "coupling": 1,
       "verifiability": 3
     },
-    "expected": "terra"
+    "expected": "sol"
   },
   {
     "name": "freeze to mechanical lane",

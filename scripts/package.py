@@ -14,9 +14,9 @@ INSTRUCTION_BUDGETS = {
     "role_developer_instruction_bytes": 950,
 }
 EXPECTED = {
-    "luna-worker.toml": ("luna_worker", "gpt-5.6-luna", "medium"),
+    "luna-worker.toml": ("luna_worker", "gpt-6-luna", "high"),
     "terra-executor.toml": ("terra_executor", "gpt-5.6-terra", "medium"),
-    "sol-engineer.toml": ("sol_engineer", "gpt-5.6-sol", "medium"),
+    "sol-engineer.toml": ("sol_engineer", "gpt-6-sol", "medium"),
     "astra-architect.toml": ("astra_architect", "gpt-6-astra", "high"),
 }
 AGENT_FILES = list(EXPECTED)  # Canonical source remains four role definitions.

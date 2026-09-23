@@ -22,7 +22,8 @@ class RoutingPolicyTests(unittest.TestCase):
     def test_strict_signal_validation(self):
         for key, value in (("uncertainty", 4), ("risk", True), ("novelty", 1.5),
                            ("mechanical", "false"), ("failed_attempts", -1),
-                           ("failed_attempts", True), ("prior_lane", "unknown")):
+                           ("failed_attempts", True), ("prior_lane", "unknown"),
+                           ("workload", "guess")):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 choose_lane(TaskSignals(**{key: value}))
 
@@ -63,10 +64,14 @@ class RoutingPolicyTests(unittest.TestCase):
         d = choose_dispatch(TaskSignals(), current_lane="sol", current_sufficient=True, benefit_clear=True)
         self.assertEqual(d.action, "local")
 
-    def test_cost_only_dispatch_requires_benefit(self):
+    def test_cost_only_does_not_restart_a_sufficient_sol_owner(self):
         args = dict(current_lane="sol", current_sufficient=True, available_lanes=("terra",), host_supports_routing=True)
         self.assertEqual(choose_dispatch(TaskSignals(), **args).action, "local")
-        self.assertEqual(choose_dispatch(TaskSignals(), benefit_clear=True, **args).action, "delegate")
+        self.assertEqual(choose_dispatch(TaskSignals(), benefit_clear=True, **args).action, "local")
+
+    def test_capability_failure_upgrades_luna_directly_to_sol(self):
+        s = TaskSignals(capability_failure=True, failed_attempts=1, prior_lane="luna")
+        self.assertEqual(choose_lane(s), "sol")
 
     def test_capability_upgrade_does_not_require_cost_savings(self):
         d = choose_dispatch(TaskSignals(risk=3, uncertainty=3), current_lane="terra", current_sufficient=False,

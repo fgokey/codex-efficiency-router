@@ -2,9 +2,13 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.14 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.15 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
+
+## v0.7.0-rc.15: GPT-6 routing and evidence-backed high effort
+
+Current routing defaults to GPT-6 Sol/medium for ordinary work and GPT-6 Luna/high for focused low-risk code. Exact pins stay exact; legacy GPT-5.6 bindings remain explicit or evidenced fallbacks. XHigh/Max need reviewed task evidence, while Ultra also requires one authorized Sol/Astra coordinator and disjoint leaf work.
 
 
 ## Windows Python preflight and acceptance boundaries
@@ -198,14 +202,14 @@ Only one binding is selected per child. No model calls just to probe capability,
 
 | Responsibility | Model | Fixed compatibility effort |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` | `medium` |
+| `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol_engineer` | `gpt-5.6-sol` | `medium` |
+| `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
 Auto generates four `cer_auto_<role>` unpinned aliases alongside the four fixed bindings: **eight small TOML files, four responsibilities**, not eight running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
 
-Ordinary implementation normally uses medium; deeper reasoning may use high; automatic Astra remains high. Automatic low is off by default and retains explicit prior choice. xhigh/max require explicit intent and support. No mandatory weak-model ladder. A host lacking Sol/high does not make Sol/medium an acceptable substitute.
+Ordinary work uses Sol/medium; focused low-risk code uses Luna/high, while deterministic conversion may use Luna/medium. Automatic low stays opt-in. Parent-selected XHigh/Max requires reviewed bottleneck, High-limit and value evidence. Ultra also requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work with shared bounds; explicit Ultra does not grant that authority. No mandatory ladder or silent substitute. Legacy GPT-5.6 Sol/Luna/Terra remain exact explicit/fallback options.
 
 ## Install and update
 

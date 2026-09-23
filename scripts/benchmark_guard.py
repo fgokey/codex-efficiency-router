@@ -39,7 +39,7 @@ def bench(iterations=30):
             return [sys.executable, '-I', '-B', str(reader), str(root), encoded]
         events = {
             'guard_deny': {'model': 'gpt-6-astra', 'tool_name': 'apply_patch', 'tool_input': {}},
-            'guard_passthrough': {'model': 'gpt-5.6-sol', 'tool_name': 'apply_patch', 'tool_input': {}},
+            'guard_passthrough': {'model': 'gpt-6-sol', 'tool_name': 'apply_patch', 'tool_input': {}},
             'guard_read_rewrite': {'model': 'gpt-6-astra', 'tool_name': 'Bash', 'tool_input': {'command': 'cer-read ' + json.dumps(req)}},
         }
         for index in range(iterations):

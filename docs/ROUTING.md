@@ -12,9 +12,9 @@ Direct local completion is preferred only when the current agent is sufficient. 
 
 | Situation | Likely lane, subject to evidence |
 | --- | --- |
-| Bulk call-site changes, known pattern, strong checks | Luna |
-| Implement a bounded accepted design | Terra |
-| Significant uncertain integration or coupled behavior | Sol |
+| Focused low-risk code or deterministic conversion, strong checks | Luna |
+| Explicit compatible legacy execution | Terra |
+| Ordinary work, integration or coupled behavior | Sol |
 | Consequential unresolved contract or novel mechanism | Astra after its gates |
 | Complex-looking question settled by a safe check | Run the check first |
 | Missing permission, dependency, requirement or telemetry | Repair the prerequisite |

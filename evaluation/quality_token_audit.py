@@ -62,7 +62,8 @@ def token_measurements() -> dict:
         measurements[encoding] = {name: {'tokens': len(enc.encode(s, disallowed_special=())),
                                          'bytes': len(s.encode('utf-8'))} for name, s in text.items()}
     mappings = {}
-    for model in ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']:
+    for model in ['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna',
+                  'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']:
         try:
             mappings[model] = tiktoken.encoding_for_model(model).name
         except KeyError:
@@ -79,7 +80,7 @@ def holdout_checks() -> list[dict]:
     def check(name, expected, actual, interpretation='policy boundary'):
         observations.append(dict(name=name, expected=expected, actual=actual,
                                  passed=(expected == actual), interpretation=interpretation))
-    check('known work with inadequate verification is not mechanical lane', 'terra',
+    check('known work with inadequate verification is not Luna lane', 'sol',
           choose_lane(S(mechanical=True, uncertainty=0, risk=1, verifiability=0)))
     check('settled but coupled implementation retains Sol', 'sol',
           choose_lane(S(prior_lane='astra', uncertainty=0, coupling=3, risk=1, verifiability=3)))

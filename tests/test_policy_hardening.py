@@ -12,11 +12,11 @@ from policy_reference import TaskSignals as S, choose_dispatch as dispatch, choo
 class PolicyHardeningTests(unittest.TestCase):
     def test_no_subagents_is_causal_with_available_routes(self):
         # Removing only the opt-out must change the outcome: no fallback can mask it.
-        cases = [(S(), "sol", True), (S(risk=3, uncertainty=3), "terra", False),
+        cases = [(S(), "luna", False), (S(risk=3, uncertainty=3), "terra", False),
                  (S(force_astra=True), "sol", True)]
         for signals, current, sufficient in cases:
             args = dict(current_lane=current, current_sufficient=sufficient,
-                        host_supports_routing=True, available_lanes=("terra", "astra"),
+                        host_supports_routing=True, available_lanes=("sol", "astra"),
                         benefit_clear=True)
             with self.subTest(current=current, sufficient=sufficient):
                 self.assertEqual(dispatch(signals, **args).action, "delegate")
@@ -54,23 +54,29 @@ class PolicyHardeningTests(unittest.TestCase):
                                      host_supports_routing=host, available_lanes=lanes).action, "blocked")
 
     def test_insufficient_current_agent_cannot_solve_it_by_downgrading(self):
-        self.assertEqual(dispatch(S(), current_lane="sol", current_sufficient=False,
-                                 host_supports_routing=True, available_lanes=("terra",),
+        self.assertEqual(dispatch(S(mechanical=True, uncertainty=0, coupling=0, verifiability=3),
+                                 current_lane="sol", current_sufficient=False,
+                                 host_supports_routing=True, available_lanes=("luna",),
                                  benefit_clear=True).action, "blocked")
 
-    def test_settled_rescoped_work_can_downgrade(self):
+    def test_sufficient_owner_is_retained_without_route_benefit(self):
+        self.assertEqual(dispatch(S(), current_lane="luna", current_sufficient=True,
+                                 host_supports_routing=True, available_lanes=("sol",),
+                                 benefit_clear=False).action, "local")
+
+    def test_settled_rescoped_work_retains_sufficient_owner(self):
         self.assertEqual(dispatch(S(uncertainty=0), current_lane="sol", current_sufficient=True,
                                  host_supports_routing=True, available_lanes=("terra",),
-                                 benefit_clear=True).action, "delegate")
+                                 benefit_clear=True).action, "local")
 
     def test_capability_upgrade_needs_no_recovery_flag(self):
         self.assertEqual(dispatch(S(risk=3, uncertainty=3), current_lane="sol", current_sufficient=False,
                                  host_supports_routing=True, available_lanes=("astra",)).action, "delegate")
 
-    def test_no_escalation_still_allows_justified_downgrade(self):
+    def test_no_escalation_does_not_force_cost_driven_restart(self):
         self.assertEqual(dispatch(S(), current_lane="astra", current_sufficient=True,
                                  no_escalation=True, benefit_clear=True,
-                                 host_supports_routing=True, available_lanes=("terra",)).action, "delegate")
+                                 host_supports_routing=True, available_lanes=("terra",)).action, "local")
 
     def test_all_lanes_keep_opt_out_even_when_every_route_exists(self):
         for current, sufficient, force, benefit in product(("luna", "terra", "sol", "astra"),
@@ -94,7 +100,7 @@ class PolicyHardeningTests(unittest.TestCase):
                                        risk=1, verifiability=3)), "sol")
 
     def test_quality_probe_low_verifiability_is_not_mechanical_lane(self):
-        self.assertEqual(choose_lane(S(mechanical=True, uncertainty=0, risk=1, verifiability=0)), "terra")
+        self.assertEqual(choose_lane(S(mechanical=True, uncertainty=0, risk=1, verifiability=0)), "sol")
 
 
 if __name__ == "__main__":

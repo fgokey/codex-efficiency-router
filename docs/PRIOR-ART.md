@@ -1,6 +1,6 @@
 # Primary sources and adopted experience
 
-Reviewed on **2026-09-07**. This project synthesizes workflow principles; it does not vendor these projects' code. Model-family ranking and policy thresholds are project heuristics, not facts established by the references. Community star counts and unverified benchmark savings are intentionally not used as quality evidence.
+Reviewed through **2026-09-23**. This project synthesizes workflow principles; it does not vendor these projects' code. Model-family ranking and policy thresholds are project heuristics, not facts established by the references. Community star counts and unverified benchmark savings are intentionally not used as quality evidence.
 
 ## OpenAI documentation
 
@@ -8,8 +8,7 @@ Reviewed on **2026-09-07**. This project synthesizes workflow principles; it doe
 | --- | --- | --- |
 | [Codex Skills](https://developers.openai.com/codex/skills) | Skill metadata discovery, on-demand instructions, packaged references and UI policy | Short metadata, small core, on-demand references. Our description, core and full-reference budgets are project limits in `scripts/package.py`, not official platform limits. |
 | [Codex subagents](https://developers.openai.com/codex/subagents) | Standalone agent configuration, model/effort precedence, parent permissions and extra token work | Use native roles; distinguish requested/observed models; avoid unnecessary children. Parent configuration stays unchanged. |
-| [Using GPT-6 Astra](https://developers.openai.com/api/docs/guides/latest-model) | Instruction sensitivity, appropriate verification scope and avoiding repeated tests without need | Keep necessary checks and final-state evidence, then stop. Do not automatically increase effort to maximum. |
-| [Astra](https://developers.openai.com/api/docs/models/gpt-6-astra), [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol), [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra), [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna) | Current model identities and effort support | Pin documented presets; require the user's catalog and actual runtime evidence for availability. No account access guarantee. |
+| [Choosing Astra, Sol, and Luna](https://learn.chatgpt.com/docs/models#choosing-astra-sol-and-luna) | Sol Medium and Luna High are recommended defaults; supported effort sets differ by model | Use those defaults where the task lane fits, then require the host catalog and actual runtime evidence for availability. Legacy exact bindings remain compatibility options. |
 | [Latency optimization](https://developers.openai.com/api/docs/guides/latency-optimization) | Reduce unnecessary requests/output; parallelize suitable work; use non-LLM methods | Native tools first, bounded independent concurrency and stop conditions. No universal speedup percentage. |
 | [Prompt caching](https://developers.openai.com/api/docs/guides/prompt-caching) | Prefix-sensitive reuse of stable input | Avoid rewriting stable instructions; do not claim cross-model reuse, zero cached tokens or host controls the Skill lacks. |
 | [Evaluation best practices](https://developers.openai.com/api/docs/guides/evaluation-best-practices) | Evaluate workflow components and final outcomes; justify multi-agent complexity through evidence | Separate routing/dispatch tests from real task-quality trials and account for regressions. |
@@ -31,7 +30,7 @@ Reviewed on **2026-09-07**. This project synthesizes workflow principles; it doe
 
 ## Deliberately not adopted
 
-No paid inference solely to select a model; no unbounded agent swarm; no fixed startup-time assumptions from another machine; no retry-count-only escalation; no technology keyword forcing Astra; no automatic `max`; no automatic test deletion; no blanket independent reviewer for every change. We also avoid importing undocumented hook/configuration fields from small community projects.
+No paid inference solely to select a model; no unbounded agent swarm; no fixed startup-time assumptions from another machine; no retry-count-only escalation; no technology keyword forcing Astra; no higher effort without parent-reviewed task evidence; no Ultra without one authorized coordinator and disjoint beneficial work; no automatic test deletion; no blanket independent reviewer for every change. We also avoid importing undocumented hook/configuration fields from small community projects.
 
 [Audit decisions and validation limits](AUDIT-2026-09-07.md)
 

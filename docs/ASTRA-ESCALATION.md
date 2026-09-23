@@ -28,8 +28,8 @@ Explicit Astra requests may override the cost preference, not authority or absen
 
 Provide facts, competing explanations, constraints, relevant evidence pointers, and one unresolved decision. Require a decision with concise rationale, invariants, cheapest useful next evidence, acceptance conditions, and remaining uncertainty. Do not request private reasoning transcripts.
 
-The architect stays read-only and cannot spawn workers. The parent owns implementation. Once the decision is settled, reevaluate the remaining unit: substantial bounded work normally goes to Terra/Luna when the handoff pays; difficult remaining reasoning still needs suitable capability. A tiny tail is not justification for a new model context.
+The architect stays read-only. Only a parent-authorized Ultra assignment may make it the single read-only coordinator for at least two disjoint leaf units; otherwise it cannot spawn workers. The parent owns implementation. Once the decision is settled, reevaluate the remaining unit: substantial bounded work normally goes to Sol/Luna when the handoff pays; difficult remaining reasoning still needs suitable capability. A tiny tail is not justification for a new model context.
 
-Default Astra effort remains `high`; this audit did not lower it without live evidence. Never auto-select `max` or Ultra. Effort changes must be explicitly supported by the actual host and consistent with the pinned role configuration.
+Default Astra effort remains `high`. Parent-selected XHigh/Max requires reviewed evidence naming the bottleneck, why High is insufficient and why the extra effort is worthwhile. Ultra additionally requires exact host support, coordinator authorization, disjoint ownership, capacity and net benefit; an explicit Ultra request grants none of these. Effort changes must remain consistent with the actual binding and host catalog.
 
 [Reference policy](../skills/codex-efficiency-router/references/routing.md) · [Sources](PRIOR-ART.md)

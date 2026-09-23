@@ -5,7 +5,7 @@ One Codex-only Skill with four role responsibilities and generated native bindin
 ## Layers
 
 1. The current coordinator reads the compact Skill and only needed references: routing, dispatch, effort, quality. No classifier inference, per-turn script or mandatory ledger.
-2. Four canonical roles retain models, policy and permissions. Auto also generates four unpinned aliases; native capabilities choose one binding per child. No runtime file switch or duplicate workers. Parent owns requirements/integration; leaves cannot recursively delegate or publish. Astra stays read-only.
+2. Four canonical roles retain models, policy and permissions. Auto also generates four unpinned aliases; native capabilities choose one binding per child. No runtime file switch or duplicate workers. Leaves do not delegate except one parent-authorized Ultra Sol/Astra coordinator for disjoint leaf units; no recursive/duplicate Router, and Astra subtrees stay read-only. Parent owns requirements/integration.
 3. Offline tools generate/install profiles, validate structure, compare supplied runs and test reference rules. They are not a live dispatcher or enforcement layer and are not installed as runtime scripts.
 
 ## Joint selection and acceptance

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.7.0-rc.15 — 2026-09-23 (candidate, not published)
+
+- Route ordinary work to GPT-6 Sol/medium and focused low-risk code to GPT-6 Luna/high; reserve Luna/medium for positively identified deterministic transformation work.
+- Preserve exact model/effort pins and locked owners, retain GPT-5.6 Sol/Luna/Terra as exact explicit or evidenced fallback bindings, and fail closed on unavailable or unsupported pairs.
+- Permit parent-selected XHigh/Max with reviewed task evidence. Ultra additionally requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work under shared capacity, writer and retry limits.
+- Tighten exact executor-family checks and add negative routing, fallback, ownership, mutation and write-guard coverage without adding model probes or a runtime classifier.
+
 ## 0.7.0-rc.14 — 2026-09-14 (candidate, not published)
 
 - Require changed semantic invariants before implementation. Loss, eviction or coalescing must preserve business effects or have a supported discard, replay or rebuild path across affected states; otherwise the unit stays PARTIAL/BLOCKED.

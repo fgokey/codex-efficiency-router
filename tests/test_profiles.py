@@ -256,7 +256,7 @@ class ProfileAndCatalogUnitTests(unittest.TestCase):
             p.write_text(original)
             self.assertEqual(doctor.validate_agent(p, entry), [])
             self.assertTrue(doctor.validate_agent(p, entry, Profile('adaptive')))
-            p.write_text(original.replace('model_reasoning_effort = "medium"\n', ''))
+            p.write_text(original.replace(f'model_reasoning_effort = "{entry[2]}"\n', ''))
             self.assertTrue(doctor.validate_agent(p, entry))
             self.assertEqual(doctor.validate_agent(p, entry, Profile('adaptive')), [])
 

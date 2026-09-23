@@ -6,13 +6,14 @@ import sys
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from effort_reference import (Configuration as C, Context, RoleBinding, PRESETS,
+from effort_reference import (Configuration as C, Context, EffortEvidence, RoleBinding, PRESETS,
                               plan, recommend, check_observation)
 from policy_reference import TaskSignals as S
 from profiles import Profile
 
 ADAPTIVE = Profile('adaptive')
 MECHANICAL = S(mechanical=True, uncertainty=0, risk=1, coupling=0, verifiability=3)
+DATA_TRANSFORM = replace(MECHANICAL, workload='data_transform')
 SOL = S(uncertainty=2, risk=1, coupling=1)
 ASTRA = S(uncertainty=3, risk=3, coupling=2)
 
@@ -30,8 +31,9 @@ def context(**overrides):
 
 class EffortPolicyTests(unittest.TestCase):
     def test_defaults_preserve_quality(self):
-        for signals, expected in ((MECHANICAL, C('luna', 'medium')),
-                                  (S(), C('terra', 'medium')),
+        for signals, expected in ((MECHANICAL, C('luna', 'high')),
+                                  (DATA_TRANSFORM, C('luna', 'medium')),
+                                  (S(), C('sol', 'medium')),
                                   (SOL, C('sol', 'medium')),
                                   (ASTRA, C('astra', 'high'))):
             self.assertEqual(recommend(signals), expected)
@@ -65,8 +67,8 @@ class EffortPolicyTests(unittest.TestCase):
         self.assertIsNone(recommend(replace(ASTRA, cheap_check_available=True), deep_reasoning=True))
 
     def test_auto_low_requires_opt_in(self):
-        self.assertEqual(recommend(MECHANICAL).effort, 'medium')
-        self.assertEqual(recommend(MECHANICAL, allow_low=True).effort, 'low')
+        self.assertEqual(recommend(DATA_TRANSFORM).effort, 'medium')
+        self.assertEqual(recommend(DATA_TRANSFORM, allow_low=True).effort, 'low')
 
     def test_low_gate_rejects_every_individual_risk_signal(self):
         bad = dict(uncertainty=1, risk=2, coupling=2, verifiability=2,
@@ -75,17 +77,17 @@ class EffortPolicyTests(unittest.TestCase):
                    mechanical=False)
         for name, value in bad.items():
             with self.subTest(name=name):
-                self.assertNotEqual(recommend(replace(MECHANICAL, **{name: value}), allow_low=True).effort, 'low')
+                self.assertNotEqual(recommend(replace(DATA_TRANSFORM, **{name: value}), allow_low=True).effort, 'low')
 
     def test_deep_request_cannot_auto_low(self):
         self.assertEqual(recommend(MECHANICAL, allow_low=True, deep_reasoning=True).effort, 'high')
 
     def test_low_only_uses_confirmed_catalog_entry(self):
         c = context(current=C('sol', 'high'), current_sufficient=True, benefit_clear=True)
-        result = plan(MECHANICAL, c, Profile('adaptive', True))
+        result = plan(DATA_TRANSFORM, c, Profile('adaptive', True))
         self.assertEqual(result.requested, C('luna', 'low'))
         denied = dict(c.catalog); denied[PRESETS['luna'][1]] = frozenset(('medium', 'high'))
-        result = plan(MECHANICAL, replace(c, catalog=denied), Profile('adaptive', True))
+        result = plan(DATA_TRANSFORM, replace(c, catalog=denied), Profile('adaptive', True))
         self.assertEqual(result.action, 'local')
         self.assertIn('catalog', result.reason)
         self.assertIsNone(result.requested)
@@ -93,11 +95,11 @@ class EffortPolicyTests(unittest.TestCase):
     def test_unknown_or_mismatched_observation_disables_future_auto_low(self):
         c = context(current=C('sol', 'high'), current_sufficient=True, benefit_clear=True)
         for status in ('UNKNOWN', 'MISMATCH'):
-            result = plan(MECHANICAL, replace(c, last_observation=status), Profile('adaptive', True))
+            result = plan(DATA_TRANSFORM, replace(c, last_observation=status), Profile('adaptive', True))
             self.assertEqual(result.recommended, C('luna', 'medium'))
-        self.assertEqual(plan(MECHANICAL, c, Profile('adaptive', True)).recommended.effort, 'low')
+        self.assertEqual(plan(DATA_TRANSFORM, c, Profile('adaptive', True)).recommended.effort, 'low')
 
-    def test_xhigh_and_max_are_never_automatic(self):
+    def test_default_recommendation_never_raises_above_high_without_evidence(self):
         for u, r, v in product(range(4), repeat=3):
             self.assertNotIn(recommend(S(uncertainty=u, risk=r, verifiability=v)).effort, ('xhigh', 'max'))
 
@@ -119,7 +121,7 @@ class EffortPolicyTests(unittest.TestCase):
 
     def test_explicit_low_on_safe_mechanical_task_can_be_requested(self):
         c = context(current=C('sol', 'high'), current_sufficient=True)
-        self.assertEqual(plan(MECHANICAL, c, ADAPTIVE, explicit_effort='low').requested, C('luna', 'low'))
+        self.assertEqual(plan(DATA_TRANSFORM, c, ADAPTIVE, explicit_effort='low').requested, C('luna', 'low'))
 
     def test_astra_medium_explicit_only_for_bounded_safe_request(self):
         s = S(force_astra=True)
@@ -133,13 +135,14 @@ class EffortPolicyTests(unittest.TestCase):
         c = context(roles=bindings)
         result = plan(SOL, c, Profile(), deep_reasoning=True)
         self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
-        result = plan(S(), replace(c, current_sufficient=True, benefit_clear=True), Profile())
-        self.assertEqual(result.requested, C('terra', 'medium'))
+        result = plan(S(), replace(c, current=C('luna','high'), current_sufficient=True,
+                                   benefit_clear=True), Profile())
+        self.assertEqual(result.requested, C('sol', 'medium'))
 
     def test_pinned_adaptive_role_is_a_configuration_error_even_when_value_matches(self):
         c = context(roles={PRESETS['astra'][0]: RoleBinding(PRESETS['astra'][1], 'high')})
         result = plan(ASTRA, c, ADAPTIVE)
-        self.assertEqual(result.action, 'blocked'); self.assertIn('pins effort', result.reason)
+        self.assertEqual(result.action, 'blocked'); self.assertIn('exact role', result.reason)
 
     def test_adaptive_requires_native_effort_field(self):
         self.assertEqual(plan(ASTRA, context(host_can_set_effort=False), ADAPTIVE).action, 'blocked')
@@ -149,6 +152,148 @@ class EffortPolicyTests(unittest.TestCase):
                        {'roles': {PRESETS['astra'][0]: RoleBinding('different-model', None)}}):
             result = plan(ASTRA, context(**kwargs), ADAPTIVE)
             self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
+
+    def test_configuration_normalizes_default_model_but_legacy_identity_remains_distinct(self):
+        self.assertEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6-sol'))
+        self.assertNotEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-5.6-sol'))
+
+    def test_exact_legacy_pin_is_preserved_and_unavailable_pin_fails_closed(self):
+        old = C('sol', 'medium', 'gpt-5.6-sol')
+        roles = {PRESETS['sol'][0]: RoleBinding(old.model, None)}
+        catalog = {old.model: frozenset(('medium', 'high'))}
+        c = context(current=C('luna', 'high'), roles=roles, catalog=catalog)
+        result = plan(S(), c, ADAPTIVE, explicit_model=old.model)
+        self.assertEqual((result.action, result.requested), ('delegate', old))
+        result = plan(S(), replace(c, unavailable_models={old.model: 'host rejected model'}),
+                      ADAPTIVE, explicit_model=old.model)
+        self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
+
+    def test_explicit_stronger_model_is_allowed_but_astra_keeps_its_admission_gate(self):
+        self.assertEqual(plan(DATA_TRANSFORM, context(current=C('luna', 'high'), current_sufficient=True),
+                              ADAPTIVE, explicit_model='gpt-6-sol').requested.model, 'gpt-6-sol')
+        self.assertEqual(plan(DATA_TRANSFORM, context(), ADAPTIVE,
+                              explicit_model='gpt-6-astra').action, 'blocked')
+
+    def test_workload_label_does_not_bypass_conflict_risk_or_coupling(self):
+        for signals in (replace(DATA_TRANSFORM, evidence_conflict=True),
+                        replace(DATA_TRANSFORM, capability_failure=True),
+                        replace(DATA_TRANSFORM, coupling=2), replace(DATA_TRANSFORM, risk=2)):
+            with self.subTest(signals=signals):
+                self.assertEqual(recommend(signals).lane, 'sol')
+
+    def test_explicit_terra_only_covers_ordinary_bounded_work(self):
+        bindings = {PRESETS['terra'][0]: RoleBinding('gpt-5.6-terra', None)}
+        catalog = {'gpt-5.6-terra': frozenset(('medium', 'high'))}
+        c = context(current=C('sol', 'medium'), current_sufficient=True,
+                    roles=bindings, catalog=catalog)
+        self.assertEqual(plan(S(), c, ADAPTIVE, explicit_model='gpt-5.6-terra').requested.model,
+                         'gpt-5.6-terra')
+        coupled = S(reasoning_bound=False, coupling=2)
+        self.assertEqual(plan(coupled, c, ADAPTIVE, explicit_model='gpt-5.6-terra').action,
+                         'blocked')
+
+    def test_explicit_legacy_luna_medium_is_allowed_only_below_real_high_floor(self):
+        old = 'gpt-5.6-luna'
+        bindings = {PRESETS['luna'][0]: RoleBinding(old, None)}
+        catalog = {old: frozenset(('medium', 'high'))}
+        c = context(current=C('sol', 'medium'), current_sufficient=True,
+                    roles=bindings, catalog=catalog)
+        result = plan(MECHANICAL, c, ADAPTIVE, explicit_model=old, explicit_effort='medium')
+        self.assertEqual(result.requested, C('luna', 'medium', old))
+        risky = replace(MECHANICAL, uncertainty=2, coupling=2)
+        self.assertEqual(plan(risky, c, ADAPTIVE, explicit_model=old,
+                              explicit_effort='medium').action, 'blocked')
+
+    def test_model_lock_keeps_legacy_sol_while_effort_increases(self):
+        old = 'gpt-5.6-sol'
+        bindings = {PRESETS['sol'][0]: RoleBinding(old, None)}
+        catalog = {old: frozenset(('medium', 'high'))}
+        c = context(current=C('sol', 'medium', old), current_sufficient=False,
+                    keep_model=True, roles=bindings, catalog=catalog)
+        result = plan(SOL, c, ADAPTIVE, deep_reasoning=True)
+        self.assertEqual(result.requested, C('sol', 'high', old))
+
+    def test_automatic_xhigh_and_max_need_specific_high_insufficiency_evidence(self):
+        c = context(current=C('luna','high'), current_sufficient=False)
+        for effort in ('xhigh','max'):
+            self.assertEqual(plan(SOL,c,ADAPTIVE,automatic_effort=effort).action,'blocked')
+            vague=EffortEvidence(bottleneck='cross-module lifetime proof',high_insufficient=True)
+            self.assertEqual(plan(SOL,c,ADAPTIVE,automatic_effort=effort,
+                                  effort_evidence=vague).action,'blocked')
+            evidence=EffortEvidence(bottleneck='cross-module lifetime proof',
+                high_limit='high cannot retain all ownership alternatives',
+                extra_effort_value='the chosen effort can compare the surviving alternatives',
+                high_insufficient=True)
+            result=plan(SOL,c,ADAPTIVE,automatic_effort=effort,effort_evidence=evidence)
+            self.assertEqual(result.requested,C('sol',effort))
+            self.assertIn(evidence.bottleneck,result.reason)
+
+    def test_automatic_luna_max_is_allowed_with_exact_support_and_evidence(self):
+        evidence=EffortEvidence(bottleneck='dense deterministic conversion proof',
+            high_limit='high cannot retain every verified mapping invariant',
+            extra_effort_value='max checks the complete mapping without changing model',
+            high_insufficient=True)
+        c=context(current=C('luna','high'),current_sufficient=False)
+        result=plan(MECHANICAL,c,ADAPTIVE,automatic_effort='max',effort_evidence=evidence)
+        self.assertEqual(result.requested,C('luna','max'))
+
+    def test_ultra_requires_one_verified_coordinator_and_disjoint_parallel_units(self):
+        evidence=EffortEvidence(bottleneck='three independent protocol proofs',
+            high_limit='high serializes evidence that can be checked independently',
+            extra_effort_value='ultra coordinates the disjoint proofs once',
+            high_insufficient=True,independent_units=3,disjoint_ownership=True,net_benefit=True,
+            coordinator_authorized=True,coordinator_contract_verified=True,single_coordinator=True,
+            capacity_available=True,shared_limits_retained=True)
+        c=context(current=C('luna','high'),current_sufficient=False)
+        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        result=plan(SOL,replace(c,catalog=catalog),ADAPTIVE,
+                    automatic_effort='ultra',effort_evidence=evidence)
+        self.assertEqual(result.requested,C('sol','ultra'))
+        for field in ('disjoint_ownership','net_benefit','coordinator_authorized',
+                      'coordinator_contract_verified','single_coordinator','capacity_available',
+                      'shared_limits_retained'):
+            with self.subTest(field=field):
+                bad=replace(evidence,**{field:False})
+                self.assertEqual(plan(SOL,replace(c,catalog=catalog),ADAPTIVE,
+                                      automatic_effort='ultra',effort_evidence=bad).action,'blocked')
+
+    def test_ultra_rejects_luna_no_subagents_and_missing_catalog_support(self):
+        evidence=EffortEvidence(bottleneck='independent conversion sets',
+            high_limit='high cannot compare every disjoint result in one bounded unit',
+            extra_effort_value='ultra coordinates the independent checks once',
+            high_insufficient=True,independent_units=2,disjoint_ownership=True,net_benefit=True,
+            coordinator_authorized=True,coordinator_contract_verified=True,single_coordinator=True,
+            capacity_available=True,shared_limits_retained=True)
+        c=context(current=C('sol','medium'),current_sufficient=False)
+        catalog=dict(c.catalog);catalog['gpt-6-luna']=frozenset(('medium','high','ultra'))
+        self.assertEqual(plan(MECHANICAL,replace(c,catalog=catalog),ADAPTIVE,
+                              automatic_effort='ultra',effort_evidence=evidence).action,'blocked')
+        self.assertEqual(plan(SOL,c,ADAPTIVE,automatic_effort='ultra',
+                              effort_evidence=evidence).action,'blocked')
+        catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        self.assertEqual(plan(replace(SOL,no_subagents=True),replace(c,catalog=catalog),ADAPTIVE,
+                              automatic_effort='ultra',effort_evidence=evidence).action,'blocked')
+
+    def test_explicit_ultra_does_not_grant_coordinator_authority(self):
+        c=context(current=C('luna','high'),current_sufficient=False)
+        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        c=replace(c,catalog=catalog)
+        self.assertEqual(plan(SOL,c,ADAPTIVE,explicit_effort='ultra').action,'blocked')
+        evidence=EffortEvidence(independent_units=2,disjoint_ownership=True,net_benefit=True,
+            coordinator_authorized=True,coordinator_contract_verified=True,single_coordinator=True,
+            capacity_available=True,shared_limits_retained=True)
+        self.assertEqual(plan(SOL,c,ADAPTIVE,explicit_effort='ultra',
+                              effort_evidence=evidence).requested,C('sol','ultra'))
+
+    def test_higher_effort_never_renews_retry_history(self):
+        evidence=EffortEvidence(bottleneck='surviving ownership hypotheses',
+            high_limit='high cannot retain the competing lifetime paths',
+            extra_effort_value='max compares the remaining paths without another trial',
+            high_insufficient=True)
+        s=replace(SOL,failed_attempts=2)
+        self.assertEqual(plan(s,context(),ADAPTIVE,automatic_effort='max',
+                              effort_evidence=evidence).action,'blocked')
+        self.assertEqual(s.failed_attempts,2)
 
     def test_no_subagent_causal_positive_control(self):
         for sufficient in (False, True):
@@ -242,8 +387,12 @@ class EffortPolicyTests(unittest.TestCase):
                        {'last_observation': 'probably high'}, {'catalog': {'m': 'high'}},
                        {'roles': {'sol': 'high'}}):
             with self.assertRaises(ValueError): plan(S(), context(**kwargs), ADAPTIVE)
-        for effort in ('none', 'ultra', 1, [], ''):
+        for effort in ('none', 'extreme', 1, [], ''):
             with self.assertRaises(ValueError): plan(S(), context(), ADAPTIVE, explicit_effort=effort)
+        with self.assertRaises(ValueError):
+            plan(S(),context(),ADAPTIVE,automatic_effort='high')
+        with self.assertRaises(ValueError):
+            plan(S(),context(),ADAPTIVE,explicit_effort='max',automatic_effort='max')
         s = replace(SOL, failed_attempts=1)
         before = s.__dict__.copy()
         plan(s, context(), ADAPTIVE, deep_reasoning=True)

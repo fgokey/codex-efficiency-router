@@ -2,9 +2,13 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.14 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.15 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
+
+## v0.7.0-rc.15：GPT-6 路由与有证据的高档位
+
+现行路由默认以 GPT-6 Sol/medium 处理普通工作，以 GPT-6 Luna/high 处理聚焦低风险代码。精确钉选保持不变；旧 GPT-5.6 绑定只作显式选择或有证据的回退。XHigh/Max 需要父代理审查任务证据；Ultra 还要求一个获授权的 Sol/Astra 协调者和互相独立的叶子任务。
 
 
 ## Windows 解释器预检与验收边界
@@ -170,14 +174,14 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 | 角色职责 | 模型 | 固定兼容档位 |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` | `medium` |
+| `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol_engineer` | `gpt-5.6-sol` | `medium` |
+| `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
 自动模式从这四份源定义生成四个 `cer_auto_<角色名>` 自适应别名，加上四个固定兼容角色，共 **8 个小型 TOML 文件、4 种职责**。这不是 8 个同时运行的代理，也不增加模型等级；别名增加一段简短的自动档位发现标记、改变名称并去掉档位固定，模型、指令及权限保持一致。新增发现文本会占用少量宿主上下文，不宣称零开销。
 
-正常实现通常 medium，深层推理可用 high；Astra 自动使用 high。自动 low 默认关闭，已有显式选择会保留；xhigh/max 不自动选择。不强制逐档试错，也不因改档重置失败预算。**宿主不支持 Sol/high 时，不会用 Sol/medium 冒充它。**
+普通工作使用 Sol/medium；聚焦低风险代码使用 Luna/high，确定性转换可用 Luna/medium。自动 low 仍需主动开启。父代理自动选择 XHigh/Max 时必须记录瓶颈、High 不足及额外档位价值；Ultra 还需精确 Sol/Astra 支持和一个获授权协调者管理互斥叶子任务及共享边界，显式 Ultra 不会自动授予协调权。不强制逐档试错，不静默替代，也不重置失败预算。旧 GPT-5.6 Sol/Luna/Terra 保留为精确显式/回退选项。
 
 ## 安装与更新
 

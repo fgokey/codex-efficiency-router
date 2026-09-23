@@ -2,7 +2,7 @@
 
 Source review: 2026-09-08. [Design and primary sources](ADAPTIVE-EFFORT.md).
 
-Four canonical fixed roles remain under `agents/`. Default auto generates four unpinned `cer_auto_` aliases as well. User bindings live under `$CODEX_HOME/agents`, project bindings under `.codex/agents`; Skills use `~/.agents/skills` or project `.agents/skills`. No runtime config rewrite or foreign framework. Legacy fixed/adaptive overrides remain supported but are unnecessary for ordinary use.
+Four canonical fixed roles remain under `agents/`; defaults are GPT-6 Luna/high, GPT-5.6 Terra/medium compatibility, GPT-6 Sol/medium and GPT-6 Astra/high. Auto also generates four unpinned `cer_auto_` aliases. User bindings live under `$CODEX_HOME/agents`, project bindings under `.codex/agents`; Skills use `~/.agents/skills` or project `.agents/skills`. No runtime config rewrite or foreign framework. Exact GPT-5.6 Sol/Luna/Terra pins and evidence-backed fallbacks remain supported.
 
 File pins override contradictory spawn values. Auto requires a verified unpinned alias when explicit native effort exists; the generated description marks that binding in native discovery. Otherwise it uses the exact matching fixed pair and records why the alias or field was unavailable. Absence of an effort pin alone is not adaptive behavior: explicitly pass supported model/effort through the real schema. Do not infer support from version strings, model self-description or successful installation.
 

@@ -82,9 +82,10 @@ class DocumentedContractTests(unittest.TestCase):
         # Wording sentinels prevent accidental deletion, not semantic-quality proof.
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
-                       'Do not weaken assertions', 'contrary evidence', 'revision/dirty paths',
-                       'Same-model delegation', 'AND a net benefit', 'missing authority/ownership/capacity',
-                       'No extra LLM classifier', 'No agent per file', 'Never auto-select `max`'):
+                       'Do not weaken assertions', 'contrary evidence', 'revision/dirt',
+                       'same-model handoff', 'AND net benefit', 'without authority/ownership/capacity',
+                       'no classifier', 'no agent per file',
+                       'higher efforts need evidence/support'):
             self.assertIn(phrase, core)
 
     def test_semantic_loss_and_review_evidence_are_required(self):
@@ -100,22 +101,21 @@ class DocumentedContractTests(unittest.TestCase):
 
     def test_astra_does_not_own_long_command_continuations(self):
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('Astra NEVER uses write_stdin', 'Executors own long commands',
-                       'continuation/polling', 'bounded persisted evidence'):
+        for phrase in ('Astra never uses write_stdin', 'Executors own long commands',
+                       'long commands/continuation', 'bounded saved evidence'):
             self.assertIn(phrase, dispatch)
 
     def test_native_change_summary_is_preflighted_before_delegation(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        self.assertIn('native change-summary preflight in dispatch', core)
-        for phrase in ('every repository root', 'exact changed paths/status',
-                       'pre-existing dirt', 'Parent checks each status/diff',
-                       'Native review/open-review', 'unstaged review',
-                       'task workspace roots', 'native file-change attribution',
-                       'model name proves neither', 'requires the native parent badge',
-                       'support is missing/unknown',
-                       'does not populate it',
-                       'Never touch files only for attribution'):
+        self.assertIn('Run dispatch preflight', core)
+        for phrase in ('every root', 'exact changed paths/status',
+                       'owned/prior dirt', 'Parent checks each diff/status',
+                       'review/open-review', 'unstaged review',
+                       'workspace roots', 'native parent file-change attribution',
+                       'model name and review/open-review do not prove it',
+                       'Stop when support is missing/unknown',
+                       'Never edit for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
             instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
@@ -128,9 +128,10 @@ class DocumentedContractTests(unittest.TestCase):
         effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
         for text in (core, effort):
             self.assertIn('`cer_auto_<role>`', text)
-            self.assertIn('explicit effort', text)
             self.assertIn('base role is MISMATCH', text)
-            self.assertIn('exact pinned pair', text)
+        self.assertIn('Select model AND effort', core)
+        self.assertIn('explicit effort', effort)
+        self.assertIn('exact role/catalog pair', effort)
 
     def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
@@ -138,20 +139,20 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('one bounded local repair unit', 'two qualified executor attempts failed',
                        'current-workspace target', 'observed active strict Guard disables it'):
             self.assertIn(phrase, core)
-        self.assertIn('Strict PreToolUse Guard denies every Astra', dispatch)
-        self.assertIn('UNKNOWN may deny at runtime', dispatch)
+        self.assertIn('Strict Guard denies Astra', dispatch)
+        self.assertIn('UNKNOWN may deny', dispatch)
 
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('host-observed', 'once per repair unit', 'No per-command parent reauthorization',
-                       'child claims do not count', 'UNKNOWN/MISMATCH blocks writes',
+        for phrase in ('host-observed', 'once per repair unit',
+                       'child claims do not count', 'Reuse until a field', 'UNKNOWN/MISMATCH blocks writes',
                        'source/build config', 'destructive recovery'):
             self.assertIn(phrase, dispatch)
-        for phrase in ('policy denial', 'equivalent replay/repackaging',
+        for phrase in ('Policy denial', 'equivalent replay/repackaging',
                        'approval=never', 'no manual boundary'):
             self.assertIn(phrase, dispatch)
-        self.assertIn('Read dispatch before delegation/writes', core)
+        self.assertIn('Read dispatch before writes/delegation', core)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
@@ -166,23 +167,23 @@ class DocumentedContractTests(unittest.TestCase):
         luna=tomllib.loads((ROOT/'agents/luna-worker.toml').read_text())['developer_instructions']
         self.assertIn('No spawning, nested CLI/API, model/effort changes, commit/push/deploy/publish',luna)
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
-        self.assertIn('Handoff grants no new authority',dispatch)
+        self.assertIn('grants no new authority',dispatch)
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
-        for phrase in ('rule paths','rationale','missing critical context blocks affected work'):
+        for phrase in ('rule paths','rationale','missing context blocks affected work'):
             self.assertIn(phrase,core)
         for name in EXPECTED:
             role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
-            self.assertIn('read applicable repository rules',role,name)
+            self.assertRegex(role,r'read applicable repo(?:sitory)? rules',name)
             self.assertIn('missing critical context blocks affected work',role,name)
 
     def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
         effort=(ROOT/'skills'/PROJECT/'references/effort.md').read_text()
         self.assertIn('Resolve MISMATCH before continuation',core)
-        for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase pending review',
-                       'UNKNOWN alone is not a confirmed failure','Preserve attempts/user limits'):
+        for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase review',
+                       'UNKNOWN is not failure','Retain work/attempts/limits'):
             self.assertIn(phrase,effort)
 
 

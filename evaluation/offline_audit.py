@@ -86,7 +86,8 @@ def token_measurements() -> dict:
         measurements[encoding] = {name: {'tokens': len(enc.encode(s, disallowed_special=())),
                                          'bytes': len(s.encode('utf-8'))} for name, s in text.items()}
     mappings = {}
-    for model in ['gpt-6-astra', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']:
+    for model in ['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna',
+                  'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']:
         try:
             mappings[model] = tiktoken.encoding_for_model(model).name
         except KeyError:
@@ -112,18 +113,18 @@ def holdout_checks() -> list[dict]:
     def check(name, expected, actual, interpretation='policy boundary'):
         observations.append(dict(name=name, expected=expected, actual=actual,
                                  passed=(expected == actual), interpretation=interpretation))
-    check('known work with inadequate verification is not mechanical lane', 'terra',
+    check('known work with inadequate verification is not Luna lane', 'sol',
           choose_lane(S(mechanical=True, uncertainty=0, risk=1, verifiability=0)))
     check('settled but coupled implementation retains Sol', 'sol',
           choose_lane(S(prior_lane='astra', uncertainty=0, coupling=3, risk=1, verifiability=3)))
     check('explicit Astra cost override can bypass cheap-check preference', 'astra',
           choose_lane(S(force_astra=True, cheap_check_available=True)))
-    check('no-escalation still permits justified downward handoff', 'delegate',
+    check('no-escalation retains a sufficient owner instead of cost restart', 'local',
           D(S(), current_lane='astra', current_sufficient=True, no_escalation=True,
             benefit_clear=True, host_supports_routing=True, available_lanes=('terra',)).action)
     check('already sufficient Astra plus no-subagents stays local', 'local',
           D(S(force_astra=True, no_subagents=True), current_lane='astra', current_sufficient=True).action)
-    check('multiple cheap-lane failures need not jump to Astra', 'terra',
+    check('multiple Luna failures upgrade directly to adequate Sol', 'sol',
           choose_lane(S(prior_lane='luna', capability_failure=True, failed_attempts=20)))
     check('nonreasoning blocker cannot automatically select Astra', False,
           choose_lane(S(reasoning_bound=False, uncertainty=3, risk=3, novelty=3,

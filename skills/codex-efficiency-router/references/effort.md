@@ -1,13 +1,13 @@
 # Effort and binding
 
-Medium fits ordinary work. High fits reasoning-bound coupling, concurrency/lifetime, consequential ambiguity or conflicting evidence; Astra defaults high. State the basis. Mechanical patch failure alone does not raise effort. Reassess on phase change.
+Sol medium fits ordinary work. Luna high fits focused low-risk code or unknown mechanical work; medium needs confirmed deterministic conversion. High fits reasoning-bound coupling/lifetime, consequential ambiguity or conflict; Astra uses high.
 
-In auto, an exposed effort field plus valid `cer_auto_<role>` requires that alias and explicit effort; a base role is MISMATCH. Fallback needs unavailable alias/field and an exact pinned pair. Pins win; omission inherits. Inspect schema/roles/pair support once; refresh on invalidation. No silent remapping.
+With valid `cer_auto_<role>` and effort field, use it plus explicit effort; avoidable base role is MISMATCH. Exact pins win. Legacy fallback needs confirmed unavailability, exact role/catalog pair and intact locks/floors/history. Inspect once; refresh when invalid. No remap.
 
-Spawn with `agent_type=cer_auto_<role>`, `reasoning_effort=<selected>`, `fork_turns="none"` and the scoped contract. Role binds model; full-history forks cannot override effort. Host metadata alone confirms the pair.
+Spawn the alias with selected effort and `fork_turns="none"`; host metadata confirms. Reuse sufficient idle owners, not cost restarts. Capability failure may go directly adequate; other failures repair prerequisites. Retain attempts; no probes/replay/ladder.
 
-Reuse sufficient idle owners; changes need host support and retained attempts. Cache failed bindings; no paid probes/replay.
+Auto-low is opt-in deterministic Luna with strong checks and no novelty/conflict/failure. Explicit low obeys floors; Astra medium is explicit-only.
 
-Auto-low: opt-in mechanical Luna with strong checks, low consequences and no novelty/conflict/failure. Explicit low obeys the floor; Astra medium is explicit-only. xhigh/max require intent/support. Effort is no token cap or quality guarantee.
+Auto XHigh/Max needs reviewed bottleneck, High-limit and value fields; no lower trial. Ultra needs exact Sol/Astra support, one authorized coordinator, 2+ disjoint units, capacity and benefit. It owns unit; children are leaves, parent does not duplicate, and shared writer/retry bounds apply. Role conflict blocks. Static checks completeness; parent judges truth. Effort is no token cap/guarantee.
 
-MISMATCH: at a safe boundary reconcile binding/effects and review affected checks. Retain valid work; correct binding before reuse. Preserve attempts/user limits. Later VERIFIED does not erase pending review. UNKNOWN alone is not a confirmed failure.
+On MISMATCH, reconcile binding/effects at a safe boundary and review affected checks. Retain work/attempts/limits. Later VERIFIED does not erase review; UNKNOWN is not failure.

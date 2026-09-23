@@ -98,7 +98,10 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual(before_action('mutation','gpt-5.6-sol',scope(local_owner=True),read_only=True).action,'blocked')
 
     def test_legitimate_exclusive_sol_owner_can_write(self):
-        self.assertEqual(before_action('mutation','gpt-5.6-sol',scope(local_owner=True)).action,'local_write')
+        for model in ('gpt-6-sol','gpt-6-luna','gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna'):
+            with self.subTest(model=model):
+                self.assertEqual(before_action('mutation',model,scope(local_owner=True)).action,'local_write')
+        self.assertEqual(before_action('mutation','gpt-6-sol-lookalike',scope(local_owner=True)).action,'blocked')
 
     def test_no_subagents_not_an_astra_write_exception(self):
         self.assertEqual(before_action('mutation','gpt-6-astra',scope(),no_subagents=True,host_supports_routing=True).action,'blocked')
@@ -139,11 +142,11 @@ class WriteGateTests(unittest.TestCase):
 
     def test_joint_planner_no_benefit_local_shortcut_for_astra_write(self):
         d=plan(S(),host())
-        self.assertEqual((d.action,d.requested.lane),('delegate','terra'))
+        self.assertEqual((d.action,d.requested.lane),('delegate','sol'))
 
-    def test_joint_planner_mechanical_astra_writes_go_to_terra_not_luna(self):
+    def test_joint_planner_focused_astra_writes_can_use_luna(self):
         d=plan(S(mechanical=True,uncertainty=0,verifiability=3),host())
-        self.assertEqual((d.action,d.requested.lane),('delegate','terra'))
+        self.assertEqual((d.action,d.requested.lane,d.requested.effort),('delegate','luna','high'))
 
     def test_joint_planner_retains_root_astra_for_qualified_bounded_patch(self):
         c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()),

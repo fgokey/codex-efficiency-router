@@ -9,7 +9,7 @@ from effort_reference import Configuration as C, plan, recommend, record_observa
 from write_policy import AstraWriteEvidence, WriteScope, Writer
 from policy_reference import TaskSignals as S
 from profiles import Profile
-from test_effort_policy import context, ADAPTIVE, MECHANICAL
+from test_effort_policy import context, ADAPTIVE, DATA_TRANSFORM
 
 
 class EffortObservationTests(unittest.TestCase):
@@ -32,7 +32,7 @@ class EffortObservationTests(unittest.TestCase):
 
     def test_new_verified_or_unknown_identity_cannot_erase_affected_work(self):
         for effort in ('high',None):
-            c=record_observation(self.mismatch(),C('sol','high'),'gpt-5.6-sol',effort)
+            c=record_observation(self.mismatch(),C('sol','high'),'gpt-6-sol',effort)
             self.assertEqual(plan(S(),c,ADAPTIVE).action,'prerequisite')
             self.assertEqual(c.observation_review,'pending')
 
@@ -93,21 +93,21 @@ class EffortObservationTests(unittest.TestCase):
 
     def test_legacy_mismatch_state_cannot_be_overwritten_without_review(self):
         c=context(last_observation='MISMATCH')
-        next_c=record_observation(c,C('sol','high'),'gpt-5.6-sol','high')
+        next_c=record_observation(c,C('sol','high'),'gpt-6-sol','high')
         self.assertEqual(plan(S(),next_c,ADAPTIVE).action,'prerequisite')
         resolved=self.resolve(c)
-        later=record_observation(resolved,C('sol','high'),'gpt-5.6-sol','high')
+        later=record_observation(resolved,C('sol','high'),'gpt-6-sol','high')
         self.assertTrue(later.automatic_low_suspended)
         self.assertEqual(later.observation_review,'resolved')
 
     def test_auto_low_suspension_survives_later_verified_medium(self):
         c = context(current=C('sol', 'high'), current_sufficient=True, benefit_clear=True)
-        c = record_observation(c, C('luna', 'low'), 'gpt-5.6-luna', None)
+        c = record_observation(c, C('luna', 'low'), 'gpt-6-luna', None)
         self.assertTrue(c.automatic_low_suspended)
-        c = record_observation(c, C('luna', 'medium'), 'gpt-5.6-luna', 'medium')
+        c = record_observation(c, C('luna', 'medium'), 'gpt-6-luna', 'medium')
         self.assertEqual(c.last_observation, 'VERIFIED')
         self.assertTrue(c.automatic_low_suspended)
-        self.assertEqual(plan(MECHANICAL, c, Profile('adaptive', True)).recommended.effort, 'medium')
+        self.assertEqual(plan(DATA_TRANSFORM, c, Profile('adaptive', True)).recommended.effort, 'medium')
 
     def test_forced_astra_does_not_hide_intrinsically_hard_novelty_gate(self):
         s = S(uncertainty=2, risk=1, coupling=0, verifiability=1, novelty=3, force_astra=True)

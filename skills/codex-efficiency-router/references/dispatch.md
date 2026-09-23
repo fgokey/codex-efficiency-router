@@ -1,17 +1,17 @@
 # Native dispatch and guard
 
-Leaves never spawn. Sol/Terra parent handoff needs user authority, repo/ref/destination/checks. Handoff grants no new authority.
+Leaves never spawn except one parent-assigned Ultra Sol/Astra coordinator for a verified disjoint unit. Its children are non-Ultra leaves; Astra subtrees stay read-only; no duplicate parent dispatch. Handoff needs authority and exact repo/ref/destination/checks; it grants no new authority.
 
 ## Native change summary and review
 
-Compare task workspace roots before writes. Only when the user requires the native parent badge, verify native file-change attribution; model name proves neither. Stop that requirement when support is missing/unknown. Native review/open-review does not populate it.
+Compare workspace roots before writes. Only when required, verify native parent file-change attribution; model name and review/open-review do not prove it. Stop when support is missing/unknown.
 
-Return every repository root, exact changed paths/status, owned vs pre-existing dirt. Parent checks each status/diff and opens unstaged review. Never touch files only for attribution.
+Return every root, exact changed paths/status and owned/prior dirt. Parent checks each diff/status and opens unstaged review. Never edit for attribution.
 
-Check host-observed model/effort/role/permission/owner once per repair unit; child claims do not count. No per-command parent reauthorization. Reuse until a field, session resume or contrary evidence changes. UNKNOWN/MISMATCH blocks writes.
+Check host-observed model/effort/role/permission/owner once per repair unit; child claims do not count. Reuse until a field, session resume or contrary evidence changes. UNKNOWN/MISMATCH blocks writes.
 
-A repair unit covers implementation, source/build config, format, targeted tests and self-check. Bound binary copy, runtime/permission config, deploy and destructive recovery separately; reconcile before recovery.
+A repair unit covers source/build config/format/targeted tests/self-check. Bound binary copy, runtime config, deploy and destructive recovery separately; reconcile first.
 
-Actual policy denial stops equivalent replay/repackaging until supported permission change. `approval=never` alone creates no manual boundary.
+Policy denial stops equivalent replay/repackaging until supported permission change. `approval=never` alone creates no manual boundary.
 
-Strict PreToolUse Guard denies every Astra/unknown shell, patch and tool; active disables exception; UNKNOWN may deny at runtime. Astra NEVER uses write_stdin. Executors own long commands plus continuation/polling; Astra reads bounded persisted evidence. Root Astra uses permitted bounded read-only shell/diff/source/log review; readonly leaves stay readonly. cer-read only reads. Hosted paths UNPROTECTED; specialized UNKNOWN.
+Strict Guard denies Astra/unknown shell, patch and tools; active disables exceptions and UNKNOWN may deny. Astra never uses write_stdin. Executors own long commands/continuation; Astra reads bounded saved evidence and permitted read-only shell/diff/source/logs. Read-only leaves stay so; cer-read only reads. Hosted paths UNPROTECTED; specialized UNKNOWN.

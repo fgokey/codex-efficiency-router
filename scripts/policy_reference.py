@@ -6,6 +6,8 @@ from typing import Literal
 
 Lane = Literal["local", "luna", "terra", "sol", "astra"]
 LANES = ("local", "luna", "terra", "sol", "astra")
+Workload = Literal["general", "focused_code", "data_transform"]
+WORKLOADS = ("general", "focused_code", "data_transform")
 SameLaneReason = Literal["none", "context_recovery", "independent_review", "scope_isolation"]
 SAME_LANE_REASONS = ("none", "context_recovery", "independent_review", "scope_isolation")
 
@@ -13,6 +15,7 @@ SAME_LANE_REASONS = ("none", "context_recovery", "independent_review", "scope_is
 @dataclass(frozen=True)
 class TaskSignals:
     mechanical: bool = False
+    workload: Workload = "general"
     uncertainty: int = 1
     risk: int = 1
     coupling: int = 1
@@ -43,6 +46,9 @@ class TaskSignals:
             elif field.name == "failed_attempts":
                 if type(value) is not int or value < 0:
                     raise ValueError("failed_attempts must be a nonnegative integer")
+            elif field.name == "workload":
+                if value not in WORKLOADS:
+                    raise ValueError("unknown workload")
             elif field.name == "prior_lane":
                 if value not in LANES:
                     raise ValueError("unknown prior_lane")
@@ -76,15 +82,15 @@ def choose_lane(s: TaskSignals) -> Lane:
         return "sol"
     if s.risk >= 2 and (s.uncertainty >= 1 or s.verifiability <= 2):
         return "sol"
-    if s.capability_failure and s.failed_attempts >= 1:
-        if s.prior_lane in ("terra", "sol"):
-            return "sol"
-        if s.prior_lane == "luna":
-            return "terra"
-    if (s.mechanical and s.uncertainty == 0 and s.risk <= 1
+    if s.capability_failure and s.failed_attempts >= 1 and s.prior_lane in ("luna", "terra", "sol"):
+        return "sol"
+    if s.evidence_conflict or s.capability_failure:
+        return "sol"
+    if ((s.workload == "focused_code" or s.mechanical)
+            and s.uncertainty <= 1 and s.risk <= 1 and s.coupling <= 1
             and s.verifiability >= 2 and s.irreversibility <= 1):
         return "luna"
-    return "terra"
+    return "sol"
 
 
 @dataclass(frozen=True)

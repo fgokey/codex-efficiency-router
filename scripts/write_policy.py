@@ -4,11 +4,12 @@ from dataclasses import dataclass
 
 OPERATIONS = ('reasoning', 'read', 'coordinate', 'local_patch', 'mutation', 'unknown')
 ASTRA_WRITE_REASONS = ('none', 'qualified_executor_failure', 'critical_context_loss')
+EXECUTOR_MODELS = frozenset(('gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol',
+                             'gpt-5.6-terra', 'gpt-5.6-luna'))
 
 
 def is_astra(model: str | None) -> bool:
-    # Host-reported family slug, including dated Astra snapshots. Never read a prompt.
-    return isinstance(model, str) and (model == 'gpt-6-astra' or model.startswith('gpt-6-astra-'))
+    return model == 'gpt-6-astra'
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class Writer:
     def __post_init__(self):
         if any(not isinstance(v, str) or not v.strip() for v in (self.agent_id, self.unit, self.model)):
             raise ValueError('writer identity, unit and model are required')
-        if self.effort is not None and self.effort not in ('low', 'medium', 'high', 'xhigh', 'max'):
+        if self.effort is not None and self.effort not in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
             raise ValueError('invalid observed writer effort')
         if self.state not in ('idle', 'active', 'unknown', 'stopped'):
             raise ValueError('invalid writer state')
@@ -133,7 +134,7 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
     owners = [w for w in scope.writers if w.unit == scope.unit and w.state != 'stopped']
     if len(owners) > 1:
         return WriteDecision('blocked', 'conflicting owners for this unit')
-    known_executor = isinstance(model, str) and any(model == m or model.startswith(m + '-') for m in ('gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'))
+    known_executor = model in EXECUTOR_MODELS
     can_write = known_executor and not is_astra(model) and not read_only
     continuing_owner = len(owners) == 1 and owners[0].agent_id == scope.actor_id and owners[0].model == model and owners[0].authorized
     if can_write and scope.local_owner and (not owners or continuing_owner):
@@ -159,12 +160,12 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
         owner = owners[0]
         if owner.state == 'active':
             return WriteDecision('defer', 'wait for the existing owner at a safe boundary', owner.agent_id)
-        if (owner.authorized and owner.sufficient and owner.model in ('gpt-5.6-sol', 'gpt-5.6-terra')):
+        if owner.authorized and owner.sufficient and owner.model in EXECUTOR_MODELS:
             return WriteDecision('reuse', 'handoff to compatible idle owner; preserve diff and retry history', owner.agent_id)
         return WriteDecision('blocked', 'existing owner is not an eligible executor; reconcile ownership')
     if not host_supports_routing:
         return WriteDecision('blocked', 'no eligible writer route; Astra/unknown identity cannot write locally')
-    return WriteDecision('delegate', 'assign the bounded write unit to Terra/Sol, not Astra')
+    return WriteDecision('delegate', 'assign the bounded write unit to an exact eligible executor, not Astra')
 
 
 def diagnostic_action(*, model: str | None, complex_judgment: bool = False,

@@ -5,9 +5,9 @@ description: Quality-gated routing for substantial Codex tasks; use Astra for ha
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.14 -->
+<!-- CER version: 0.7.0-rc.15 -->
 
-Preserve quality, authority and parent model. No extra LLM classifier, hidden CLI/API or config edits.
+Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
@@ -15,11 +15,11 @@ Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-v
 
 ## Before any side effect
 
-Unknown identity/effects grant no writes. Reuse authorized Terra/Sol; missing authority/ownership/capacity means BLOCKED/defer. Preserve edits; never auto-revert. Read dispatch before delegation/writes.
+Unknown identity/effects grant no writes. Reuse authorized exact-model executors; without authority/ownership/capacity BLOCK/defer. Preserve edits; no auto-revert. Read dispatch before writes/delegation.
 
 Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; host permissions may allow bounded read-only shell/diff/source/log review. Its one bounded local repair unit requires two qualified executor attempts failed or material critical-context loss, authorization, current-workspace target, exclusive ownership and checks; observed active strict Guard disables it. Multiple patches may finish that unit within retained attempts/absolute ceiling. Side-effecting shell, build, test, publish and deploy stay with executors.
 
-Astra diagnoses hard judgments and qualified failures; Astra reasons locally. Exhaustion stops blind edits, not diagnosis.
+Exhaustion stops blind edits, not diagnosis.
 
 ## Route once per meaningful decision
 
@@ -27,20 +27,20 @@ Route on phase/evidence changes, failures or user requests, not each tool. Prese
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
-| `luna_worker` | `gpt-5.6-luna` / medium | Mechanical, low-risk, strongly checked |
-| `terra_executor` | `gpt-5.6-terra` / medium | Settled implementation |
-| `sol_engineer` | `gpt-5.6-sol` / medium | Diagnosis, coupling, integration |
+| `luna_worker` | `gpt-6-luna` / high | Focused low-risk code; data transforms medium |
+| `terra_executor` | `gpt-5.6-terra` / medium | Legacy explicit/fallback |
+| `sol_engineer` | `gpt-6-sol` / medium | Ordinary work, diagnosis, integration |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
-Select sufficient model AND explicit effort via `cer_auto_<role>` with a concise difficulty basis; read effort. An avoidable base role is MISMATCH; fallback needs evidence and an exact pinned pair. Never auto-select `max`/xhigh/Ultra; low needs opt-in. Exceptional Astra escalation needs consequential hard judgment AND no cheap falsification; parent acceptance still applies to Astra.
+Select model AND effort via `cer_auto_<role>`; read effort. Avoidable base role is MISMATCH. Exact pins win; fallback needs an exact supported pair plus observed selected-model unavailability. Legacy `gpt-5.6-sol/luna` are explicit/fallback only. Low is opt-in; higher efforts need evidence/support. Qualified Ultra is one Sol/Astra coordinator for disjoint leaves with shared limits; no duplicate/recursion. Astra needs consequential hard judgment AND no cheap falsification; parent acceptance applies.
 
 ## Decide whether delegation is worth it
 
-Keep sufficient authorized work local. Delegate for capability, ownership or net benefit. Same-model delegation needs contextual value AND a net benefit. Default one leaf; at most two disjoint writers, the third waits. No agent per file, recursive workers or permission bypasses.
+Keep sufficient authorized work local. Delegate for capability, ownership or benefit; same-model handoff needs contextual value AND net benefit. Default one leaf; only qualified Ultra coordinates disjoint leaves. Two writers max; no agent per file, recursive Ultra or permission bypass.
 
 ## Handoff without losing the decision
 
-Pass outcomes, revision/dirty paths, rule paths, rationale/invariants, scope/checks, binding/attempts. Read rules separately; missing critical context blocks affected work. Before implementation identify changed semantic invariants, platform/macros, consumers and validation. Loss/eviction/coalescing: preserve effects or support discard/replay/rebuild across affected states; else PARTIAL/BLOCKED. Requirements win; contrary evidence reopens decisions. Run native change-summary preflight in dispatch.
+Pass outcomes, revision/dirt, rule paths, rationale/invariants, scope/checks, binding/attempts. Receiver reads rules; missing context blocks affected work. Before work identify changed semantic invariants, platform/macros, consumers and validation. Loss/eviction/coalescing must preserve effects or support discard/replay/rebuild across affected states; else PARTIAL/BLOCKED. Requirements win; contrary evidence reopens decisions. Run dispatch preflight.
 
 Child reports evidence, roots, paths/status/diff, checks/gaps, owned/prior dirt. Child PASS is unit evidence, never parent PASS. Parent reviews every diff/actual validation, rechecks corrections, closes blockers and accepts integration.
 
