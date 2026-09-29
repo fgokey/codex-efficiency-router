@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0-rc.17 — 2026-09-30 (candidate, not published)
+
+- Index unknown reads and page captured, fully serialized output including continuation cursors under the outer byte budget. Mandatory rules remain complete across bounded ranges.
+- Clarify same-session release reuse versus real session restart, capacity-failure reassessment by new duties and fit, and review evidence for baseline, callees, gray paths and source-derived red/green tests. Offline helpers remain illustrative, not host enforcement.
+
 ## 0.7.0-rc.16 — 2026-09-29 (candidate, not published)
 
 - Start delegated children read-only and require an explicit parent release after checking current host model, effort, role, permission and owner. Keep direct parent work on its existing local gates; reuse release through one repair unit until invalidated.

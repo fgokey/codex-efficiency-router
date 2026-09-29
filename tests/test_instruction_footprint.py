@@ -88,12 +88,13 @@ class InstructionFootprintTests(unittest.TestCase):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            phrases = (('Bound reads', 'total shell/web/tool output', 'outer caps',
-                        'Unknown: index/split', 'Read rules fully', 'recover missing output only')
+            phrases = (('Total output <= outer cap', 'Index unknowns', 'budget reads',
+                        'capture+serialize fields/cursor', 'page then emit',
+                        'Read rules fully in chunks', 'recover gaps only')
                        if name == 'astra-architect.toml' else
-                       ('Outer cap bounds all output', 'not inner/item caps',
-                        'Index unknowns', 'capture large returns',
-                        'emit bounded fields/ranges', 'Read rules fully in chunks',
+                       ('Outer total cap', 'not inner/item caps',
+                        'Index unknowns', 'budget reads', 'capture+serialize fields/cursor',
+                        'page then emit', 'Read rules fully in chunks',
                         'recover gaps only'))
             for phrase in phrases:
                 self.assertIn(phrase, role, name)

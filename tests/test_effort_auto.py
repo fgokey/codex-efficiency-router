@@ -187,6 +187,17 @@ class AutomaticBindingTests(unittest.TestCase):
         catalog=dict(c.catalog);catalog['gpt-5.6-terra']=frozenset(('medium','high'))
         self.assertEqual(plan(s,replace(c,roles=roles,catalog=catalog),AUTO).action,'blocked')
 
+    def test_new_scope_reclassifies_after_transient_capacity_without_stale_blacklist(self):
+        new_duties=S(coupling=2,uncertainty=2,risk=1)
+        context=host(current=C('luna','high'),current_sufficient=False,
+                     change_event='classified_failure',failure_kind='environment')
+        decision=plan(new_duties,context,AUTO)
+        self.assertEqual(decision.requested,C('sol','high'))
+        self.assertEqual(decision.requested_role,'cer_auto_sol_engineer')
+        retained=host(current=C('sol','high'),current_sufficient=True,benefit_clear=False,
+                      change_event='classified_failure',failure_kind='environment')
+        self.assertEqual(plan(new_duties,retained,AUTO).action,'local')
+
     def test_ultra_never_falls_back_to_terra(self):
         evidence=EffortEvidence(
             bottleneck='two independent compatibility proofs remain',

@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.16 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.17 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0-rc.17: bounded reads and evidence checks
+
+Unknown reads are indexed before content; captured output is paged within the total serialized byte budget, including its continuation cursor. The router also clarifies same-session write release reuse, reassessment after a capacity failure, and baseline/source evidence for reviews. These remain policy and offline examples, not live host enforcement.
 
 ## v0.7.0-rc.16: parent release and output caps
 

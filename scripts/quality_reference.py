@@ -5,12 +5,13 @@ read checkpoints, inspect code, grade an LLM response or prove model compliance.
 """
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Literal
 
 Verdict = Literal['PASS', 'FAIL', 'UNKNOWN']
 Status = Literal['PASS', 'PARTIAL', 'BLOCKED']
-ReadAction = Literal['INDEX', 'SEPARATE_FULL', 'BATCH', 'RANGE', 'RESUME', 'LOCATE_GAP']
+ReadAction = Literal['INDEX', 'BATCH', 'RANGE', 'RESUME', 'LOCATE_GAP']
 ToolAction = Literal['REUSE', 'DISCOVER']
 RoundtripAction = Literal['DEFER', 'BATCH', 'SINGLE']
 ProgressAction = Literal['COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
@@ -44,11 +45,47 @@ def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
         flag(value)
     if truncated:
         return 'RESUME' if continuation_known else 'LOCATE_GAP'
-    if mandatory_full:
-        return 'SEPARATE_FULL'
     if not size_known or not members_bounded:
         return 'INDEX'
+    if mandatory_full:
+        return 'RANGE'
     return 'BATCH' if aggregate_fits else 'RANGE'
+
+
+def serialized_output_page(items: tuple[str, ...], *, cursor: int, max_bytes: int) -> str:
+    """Return one complete JSON page envelope within a caller-reserved UTF-8 cap."""
+    if not isinstance(items, tuple) or any(not isinstance(item, str) for item in items):
+        raise ValueError('items must be a tuple of strings')
+    if type(cursor) is not int or type(max_bytes) is not int or max_bytes < 3:
+        raise ValueError('cursor and max_bytes must be valid integers')
+    source = json.dumps(items, ensure_ascii=False, separators=(',', ':'))
+    if cursor < 0 or cursor > len(source):
+        raise ValueError('cursor outside serialized source')
+    def envelope(end: int) -> str:
+        return json.dumps({'page': source[cursor:end],
+                           'next_cursor': end if end < len(source) else None},
+                          ensure_ascii=False, separators=(',', ':'))
+    if cursor == len(source):
+        page = envelope(cursor)
+        if len(page.encode('utf-8')) > max_bytes:
+            raise ValueError('max_bytes cannot hold page envelope')
+        return page
+    complete = envelope(len(source))
+    if len(complete.encode('utf-8')) <= max_bytes:
+        return complete
+    low, high = cursor + 1, len(source) - 1
+    end = cursor
+    while low <= high:
+        mid = (low + high) // 2
+        page = envelope(mid)
+        if len(page.encode('utf-8')) <= max_bytes:
+            end = mid
+            low = mid + 1
+        else:
+            high = mid - 1
+    if end == cursor:
+        raise ValueError('max_bytes cannot hold one serialized character')
+    return envelope(end)
 
 
 def tool_action(*, known: bool, invalidated: bool) -> ToolAction:

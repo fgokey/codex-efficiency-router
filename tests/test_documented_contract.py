@@ -69,7 +69,7 @@ class DocumentedContractTests(unittest.TestCase):
             shutil.copytree(ROOT / 'skills' / PROJECT, skill)
             path = skill / 'SKILL.md'
             original = path.read_text()
-            for bad in (original.replace('tasks; use Astra', 'tasks: use Astra'),
+            for bad in (original.replace('routing; Astra', 'routing: Astra'),
                         original.replace('name: codex-efficiency-router',
                                          'name: codex-efficiency-router\nname: duplicate'),
                         original.replace('description: Quality-gated', 'description: # missing')):
@@ -146,7 +146,8 @@ class DocumentedContractTests(unittest.TestCase):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         for phrase in ('host-observed', 'explicitly releases unit for writes',
-                       'ID/config/claims/old logs fail', 'Reuse until field/resume/contradiction',
+                       'ID/config/claims/old logs fail', 'Same-session turns reuse release',
+                       'real restart/resume or contradiction rechecks',
                        'UNKNOWN/MISMATCH blocks writes',
                        'source/build config', 'destructive recovery'):
             self.assertIn(phrase, dispatch)

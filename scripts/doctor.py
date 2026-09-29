@@ -23,8 +23,7 @@ from package import (AUTO_DESCRIPTION_PREFIX, EXPECTED, AUTO_EXPECTED, INSTRUCTI
 from profiles import Profile, MARKER
 from catalog import parse_catalog
 
-HEADINGS = ("Route once per meaningful decision", "Decide whether delegation is worth it",
-            "Handoff without losing the decision", "Failure, validation, and stopping", "Context and reporting")
+HEADINGS = ("Routing", "Delegate", "Handoff", "Recovery", "Context and reporting")
 
 
 def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile = Profile()) -> list[str]:

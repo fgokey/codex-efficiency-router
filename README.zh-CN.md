@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.16 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.17 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0-rc.17：有界读取与证据核查
+
+未知大小先索引再读取；捕获的输出按序列化后总字节预算分页，续读位置也计入预算。规则还明确同一会话写入放行的复用、容量故障后按新职责重评，以及评审中的基线和源码证据。这些仍是策略与离线示例，不代表宿主已强制执行。
 
 ## v0.7.0-rc.16：父级放行与输出总量
 
