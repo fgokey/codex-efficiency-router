@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0-rc.16 — 2026-09-29 (candidate, not published)
+
+- Start delegated children read-only and require an explicit parent release after checking current host model, effort, role, permission and owner. Keep direct parent work on its existing local gates; reuse release through one repair unit until invalidated.
+- Budget the total outer output before emission: capture large returns, select bounded fields or pages, and read mandatory rules completely in bounded chunks. Add offline negative cases for missing release and aggregate overflow; no live enforcement claim.
+
 ## 0.7.0-rc.15 — 2026-09-23 (candidate, not published)
 
 - Route ordinary work to GPT-6 Sol/medium and focused low-risk code to GPT-6 Luna/high; reserve Luna/medium for positively identified deterministic transformation work.

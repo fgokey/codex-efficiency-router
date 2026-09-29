@@ -53,6 +53,18 @@ class QualityProtocolTests(unittest.TestCase):
         self.assertEqual(read_action(mandatory_full=True, size_known=True,
                                      aggregate_fits=True, members_bounded=False), 'SEPARATE_FULL')
 
+    def test_inner_and_per_item_caps_do_not_replace_outer_aggregate_cap(self):
+        outer_cap = 1000
+        inner_cap = 800
+        captured = ('a' * 600, 'b' * 600)
+        self.assertTrue(all(len(item) < inner_cap for item in captured))
+        self.assertEqual(read_action(mandatory_full=False, size_known=True,
+                                     aggregate_fits=sum(map(len, captured)) < outer_cap,
+                                     members_bounded=True), 'RANGE')
+        self.assertEqual(read_action(mandatory_full=False, size_known=True,
+                                     aggregate_fits=len(captured[0]) < outer_cap,
+                                     members_bounded=True), 'BATCH')
+
     def test_mandatory_rule_stays_separate_even_when_one_chunk_fits(self):
         self.assertEqual(read_action(mandatory_full=True, size_known=True,
                                      aggregate_fits=True, members_bounded=True), 'SEPARATE_FULL')
@@ -102,7 +114,7 @@ class QualityProtocolTests(unittest.TestCase):
     def test_mutation_requires_observed_matching_sol_or_terra(self):
         safe = {'observed_model': 'gpt-5.6-terra', 'read_only': False, 'binding_match': True,
                 'exact_manifest': True, 'bounded': True, 'actions': ('implementation',),
-                'destructive_rollback': False, 'policy_denied': False}
+                'destructive_rollback': False, 'policy_denied': False, 'parent_released': True}
         self.assertEqual(mutation_action(**safe), 'ADMIT')
         self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-6-sol'}), 'ADMIT')
         self.assertEqual(mutation_action(**{**safe, 'observed_model': 'gpt-6-luna'}), 'ADMIT')
@@ -114,7 +126,7 @@ class QualityProtocolTests(unittest.TestCase):
     def test_mutation_decomposes_mixed_or_destructive_transaction(self):
         safe = {'observed_model': 'gpt-5.6-sol', 'read_only': False, 'binding_match': True,
                 'exact_manifest': True, 'bounded': True, 'actions': ('implementation',),
-                'destructive_rollback': False, 'policy_denied': False}
+                'destructive_rollback': False, 'policy_denied': False, 'parent_released': True}
         for change in ({'exact_manifest': False}, {'bounded': False},
                        {'actions': ('implementation', 'deploy')}, {'destructive_rollback': True}):
             self.assertEqual(mutation_action(**{**safe, **change}), 'DECOMPOSE')
@@ -123,16 +135,26 @@ class QualityProtocolTests(unittest.TestCase):
         safe = {'observed_model': 'gpt-5.6-sol', 'read_only': False, 'binding_match': True,
                 'exact_manifest': True, 'bounded': True,
                 'actions': ('implementation', 'build_config', 'format', 'targeted_test', 'self_check'),
-                'destructive_rollback': False, 'policy_denied': False}
+                'destructive_rollback': False, 'policy_denied': False, 'parent_released': True}
         self.assertEqual(mutation_action(**safe), 'ADMIT')
         for invalidator in ('model', 'effort', 'role', 'permission', 'owner',
                             'session_resume', 'contradictory_evidence'):
             self.assertEqual(mutation_action(**safe, binding_invalidators=(invalidator,)), 'REROUTE')
 
+    def test_observed_binding_without_parent_release_stays_read_only(self):
+        safe = {'observed_model': 'gpt-6-sol', 'read_only': False, 'binding_match': True,
+                'exact_manifest': True, 'bounded': True, 'actions': ('implementation',),
+                'destructive_rollback': False, 'policy_denied': False}
+        self.assertEqual(mutation_action(**safe), 'BLOCKED')
+        self.assertEqual(mutation_action(**safe, parent_released=True), 'ADMIT')
+        self.assertEqual(mutation_action(**{**safe, 'binding_match': False}), 'REROUTE')
+        with self.assertRaises(ValueError):
+            mutation_action(**safe, parent_released='yes')
+
     def test_sensitive_mutations_are_separately_bounded(self):
         safe = {'observed_model': 'gpt-5.6-terra', 'read_only': False, 'binding_match': True,
                 'exact_manifest': True, 'bounded': True,
-                'destructive_rollback': False, 'policy_denied': False}
+                'destructive_rollback': False, 'policy_denied': False, 'parent_released': True}
         for action in ('binary_copy', 'runtime_config', 'deploy'):
             self.assertEqual(mutation_action(**safe, actions=(action,)), 'ADMIT')
         self.assertEqual(mutation_action(**{**safe, 'actions': ('destructive_recovery',),
@@ -142,7 +164,7 @@ class QualityProtocolTests(unittest.TestCase):
     def test_policy_denial_blocks_replay_or_repackaging(self):
         denied = {'observed_model': 'gpt-5.6-sol', 'read_only': False, 'binding_match': True,
                   'exact_manifest': True, 'bounded': True, 'actions': ('implementation',),
-                  'destructive_rollback': False, 'policy_denied': True}
+                  'destructive_rollback': False, 'policy_denied': True, 'parent_released': True}
         self.assertEqual(mutation_action(**denied), 'BLOCKED')
         for bad in ({'actions': ()}, {'actions': ('invented',)}, {'actions': ['implementation']},
                     {'binding_invalidators': ('invented',)}, {'observed_model': ''},

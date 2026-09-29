@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.15 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.16 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0-rc.16：父级放行与输出总量
+
+新派发或恢复的子执行者先只读准备。父代理核对当前宿主观测到的代理与会话绑定，再明确放行一个修复单元；仅绑定匹配不能写入。大型工具返回先捕获，再按外层总预算挑选字段或分页输出；内层与单项限制不能代替总预算。强制规则按有界分块完整读取。这些是策略指令与离线检查，不代表宿主已强制执行。
 
 按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
 

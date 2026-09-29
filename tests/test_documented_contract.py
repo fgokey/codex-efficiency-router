@@ -114,7 +114,7 @@ class DocumentedContractTests(unittest.TestCase):
                        'review/open-review', 'unstaged review',
                        'workspace roots', 'native parent file-change attribution',
                        'model name and review/open-review do not prove it',
-                       'Stop when support is missing/unknown',
+                       'Missing/unknown support stops',
                        'Never edit for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
@@ -136,8 +136,8 @@ class DocumentedContractTests(unittest.TestCase):
     def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('one bounded local repair unit', 'two qualified executor attempts failed',
-                       'current-workspace target', 'observed active strict Guard disables it'):
+        for phrase in ('one bounded local repair unit', 'two failed qualified executor attempts',
+                       'current-workspace target', 'no observed active strict Guard'):
             self.assertIn(phrase, core)
         self.assertIn('Strict Guard denies Astra', dispatch)
         self.assertIn('UNKNOWN may deny', dispatch)
@@ -145,8 +145,9 @@ class DocumentedContractTests(unittest.TestCase):
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('host-observed', 'once per repair unit',
-                       'child claims do not count', 'Reuse until a field', 'UNKNOWN/MISMATCH blocks writes',
+        for phrase in ('host-observed', 'explicitly releases unit for writes',
+                       'ID/config/claims/old logs fail', 'Reuse until field/resume/contradiction',
+                       'UNKNOWN/MISMATCH blocks writes',
                        'source/build config', 'destructive recovery'):
             self.assertIn(phrase, dispatch)
         for phrase in ('Policy denial', 'equivalent replay/repackaging',
@@ -162,21 +163,21 @@ class DocumentedContractTests(unittest.TestCase):
     def test_delivery_owner_requires_existing_user_authority(self):
         for name in ('sol-engineer.toml','terra-executor.toml'):
             text=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions']
-            self.assertIn('Commit/push/deploy/publish needs user authority',text)
+            self.assertIn('Commit/push/deploy/publish: user authority',text)
             self.assertIn('exact repo/ref/destination/checks',text)
         luna=tomllib.loads((ROOT/'agents/luna-worker.toml').read_text())['developer_instructions']
         self.assertIn('No spawning, nested CLI/API, model/effort changes, commit/push/deploy/publish',luna)
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
-        self.assertIn('grants no new authority',dispatch)
+        self.assertIn('grants none',dispatch)
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
-        for phrase in ('rule paths','rationale','missing context blocks affected work'):
+        for phrase in ('rule paths','rationale','context gaps block affected work'):
             self.assertIn(phrase,core)
         for name in EXPECTED:
             role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
-            self.assertRegex(role,r'read applicable repo(?:sitory)? rules',name)
-            self.assertIn('missing critical context blocks affected work',role,name)
+            self.assertRegex(role,r'read (?:applicable )?repo(?:sitory)? rules',name)
+            self.assertRegex(role,r'(?:missing critical context blocks|critical context gaps block) affected work',name)
 
     def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()

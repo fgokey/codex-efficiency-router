@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.15 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0-rc.16 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0-rc.16: parent release and output caps
+
+New or resumed child executors prepare read-only. The parent checks the current host-observed agent/session binding, then explicitly releases one repair unit for writes; a matching binding alone is insufficient. Large tool returns are captured and reduced to bounded fields or pages before emission. Inner and per-item limits do not replace the outer total cap. Mandatory rules are read completely in bounded chunks. These are policy instructions and offline checks, not live host enforcement.
 
 Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
 

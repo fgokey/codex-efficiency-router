@@ -87,10 +87,11 @@ def progress_action(*, worker_active: bool, progress_changed: bool,
 def mutation_action(*, observed_model: str | None, read_only: bool, binding_match: bool,
                     exact_manifest: bool, bounded: bool, actions: tuple[str, ...],
                     destructive_rollback: bool, policy_denied: bool,
-                    binding_invalidators: tuple[str, ...] = ()) -> MutationAction:
-    """Admit one bounded unit while separating sensitive mutation classes."""
+                    binding_invalidators: tuple[str, ...] = (),
+                    parent_released: bool = False) -> MutationAction:
+    """Admit a delegated child unit; direct parent work uses its local gates."""
     for value in (read_only, binding_match, exact_manifest, bounded,
-                  destructive_rollback, policy_denied):
+                  destructive_rollback, policy_denied, parent_released):
         flag(value)
     if observed_model is not None and (not isinstance(observed_model, str) or not observed_model.strip()):
         raise ValueError('observed model must be nonempty text or None')
@@ -110,6 +111,8 @@ def mutation_action(*, observed_model: str | None, read_only: bool, binding_matc
                                   'gpt-5.6-terra', 'gpt-5.6-luna')
     if read_only or not binding_match or binding_invalidators or not executor:
         return 'REROUTE'
+    if not parent_released:
+        return 'BLOCKED'
     if not exact_manifest or not bounded:
         return 'DECOMPOSE'
     action_set = frozenset(actions)

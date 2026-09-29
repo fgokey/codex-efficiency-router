@@ -81,16 +81,21 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
         for phrase in ('global byte/character cap', 'smallest outer tool cap',
-                       'all shell/web/nested-tool output', '`rg -m` and line counts',
-                       'not total bytes', 'Index/split unknowns',
-                       'Read required rules fully in chunks', 'without replaying effects',
+                       'all shell/web/nested-tool output', '`rg -m`',
+                       "line counts aren't total byte caps", 'Index/split unknowns',
+                       'Read required rules fully in bounded chunks', 'without replaying effects',
                        'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            for phrase in ('Bound reads', 'total shell/web/tool output', 'outer caps',
-                           'Unknown: index/split', 'Read rules fully',
-                           'recover missing output only'):
+            phrases = (('Bound reads', 'total shell/web/tool output', 'outer caps',
+                        'Unknown: index/split', 'Read rules fully', 'recover missing output only')
+                       if name == 'astra-architect.toml' else
+                       ('Outer cap bounds all output', 'not inner/item caps',
+                        'Index unknowns', 'capture large returns',
+                        'emit bounded fields/ranges', 'Read rules fully in chunks',
+                        'recover gaps only'))
+            for phrase in phrases:
                 self.assertIn(phrase, role, name)
 
     def test_monitoring_uses_one_delta_then_backoff(self):
@@ -111,8 +116,9 @@ class InstructionFootprintTests(unittest.TestCase):
                     self.assertIn(boundary, text)
             else:
                 for boundary in ('write scope', 'retry history across workers',
-                                 'Never weaken assertions', 'No spawning'):
+                                 'Never weaken assertions', 'current host binding precedes writes'):
                     self.assertIn(boundary, text, name)
+                self.assertTrue('No spawning' in text or 'Only parent-authorized Ultra spawns' in text)
 
     def test_readonly_diagnosis_and_limits_remain_in_core(self):
         text = SKILL.read_text()
