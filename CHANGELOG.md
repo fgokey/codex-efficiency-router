@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.1 — 2026-09-30
+
+- Add installed reader `excerpt` for a known line range in one snapshot and `locate` for bounded literal path/line candidates. Keep cursor paging for long ranges and complete rules.
+- Provide bounded `--help`; prefer direct verified Python for repeated reads. Preserve existing read-only and installation boundaries.
+
 ## 0.7.0 — 2026-09-30
 
 - Install the existing read-only adapter with ordinary Skills and expose bounded `cer.ps1 read index/page` commands. Each UTF-8 JSON response includes its cursor and line ending within 4096 bytes; cursors bind the file and requested line range.

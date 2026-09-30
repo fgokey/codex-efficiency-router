@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.1 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.1: locate and excerpt
+
+For a known line range, call the installed reader directly with verified Python: `python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N` (1–200 lines). If the location is unknown, use `locate --root ABS --path DIR --query LITERAL` first; it returns bounded path/line candidates, not source text. `--help` lists all options. Continue a long excerpt with `page` and its cursor. Use `index`/ `page` through a null cursor for complete rules. Emit one page at a time; do not read whole files to slice a few lines or combine pages/files into an oversized response. `cer.ps1 read` remains a convenience. Locate respects rg's normal ignore/hidden rules, excludes common build directories and files over 16 MiB; PARTIAL means narrow the search. Only calls through this reader are bounded.
 
 ## v0.7.0: installed bounded reader
 

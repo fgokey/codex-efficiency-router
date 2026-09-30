@@ -5,13 +5,13 @@ description: Quality-gated Codex routing; Astra for hard decisions and rare boun
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0 -->
+<!-- CER version: 0.7.1 -->
 
 Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
-For text-file reads use `& "<Skill>/cer.ps1" read index --root "<abs>" --path "<relative file>"`; page with same root/path plus `--cursor <token>`. Python: `-I -B <Skill>/scripts/readonly_reader.py`. Handoff exact reader and verified interpreter paths. Optional index `--start N --lines N`; omit for full rules, page to null cursor. JSON+CRLF <=4096 bytes; <=16 MiB rehash/page.
+Text: verified Python `-I -B <Skill>/scripts/readonly_reader.py`; handoff both paths. Known: `excerpt --root ABS --path FILE --start N --lines N`; unknown: `locate --root ABS --path DIR --query Q`. `page` same root/path, `--cursor TOKEN`. Full rules: `index` without range, page to null. Emit one <=4096B page; never read whole files to slice or combine pages/files.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
 

@@ -79,19 +79,23 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
-        for phrase in ('For text-file reads use', 'cer.ps1" read index',
-                       '--root "<abs>" --path "<relative file>"',
-                       'page with same root/path plus `--cursor <token>`',
-                       'omit for full rules, page to null cursor', 'JSON+CRLF <=4096 bytes',
+        for phrase in ('verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
+                       'handoff both paths',
+                       'excerpt --root ABS --path FILE --start N --lines N',
+                       'locate --root ABS --path DIR --query Q',
+                       '`page` same root/path, `--cursor TOKEN`',
+                       '`index` without range, page to null', 'one <=4096B page',
+                       'never read whole files to slice or combine pages/files',
                        'Only CLI reads capped', 'total output below outer incl framing',
                        'capture/serialize fields+cursor', 'emit one page',
                        'Inner/item/line limits fail', 'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            phrases = ('cer.ps1 read index --root <abs> --path <file>',
-                       'page same root/path --cursor <token>', 'JSON+CRLF<=4096',
-                       'rules to null', 'Other tools: total below outer incl framing')
+            phrases = ('Use handed-off Python -I -B <reader>',
+                       'excerpt known, locate unknown, index/page full rules',
+                       'one page, no full-file slicing/merging',
+                       'Other tools total <outer incl framing')
             for phrase in phrases:
                 self.assertIn(phrase, role, name)
 

@@ -16,13 +16,29 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.7.0'
+VERSION = '0.7.1'
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
 BATCH_LIMIT = 16
-OPS = frozenset(('read', 'list', 'search', 'diff', 'status', 'index', 'page'))
+OPS = frozenset(('read', 'list', 'search', 'diff', 'status', 'index', 'page', 'excerpt', 'locate'))
 PAGE_BYTES = 4096
+EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
+HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
+  excerpt --root ABS --path RELFILE --start N --lines N [--max-bytes N]
+    One snapshot, first bounded page of lines N..N+lines-1 (lines 1..200).
+    Continue with page --root ABS --path RELFILE --cursor TOKEN if next_cursor is not null.
+  locate --root ABS --path RELDIR_OR_FILE --query LITERAL [--glob FILE_GLOB] [--max-bytes N]
+    Literal rg search; returns path/line candidates only. complete applies to the chosen
+    path/glob under rg default ignore/hidden rules and 16 MiB max file size,
+    excluding .git,node_modules,dist,build,.next,temp. PARTIAL means narrow scope.
+  index --root ABS --path RELFILE [--start N --lines N] [--max-bytes N]
+    Returns cursor, size and SHA; omit range for complete rules/full-file reads.
+  page --root ABS --path RELFILE --cursor TOKEN [--max-bytes N]
+    Repeats until next_cursor is null; rejects changed files or stale cursors.
+Paths are literal and relative to ABS. max-bytes is 256..4096, default 4096.
+Use a verified Python executable with -I -B and this script for repeated reads.
+"""
 
 
 def unique(pairs):
@@ -53,27 +69,34 @@ def validate(request: object) -> dict:
         for item in items:
             if not isinstance(item, dict) or item.get('op') == 'batch':
                 raise ValueError('nested batches are not supported')
-            if item.get('op') in ('index', 'page'):
-                raise ValueError('index/page cannot be batched')
+            if item.get('op') in ('index', 'page', 'excerpt', 'locate'):
+                raise ValueError('index/page/excerpt/locate cannot be batched')
             validate(item)
         return request
     if not isinstance(op, str) or op not in OPS:
-        raise ValueError('reader needs read/list/search/diff/status/index/page or batch')
+        raise ValueError('reader needs read/list/search/diff/status/index/page/excerpt/locate or batch')
     fields = {'op', 'path'} | {
         'read': {'start', 'lines'}, 'search': {'query', 'lines'},
         'diff': {'staged'}, 'status': set(), 'list': set(),
         'index': {'max_bytes', 'start', 'lines'}, 'page': {'max_bytes', 'cursor'},
+        'excerpt': {'max_bytes', 'start', 'lines'},
+        'locate': {'max_bytes', 'query', 'glob'},
     }[op]
     if set(request) - fields:
         raise ValueError('unknown reader field')
     path = request.get('path', '.')
     if not isinstance(path, str) or any(c in path for c in '\x00\r\n'):
         raise ValueError('invalid path')
-    if op in ('index', 'page'):
+    if op in ('index', 'page', 'excerpt', 'locate'):
         if ('path' not in request or not path or Path(path).is_absolute() or '\\' in path
                 or ':' in path or any(c in path for c in '*?[]')
-                or any(part in ('', '.', '..') for part in path.split('/'))):
-            raise ValueError('index/page require one literal relative file path')
+                or (path != '.' and any(part in ('', '.', '..') for part in path.split('/')))):
+            raise ValueError('reader CLI requires one literal relative path')
+        if op != 'locate' and path == '.':
+            raise ValueError('file reads require a literal relative file path')
+        if op == 'locate' and (len(path.encode('utf-8')) > 1024
+                               or any(part in EXCLUDED_DIRS for part in path.split('/'))):
+            raise ValueError('locate path is too long or excluded')
     for key, default in (('start', 1), ('lines', 120)):
         value = request.get(key, default)
         if type(value) is not int or value < 1 or (key == 'lines' and value > 200):
@@ -82,7 +105,7 @@ def validate(request: object) -> dict:
         raise ValueError('search requires a nonempty literal query')
     if type(request.get('staged', False)) is not bool:
         raise ValueError('staged must be boolean')
-    if op in ('index', 'page'):
+    if op in ('index', 'page', 'excerpt', 'locate'):
         cap = request.get('max_bytes', PAGE_BYTES)
         if type(cap) is not int or not 256 <= cap <= PAGE_BYTES:
             raise ValueError('max_bytes must be 256..4096')
@@ -90,6 +113,17 @@ def validate(request: object) -> dict:
             raise ValueError('page requires a cursor from index/previous page')
         if op == 'index' and ('lines' in request) != ('start' in request):
             raise ValueError('index range requires both start and lines')
+        if op == 'excerpt' and not {'start', 'lines'} <= set(request):
+            raise ValueError('excerpt requires start and lines')
+        if op == 'locate':
+            query = request.get('query')
+            if not isinstance(query, str) or not query or any(c in query for c in '\x00\r\n'):
+                raise ValueError('locate requires one nonempty line of literal query')
+            glob = request.get('glob')
+            if glob is not None and (not isinstance(glob, str) or not glob
+                                     or len(glob.encode('utf-8')) > 256
+                                     or any(c in glob for c in '\x00\r\n')):
+                raise ValueError('invalid locate glob')
     return request
 
 
@@ -121,12 +155,14 @@ def preflight(root: Path, request: dict) -> list[tuple[dict, Path]]:
     checked = []
     for item in items:
         path = resolve(root, item.get('path', '.'))
-        if item['op'] in ('read', 'search', 'index', 'page'):
+        if item['op'] in ('read', 'search', 'index', 'page', 'excerpt'):
             if not path.is_file() or not stat.S_ISREG(path.stat().st_mode):
                 raise ValueError('read/search require one regular file, not a directory')
             total += path.stat().st_size
             if total > READ_LIMIT:
                 raise ValueError('aggregate file read budget exceeds 16 MiB')
+        elif item['op'] == 'locate' and not (path.is_file() or path.is_dir()):
+            raise ValueError('locate requires one file or directory')
         elif item['op'] == 'list' and not path.is_dir():
             raise ValueError('list requires a directory')
         checked.append((item, path))
@@ -202,7 +238,7 @@ def indexed_page(root: Path, request: dict, path: Path) -> str:
     raw, identity = snapshot(root, path)
     cap = request.get('max_bytes', PAGE_BYTES)
     content = raw.decode('utf-8')  # Never replace invalid bytes or normalize CRLF.
-    if request['op'] == 'index':
+    if request['op'] in ('index', 'excerpt'):
         first, last = 0, len(content)
         if 'start' in request:
             lines = content.splitlines(keepends=True)
@@ -212,12 +248,16 @@ def indexed_page(root: Path, request: dict, path: Path) -> str:
             last = first + sum(map(len, lines[request['start'] - 1:
                                                request['start'] - 1 + request['lines']]))
         cursor_token(identity, last, first, last)  # Reject a cursor that later pages cannot accept.
-        return envelope({'op': 'index', 'path': identity['path'], 'size_bytes': identity['size'],
-                         'mtime_ns': identity['mtime_ns'], 'sha256': identity['sha256'],
-                         'cursor': cursor_token(identity, first, first, last)}, cap)
-    start, first, last = cursor_offset(request['cursor'], identity, len(content))
+        if request['op'] == 'index':
+            return envelope({'op': 'index', 'path': identity['path'], 'size_bytes': identity['size'],
+                             'mtime_ns': identity['mtime_ns'], 'sha256': identity['sha256'],
+                             'cursor': cursor_token(identity, first, first, last)}, cap)
+        start = first
+    else:
+        start, first, last = cursor_offset(request['cursor'], identity, len(content))
     def page(end: int) -> dict:
-        return {'op': 'page', 'data': content[start:end],
+        return {'op': request['op'] if request['op'] == 'excerpt' else 'page',
+                'data': content[start:end],
                 'next_cursor': cursor_token(identity, end, first, last) if end < last else None,
                 'sha256': identity['sha256']}
     complete = page(last)
@@ -273,12 +313,88 @@ def bounded_process(args: list[str], root: Path, env: dict) -> tuple[int, bytes,
     return code, bytes(data), truncated
 
 
+def locate(root: Path, request: dict, path: Path) -> str:
+    cap = request.get('max_bytes', PAGE_BYTES)
+    result = {'op': 'locate', 'path': request['path'], 'glob': request.get('glob'),
+              'scope': 'rg-default-ignore-max-16MiB',
+              'excluded': EXCLUDED_DIRS, 'complete': False, 'candidates': []}
+    # rg's --max-filesize does not filter an explicitly named file.
+    if path.is_file() and path.stat().st_size > READ_LIMIT:
+        return envelope({**result, 'status': 'PARTIAL',
+                         'hint': 'file exceeds 16 MiB; narrow scope'}, cap)
+    reason = None
+    binary = shutil.which('rg')
+    if binary is None:
+        reason = 'rg unavailable'
+        data, code, truncated = b'', 2, False
+    else:
+        args = [binary, '--no-config', '--max-filesize', str(READ_LIMIT), '--with-filename',
+                '--null', '--line-number', '--only-matching', '--fixed-strings',
+                '--no-messages', '--color', 'never']
+        if request.get('glob'):
+            args += ['--glob', request['glob']]
+        for name in EXCLUDED_DIRS:
+            args += ['--glob', f'!**/{name}/**']
+        args += ['--', request['query'], str(path.relative_to(root))]
+        try:
+            code, data, truncated = bounded_process(args, root, os.environ.copy())
+        except (OSError, ValueError) as exc:
+            code, data, truncated = 2, b'', False
+            reason = f'rg failed: {type(exc).__name__}'
+    if truncated:
+        reason = 'rg output limit'
+    elif code not in (0, 1):
+        reason = reason or f'rg exit {code}'
+    records = data.split(b'\n')
+    if records[-1]:
+        reason = reason or 'incomplete rg record'
+    records = records[:-1]
+    seen = set()
+    for record in records:
+        try:
+            raw_path, separator, rest = record.partition(b'\0')
+            number, colon, _ = rest.partition(b':')
+            if not separator or not colon or not number.isdigit():
+                raise ValueError('invalid rg record')
+            candidate = {'path': Path(raw_path.decode('utf-8')).as_posix(),
+                         'line': int(number)}
+            if candidate['line'] < 1:
+                raise ValueError('invalid rg line')
+        except (UnicodeError, ValueError):
+            reason = reason or 'invalid rg record'
+            break
+        key = (candidate['path'], candidate['line'])
+        if key in seen:
+            continue
+        seen.add(key)
+        trial = {**result, 'complete': True, 'status': 'COMPLETE',
+                 'candidates': [*result['candidates'], candidate]}
+        try:
+            envelope(trial, cap)
+        except ValueError:
+            reason = reason or 'candidate output limit'
+            break
+        result['candidates'].append(candidate)
+    result['complete'] = reason is None
+    result['status'] = 'COMPLETE' if result['complete'] else 'PARTIAL'
+    if reason:
+        result['hint'] = f'{reason}; narrow --path/--glob/--query'
+        while result['candidates']:
+            try:
+                return envelope(result, cap)
+            except ValueError:
+                result['candidates'].pop()
+    return envelope(result, cap)
+
+
 def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str:
     # Revalidate before each operation as well as the full-batch preflight.
     resolve(root, str(path))
     op = request['op']
-    if op in ('index', 'page'):
+    if op in ('index', 'page', 'excerpt'):
         return indexed_page(root, request, path)
+    if op == 'locate':
+        return locate(root, request, path)
     if op in ('diff', 'status'):
         binary = shutil.which('git')
         if not binary:
@@ -348,11 +464,12 @@ def run(root: Path, request: dict) -> str:
 
 
 def cli_request(args: list[str]) -> tuple[Path, dict]:
-    if not args or args[0] not in ('index', 'page') or len(args[1:]) % 2:
-        raise ValueError('usage: index|page --root ROOT --path FILE [--start N --lines N] [--cursor TOKEN] [--max-bytes 256..4096]')
+    if not args or args[0] not in ('index', 'page', 'excerpt', 'locate') or len(args[1:]) % 2:
+        raise ValueError('usage: excerpt|locate|index|page --root ROOT --path RELATIVE [options]; use --help')
     values = {}
     for key, value in zip(args[1::2], args[2::2]):
-        if key not in ('--root', '--path', '--cursor', '--max-bytes', '--start', '--lines') or key in values:
+        if key not in ('--root', '--path', '--cursor', '--max-bytes',
+                       '--start', '--lines', '--query', '--glob') or key in values:
             raise ValueError('unknown or duplicate reader CLI option')
         values[key] = value
     if '--root' not in values or '--path' not in values:
@@ -365,6 +482,9 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
         request['max_bytes'] = int(values['--max-bytes'])
     if '--cursor' in values:
         request['cursor'] = values['--cursor']
+    for key in ('query', 'glob'):
+        if '--' + key in values:
+            request[key] = values['--' + key]
     for key in ('start', 'lines'):
         if '--' + key in values:
             request[key] = int(values['--' + key])
@@ -375,7 +495,11 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
 def main() -> int:
     cap = PAGE_BYTES
     try:
-        if len(sys.argv) > 1 and sys.argv[1] in ('index', 'page'):
+        if sys.argv[1:] == ['--help'] or (len(sys.argv) == 3 and sys.argv[2] == '--help'
+                                         and sys.argv[1] in ('index', 'page', 'excerpt', 'locate')):
+            sys.stdout.buffer.write(HELP.encode('utf-8'))
+            return 0
+        if len(sys.argv) > 1 and sys.argv[1] in ('index', 'page', 'excerpt', 'locate'):
             root, request = cli_request(sys.argv[1:])
             cap = request.get('max_bytes', PAGE_BYTES)
         else:

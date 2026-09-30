@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import runpy
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -233,6 +234,173 @@ class NativeGuardTests(unittest.TestCase):
                                 capture_output=True,timeout=10)
         self.assertEqual(rejected.returncode,2)
         self.assertLessEqual(len(rejected.stderr),4096)
+
+    def test_reader_cli_excerpt_jumps_to_known_line_without_index(self):
+        expected='目标🙂\\"\r\nnext\n'
+        self.file.write_bytes((('skip\n'*4258)+expected).encode('utf-8'))
+        before=(self.file.read_bytes(),self.file.stat().st_mtime_ns)
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        result=subprocess.run([*cli,'excerpt','--root',str(self.root),'--path','sentinel.txt',
+                               '--start','4259','--lines','2'],capture_output=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+        page=json.loads(result.stdout)
+        self.assertEqual(page['data'],expected)
+        self.assertIsNone(page['next_cursor'])
+        self.assertEqual((self.file.read_bytes(),self.file.stat().st_mtime_ns),before)
+
+    @unittest.skipUnless(shutil.which('rg'),'rg unavailable')
+    def test_reader_cli_locate_lists_only_bounded_candidates(self):
+        (self.root/'src').mkdir()
+        (self.root/'src/a.py').write_text('none\n-needle -needle 中🙂\n',encoding='utf-8')
+        (self.root/'src/b.txt').write_text('-needle\n',encoding='utf-8')
+        (self.root/'src/中文 空格.py').write_text('-needle\n',encoding='utf-8')
+        (self.root/'src/.hidden').mkdir()
+        (self.root/'src/.hidden/skip.py').write_text('-needle\n',encoding='utf-8')
+        (self.root/'src/ignored').mkdir()
+        (self.root/'src/ignored/skip.py').write_text('-needle\n',encoding='utf-8')
+        (self.root/'.gitignore').write_text('src/ignored/\n',encoding='utf-8')
+        subprocess.run(['git','init','-q',str(self.root)],check=True,capture_output=True)
+        (self.root/'src/node_modules').mkdir()
+        (self.root/'src/node_modules/x.py').write_text('-needle\n',encoding='utf-8')
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        base=[*cli,'locate','--root',str(self.root),'--path','src','--query','-needle']
+        result=subprocess.run(base,capture_output=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+        value=json.loads(result.stdout)
+        self.assertTrue(value['complete'])
+        self.assertEqual({(item['path'],item['line']) for item in value['candidates']},
+                         {('src/a.py',2),('src/b.txt',1),('src/中文 空格.py',1)})
+        self.assertEqual(len(value['candidates']),3)
+        self.assertEqual(value['scope'],'rg-default-ignore-max-16MiB')
+        self.assertNotIn('中🙂',result.stdout.decode('utf-8'))
+        chosen=subprocess.run([*base,'--glob','*.py'],capture_output=True,timeout=10)
+        self.assertEqual(chosen.returncode,0,chosen.stderr)
+        self.assertEqual({(item['path'],item['line']) for item in json.loads(chosen.stdout)['candidates']},
+                         {('src/a.py',2),('src/中文 空格.py',1)})
+        missing=subprocess.run([*cli,'locate','--root',str(self.root),'--path','src',
+                                '--query','unseen'],capture_output=True,timeout=10)
+        self.assertEqual(missing.returncode,0,missing.stderr)
+        self.assertTrue(json.loads(missing.stdout)['complete'])
+        self.assertEqual(json.loads(missing.stdout)['candidates'],[])
+
+    def test_reader_cli_help_is_short_and_side_effect_free(self):
+        before=(self.file.read_bytes(),self.file.stat().st_mtime_ns)
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        result=subprocess.run([*cli,'--help'],capture_output=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+        for part in (b'excerpt',b'--start',b'--lines',b'locate',b'--query',b'--glob',b'next_cursor'):
+            self.assertIn(part,result.stdout)
+        self.assertEqual((self.file.read_bytes(),self.file.stat().st_mtime_ns),before)
+
+    def test_reader_cli_excerpt_pages_exact_range_and_rejects_stale_cursor(self):
+        target=('中🙂\\\"'*500)+'\r\ntail\n'
+        self.file.write_bytes(('head\n'+target+'outside\n').encode('utf-8'))
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        args=['--root',str(self.root),'--path','sentinel.txt']
+        result=subprocess.run([*cli,'excerpt',*args,'--start','2','--lines','2'],
+                              capture_output=True,timeout=10)
+        pieces=[]
+        first=None
+        for _ in range(20):
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+            page=json.loads(result.stdout)
+            pieces.append(page['data'])
+            cursor=page['next_cursor']
+            if first is None:
+                first=cursor
+            if cursor is None:
+                break
+            result=subprocess.run([*cli,'page',*args,'--cursor',cursor],
+                                  capture_output=True,timeout=10)
+        else:
+            self.fail('excerpt cursor did not terminate')
+        self.assertEqual(''.join(pieces),target)
+        self.assertIsNotNone(first)
+        self.file.write_text('changed\n',encoding='utf-8')
+        stale=subprocess.run([*cli,'page',*args,'--cursor',first],
+                             capture_output=True,timeout=10)
+        self.assertEqual(stale.returncode,2)
+        self.assertLessEqual(len(stale.stdout)+len(stale.stderr),4096)
+        for bad in (['excerpt',*args,'--start','2'],
+                    ['excerpt',*args,'--start','2','--lines','201']):
+            rejected=subprocess.run([*cli,*bad],capture_output=True,timeout=10)
+            self.assertEqual(rejected.returncode,2)
+
+    @unittest.skipUnless(shutil.which('rg'),'rg unavailable')
+    def test_reader_cli_locate_partial_and_invalid_inputs(self):
+        (self.root/'dense.txt').write_text('needle\n'*18000,encoding='utf-8')
+        (self.root/'long.txt').write_text(('x'*200000)+'needle\n',encoding='utf-8')
+        (self.root/'oversize.txt').write_bytes(b'x'*(16*1024*1024)+b'needle')
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        base=[*cli,'locate','--root',str(self.root),'--path','dense.txt','--query','needle']
+        result=subprocess.run(base,capture_output=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+        page=json.loads(result.stdout)
+        self.assertEqual(page['status'],'PARTIAL')
+        self.assertFalse(page['complete'])
+        self.assertIn('narrow',page['hint'])
+        long_line=subprocess.run([*cli,'locate','--root',str(self.root),'--path','long.txt',
+                                  '--query','needle'],capture_output=True,timeout=10)
+        self.assertEqual(long_line.returncode,0,long_line.stderr)
+        self.assertLessEqual(len(long_line.stdout)+len(long_line.stderr),4096)
+        self.assertEqual(json.loads(long_line.stdout)['candidates'],[{'path':'long.txt','line':1}])
+        oversize=subprocess.run([*cli,'locate','--root',str(self.root),'--path','oversize.txt',
+                                 '--query','needle'],capture_output=True,timeout=10)
+        self.assertEqual(oversize.returncode,0,oversize.stderr)
+        self.assertEqual(json.loads(oversize.stdout)['candidates'],[])
+        self.assertEqual(json.loads(oversize.stdout)['status'],'PARTIAL')
+        self.assertFalse(json.loads(oversize.stdout)['complete'])
+        self.assertIn('16MiB',json.loads(oversize.stdout)['scope'])
+        for bad in ([*base[:-1],'needle\nanother'],[*base,'--glob','[']):
+            rejected=subprocess.run(bad,capture_output=True,timeout=10)
+            if '--glob' in bad:
+                self.assertEqual(rejected.returncode,0)
+                self.assertFalse(json.loads(rejected.stdout)['complete'])
+            else:
+                self.assertEqual(rejected.returncode,2)
+            self.assertLessEqual(len(rejected.stdout)+len(rejected.stderr),4096)
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        original=reader['locate'].__globals__['bounded_process']
+        try:
+            reader['locate'].__globals__['bounded_process']=lambda *unused: (
+                0,b'dense.txt\x001:needle\nbad.txt\x002:need',True)
+            partial=json.loads(reader['run'](self.root,{'op':'locate','path':'.','query':'needle'}))
+        finally:
+            reader['locate'].__globals__['bounded_process']=original
+        self.assertEqual(partial['candidates'],[{'path':'dense.txt','line':1}])
+        self.assertFalse(partial['complete'])
+        for output in ((0,b'bad\xff.txt\x001:needle\n',False),
+                       (0,b'',True)):
+            try:
+                reader['locate'].__globals__['bounded_process']=lambda *unused: output
+                broken=json.loads(reader['run'](self.root,{'op':'locate','path':'.','query':'needle'}))
+                self.assertFalse(broken['complete'])
+                self.assertEqual(broken['status'],'PARTIAL')
+            finally:
+                reader['locate'].__globals__['bounded_process']=original
+        try:
+            reader['locate'].__globals__['bounded_process']=lambda *unused: (_ for _ in ()).throw(ValueError('timeout'))
+            timeout=json.loads(reader['run'](self.root,{'op':'locate','path':'.','query':'needle'}))
+            self.assertFalse(timeout['complete'])
+        finally:
+            reader['locate'].__globals__['bounded_process']=original
+        resolver=shutil.which
+        try:
+            shutil.which=lambda unused: None
+            unavailable=json.loads(reader['run'](self.root,{'op':'locate','path':'.','query':'needle'}))
+            self.assertFalse(unavailable['complete'])
+            self.assertIn('unavailable',unavailable['hint'])
+        finally:
+            shutil.which=resolver
+        with self.assertRaises(ValueError):
+            reader['validate']({'op':'batch','requests':[{'op':'locate','path':'.','query':'needle'}]})
+        with self.assertRaises(ValueError):
+            reader['validate']({'op':'batch','requests':[{'op':'excerpt','path':'dense.txt','start':1,'lines':2}]})
 
     def test_readonly_git_diff_disables_external_diff(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))

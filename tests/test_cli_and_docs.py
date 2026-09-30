@@ -82,6 +82,25 @@ class CliAndDocsTests(unittest.TestCase):
                 self.fail("installed reader did not terminate")
             self.assertEqual("".join(parts), expected)
             self.assertEqual((source.read_bytes(), source.stat().st_mtime_ns), original)
+            excerpt = read("excerpt", *common, "--start", "2", "--lines", "1")
+            self.assertEqual(excerpt.returncode, 0, excerpt.stderr.decode("utf-8", "replace"))
+            excerpt_page = json.loads(excerpt.stdout)
+            excerpt_parts = [excerpt_page["data"]]
+            while excerpt_page["next_cursor"] is not None:
+                excerpt = read("page", *common, "--cursor", excerpt_page["next_cursor"])
+                self.assertEqual(excerpt.returncode, 0, excerpt.stderr.decode("utf-8", "replace"))
+                excerpt_page = json.loads(excerpt.stdout)
+                excerpt_parts.append(excerpt_page["data"])
+            self.assertEqual("".join(excerpt_parts), "x" * 4500)
+            help_result = read("--help")
+            self.assertEqual(help_result.returncode, 0, help_result.stderr.decode("utf-8", "replace"))
+            self.assertIn(b"locate", help_result.stdout)
+            if shutil.which("rg"):
+                located = read("locate", "--root", str(project), "--path", "source.txt",
+                               "--query", "汉")
+                self.assertEqual(located.returncode, 0, located.stderr.decode("utf-8", "replace"))
+                self.assertEqual(json.loads(located.stdout)["candidates"],
+                                 [{"path": "source.txt", "line": 1}])
             blocked = subprocess.run(["pwsh", "-NoProfile", "-NonInteractive", "-File",
                                       str(skill / "cer.ps1"), "install", *flags], env=env,
                                      capture_output=True, timeout=20)
