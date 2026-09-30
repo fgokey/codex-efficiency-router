@@ -94,8 +94,8 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('changed semantic invariants', 'Loss/eviction/coalescing',
                        'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
             self.assertIn(phrase, core)
-        for phrase in ('changed before/after behavior', 'requirement violation', 'label hypotheses',
-                       'No reply callback/gray/static score proves event loss safe',
+        for phrase in ('Findings cite before/after or requirement violation', 'label hypotheses',
+                       'Callback/gray/static score cannot prove event loss safe',
                        'preexisting hazards', 'unchanged baseline'):
             self.assertIn(phrase, quality)
 
@@ -167,7 +167,9 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn('Commit/push/deploy/publish: user authority',text)
             self.assertIn('exact repo/ref/destination/checks',text)
         luna=tomllib.loads((ROOT/'agents/luna-worker.toml').read_text())['developer_instructions']
-        self.assertIn('No spawning, nested CLI/API, model/effort changes, commit/push/deploy/publish',luna)
+        for phrase in ('No spawning', 'nested model CLI/API', 'self model/effort changes',
+                       'no commit/push/deploy/publish'):
+            self.assertIn(phrase,luna)
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
         self.assertIn('grants none',dispatch)
 
@@ -178,7 +180,7 @@ class DocumentedContractTests(unittest.TestCase):
         for name in EXPECTED:
             role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
             self.assertRegex(role,r'read (?:applicable )?repo(?:sitory)? rules',name)
-            self.assertRegex(role,r'(?:missing critical context blocks|critical context gaps block) affected work',name)
+            self.assertRegex(role,r'(?:missing critical context blocks|critical (?:context )?gaps block) affected work',name)
 
     def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()

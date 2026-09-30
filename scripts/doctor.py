@@ -210,6 +210,8 @@ def main() -> int:
         if args.source_tree and (root / "plugin.json").exists():
             from release_package import validate_release
             errors.extend(validate_release(root))
+            from manage import source_files
+            source_files(root)  # Include the reader and launcher that ordinary Skill installs copy.
         if not args.source_tree:
             from write_guard import inspect_status
             guard = inspect_status(args.scope, args.project_root)

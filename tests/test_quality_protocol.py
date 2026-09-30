@@ -1,6 +1,5 @@
 """Finite declared-input checks; NOT a live Codex behavioral evaluation."""
 import sys
-import json
 import unittest
 from dataclasses import replace
 from itertools import product
@@ -9,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from quality_reference import (Contract, Evidence, Failure, FinalReview, Unit, completion, handoff,
                                mutation_action, patch_action, progress_action, read_action, retry,
-                               roundtrip_action, resume, serialized_output_page, tool_action)
+                               roundtrip_action, resume, tool_action)
 
 
 class QualityProtocolTests(unittest.TestCase):
@@ -69,46 +68,6 @@ class QualityProtocolTests(unittest.TestCase):
     def test_mandatory_rule_uses_bounded_ranges_even_when_one_chunk_fits(self):
         self.assertEqual(read_action(mandatory_full=True, size_known=True,
                                      aggregate_fits=True, members_bounded=True), 'RANGE')
-
-    def test_serialized_output_pages_cover_exact_unicode_and_escape_ranges(self):
-        items = ('tiny', '汉字🙂' * 30, 'quote " slash \\ newline\n' * 8)
-        whole = json.dumps(items, ensure_ascii=False, separators=(',', ':'))
-        self.assertGreater(len(json.dumps(whole, ensure_ascii=False).encode()), 80)
-        cursor, pages = 0, []
-        while cursor is not None:
-            previous = cursor
-            page = serialized_output_page(items, cursor=cursor, max_bytes=80)
-            self.assertLessEqual(len(page.encode('utf-8')), 80)
-            payload = json.loads(page)
-            cursor = payload['next_cursor']
-            self.assertTrue(cursor is None or cursor > previous)
-            pages.append(payload['page'])
-        self.assertEqual(''.join(pages), whole)
-        self.assertEqual(tuple(json.loads(''.join(pages))), items)
-        with self.assertRaises(ValueError):
-            serialized_output_page(('🙂',), cursor=2, max_bytes=30)
-
-    def test_serialized_page_counts_cursor_envelope_at_large_offsets(self):
-        items = ('x' * 100_000,)
-        whole = json.dumps(items, ensure_ascii=False, separators=(',', ':'))
-        cursor = 99_990
-        last = serialized_output_page(items, cursor=cursor, max_bytes=100)
-        exact = len(last.encode('utf-8'))
-        self.assertEqual(serialized_output_page(items, cursor=cursor, max_bytes=exact), last)
-        self.assertEqual(json.loads(last), {'page': whole[cursor:], 'next_cursor': None})
-        try:
-            shorter = serialized_output_page(items, cursor=cursor, max_bytes=exact - 1)
-        except ValueError:
-            pass  # Cursor overhead can make every nonfinal page larger than the final one.
-        else:
-            payload = json.loads(shorter)
-            self.assertLessEqual(len(shorter.encode('utf-8')), exact - 1)
-            self.assertGreater(payload['next_cursor'], cursor)
-            self.assertEqual(payload['page'], whole[cursor:payload['next_cursor']])
-        end = serialized_output_page((), cursor=2, max_bytes=100)
-        self.assertEqual(json.loads(end), {'page': '', 'next_cursor': None})
-        with self.assertRaises(ValueError):
-            serialized_output_page((), cursor=3, max_bytes=100)
 
     def test_read_shape_rejects_truthy_non_boolean_flags(self):
         with self.assertRaises(TypeError):

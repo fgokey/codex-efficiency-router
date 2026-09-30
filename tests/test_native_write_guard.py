@@ -107,6 +107,133 @@ class NativeGuardTests(unittest.TestCase):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         self.assertEqual(reader['run'](self.root,{'op':'search','path':'sentinel.txt','query':'before'}),'1: before')
 
+    def test_reader_cli_pages_exact_text_with_bounded_utf8_output(self):
+        expected=('汉🙂"\\' * 1800) + '\r\n' + ('A' * 6000) + '\nend'
+        self.file.write_bytes(expected.encode('utf-8'))
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        index=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr.decode('utf-8','replace'))
+        cursor=json.loads(index.stdout)['cursor']
+        pages=[]
+        for _ in range(100):
+            result=subprocess.run([*cli,'page',*common,'--cursor',cursor,'--max-bytes','4096'],
+                                  capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr.decode('utf-8','replace'))
+            self.assertLessEqual(len(result.stdout),4096)
+            payload=json.loads(result.stdout)
+            pages.append(payload['data'])
+            cursor=payload['next_cursor']
+            if cursor is None:
+                break
+        else:
+            self.fail('reader cursor did not terminate')
+        self.assertEqual(''.join(pages),expected)
+
+    def test_reader_cli_range_cursor_and_changed_file(self):
+        expected=('line\r\n' * 5999) + '目标🙂\\"\r\n' + 'tail\n'
+        self.file.write_bytes(expected.encode('utf-8'))
+        before=(self.file.read_bytes(),self.file.stat().st_mtime_ns)
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        index=subprocess.run([*cli,'index',*common,'--start','6000','--lines','2'],
+                             capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr)
+        cursor=json.loads(index.stdout)['cursor'];parts=[]
+        while cursor is not None:
+            page=subprocess.run([*cli,'page',*common,'--cursor',cursor],capture_output=True,timeout=10)
+            self.assertEqual(page.returncode,0,page.stderr)
+            self.assertLessEqual(len(page.stdout)+len(page.stderr),4096)
+            data=json.loads(page.stdout);parts.append(data['data']);cursor=data['next_cursor']
+        self.assertEqual(''.join(parts),'目标🙂\\"\r\ntail\n')
+        self.assertEqual((self.file.read_bytes(),self.file.stat().st_mtime_ns),before)
+        self.file.write_bytes(expected.replace('目标', '换字').encode('utf-8'))
+        stale=subprocess.run([*cli,'page',*common,'--cursor',json.loads(index.stdout)['cursor']],
+                             capture_output=True,timeout=10)
+        self.assertEqual(stale.returncode,2)
+        self.assertIn(b'cursor',stale.stderr)
+
+    def test_reader_cli_invalid_cursor_path_and_bounded_errors(self):
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        index=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr)
+        cursor=json.loads(index.stdout)['cursor']
+        for args in ([*cli,'page',*common,'--cursor',cursor+'!'],
+                     [*cli,'index','--root',str(self.root),'--path','../sentinel.txt'],
+                     [*cli,'index','--root',str(self.root),'--path','*.txt'],
+                     [*cli,'index',*common,'--start','3','--lines','1'],
+                     [*cli,'index','--root',str(self.root),'--path','missing.txt']):
+            result=subprocess.run(args,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,2,result.stdout)
+            self.assertEqual(result.stdout,b'')
+            self.assertLessEqual(len(result.stderr),4096)
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        identity={'path':'a'*2000,'size':1,'mtime_ns':1,'dev':1,'ino':1,'sha256':'0'*64}
+        with self.assertRaisesRegex(ValueError,'cursor size'):
+            reader['cursor_token'](identity,0,0,1)
+
+    def test_reader_cli_gbk_environment_and_exact_cap(self):
+        self.file.write_text('汉🙂\\"'*1500,encoding='utf-8')
+        cli=[sys.executable,'-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        env=dict(os.environ,PYTHONIOENCODING='ascii')
+        index=subprocess.run([*cli,'index',*common],env=env,capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr)
+        cursor=json.loads(index.stdout)['cursor'];parts=[]
+        while cursor is not None:
+            result=subprocess.run([*cli,'page',*common,'--cursor',cursor,'--max-bytes','4096'],
+                                  env=env,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertLessEqual(len(result.stdout)+len(result.stderr),4096)
+            payload=json.loads(result.stdout);parts.append(payload['data']);cursor=payload['next_cursor']
+        self.assertEqual(''.join(parts),self.file.read_text(encoding='utf-8'))
+
+    def test_reader_cli_terminal_empty_invalid_utf8_and_file_limit(self):
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        self.file.write_bytes(b'')
+        index=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr)
+        cursor=json.loads(index.stdout)['cursor']
+        terminal=subprocess.run([*cli,'page',*common,'--cursor',cursor],capture_output=True,timeout=10)
+        self.assertEqual(terminal.returncode,0,terminal.stderr)
+        self.assertEqual(json.loads(terminal.stdout)['data'],'')
+        self.assertIsNone(json.loads(terminal.stdout)['next_cursor'])
+        self.file.write_bytes(b'\xff')
+        invalid=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(invalid.returncode,2)
+        self.assertLessEqual(len(invalid.stderr),4096)
+        with self.file.open('wb') as stream:
+            stream.truncate(16*1024*1024+1)
+        large=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(large.returncode,2)
+        self.assertIn(b'16 MiB',large.stderr)
+
+    def test_reader_cli_cap_includes_envelope_and_line_ending(self):
+        self.file.write_text('汉🙂'*1000,encoding='utf-8')
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        index=subprocess.run([*cli,'index',*common],capture_output=True,timeout=10)
+        self.assertEqual(index.returncode,0,index.stderr)
+        cursor=json.loads(index.stdout)['cursor']
+        page=subprocess.run([*cli,'page',*common,'--cursor',cursor],capture_output=True,timeout=10)
+        self.assertEqual(page.returncode,0,page.stderr)
+        exact=len(page.stdout)+1  # Reader reserves the possible PowerShell CRLF.
+        equal=subprocess.run([*cli,'page',*common,'--cursor',cursor,'--max-bytes',str(exact)],
+                             capture_output=True,timeout=10)
+        self.assertEqual(equal.returncode,0,equal.stderr)
+        self.assertEqual(equal.stdout,page.stdout)
+        shorter=subprocess.run([*cli,'page',*common,'--cursor',cursor,'--max-bytes',str(exact-1)],
+                               capture_output=True,timeout=10)
+        self.assertEqual(shorter.returncode,0,shorter.stderr)
+        self.assertLessEqual(len(shorter.stdout)+1,exact-1)
+        self.assertNotEqual(shorter.stdout,page.stdout)
+        rejected=subprocess.run([*cli,'page',*common,'--cursor',cursor,'--max-bytes','4097'],
+                                capture_output=True,timeout=10)
+        self.assertEqual(rejected.returncode,2)
+        self.assertLessEqual(len(rejected.stderr),4096)
+
     def test_readonly_git_diff_disables_external_diff(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         # Fixture writes must finish before the read-only snapshot. In validate #27

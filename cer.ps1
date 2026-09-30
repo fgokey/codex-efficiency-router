@@ -54,13 +54,26 @@ function Resolve-CerPython {
 $Commands = @{
     install = 'install.py'; uninstall = 'uninstall.py'; doctor = 'doctor.py'
     guard = 'write_guard.py'; canary = 'canary.py'; compare = 'compare_runs.py'
+    read = 'readonly_reader.py'
 }
 if ($args.Count -eq 0 -or -not $Commands.ContainsKey([string]$args[0])) {
-    throw 'Usage: .\cer.ps1 <install|uninstall|doctor|guard|canary|compare> [script arguments]'
+    throw 'Usage: .\cer.ps1 <read|install|uninstall|doctor|guard|canary|compare> [script arguments]'
 }
 $Action = [string]$args[0]
 $Forward = @($args | Select-Object -Skip 1)
+if ($Action -ne 'read' -and (Test-Path -LiteralPath (Join-Path $Root '.cer-install.json') -PathType Leaf)) {
+    throw 'Installed Skill launcher supports read only; run lifecycle commands from the source checkout.'
+}
 $Python = Resolve-CerPython
+if ($Action -eq 'read') {
+    $Reader = Join-Path $Root 'scripts/readonly_reader.py'
+    if (-not (Test-Path -LiteralPath $Reader -PathType Leaf)) {
+        $Reader = Join-Path $Root 'hooks/readonly_reader.py'
+    }
+    if (-not (Test-Path -LiteralPath $Reader -PathType Leaf)) { throw 'CER reader is missing.' }
+    & $Python.executable -I -B $Reader @Forward
+    exit $LASTEXITCODE
+}
 [Console]::Error.WriteLine(('CER Python {0}: {1}' -f ($Python.version -join '.'), $Python.executable))
 # Do not use -I for these scripts: their own adjacent imports must remain available.
 & $Python.executable -B (Join-Path $Root ('scripts/' + $Commands[$Action])) @Forward

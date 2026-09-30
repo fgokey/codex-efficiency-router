@@ -104,6 +104,12 @@ def source_files(root: Path) -> dict[str, bytes]:
         p = root / "agents" / name
         reject_links(p)
         files["agents/" + name] = p.read_bytes()
+    for key, p in (("skill/scripts/readonly_reader.py", root / "hooks" / "readonly_reader.py"),
+                   ("skill/cer.ps1", root / "cer.ps1")):
+        reject_links(p)
+        if key in files:
+            raise ValueError(f"duplicate source payload: {key}")
+        files[key] = p.read_bytes()
     return files
 
 

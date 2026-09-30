@@ -2,6 +2,7 @@
 import contextlib
 import io
 import json
+import shutil
 from pathlib import Path
 import sys
 import tempfile
@@ -121,9 +122,26 @@ class AutomaticInstallTests(unittest.TestCase):
 
     def test_generate_aliases_without_mutating_canonical_source(self):
         source=manage.source_files(ROOT);before=dict(source)
+        self.assertEqual(source['skill/scripts/readonly_reader.py'],
+                         (ROOT/'hooks/readonly_reader.py').read_bytes())
+        self.assertEqual(source['skill/cer.ps1'],(ROOT/'cer.ps1').read_bytes())
         rendered=render_payload(source,Profile('auto'))
         self.assertEqual(source,before)
         self.assertEqual(set(rendered)-set(source),{'agents/'+n for n in AUTO_EXPECTED})
+
+    def test_source_payload_refuses_duplicate_reader_or_launcher(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for directory in ('skills','agents','hooks'):
+                shutil.copytree(ROOT/directory,root/directory)
+            shutil.copy2(ROOT/'cer.ps1',root/'cer.ps1')
+            for relative in ('scripts/readonly_reader.py','cer.ps1'):
+                collision=root/'skills/codex-efficiency-router'/relative
+                collision.parent.mkdir(parents=True,exist_ok=True)
+                collision.write_text('unowned',encoding='utf-8')
+                with self.assertRaisesRegex(ValueError,'duplicate source payload'):
+                    manage.source_files(root)
+                collision.unlink()
 
     def test_profile_schema_rejects_missing_fields_and_unknown_version(self):
         for value in ({'profile_schema':2}, {'profile_schema':99},

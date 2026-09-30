@@ -66,36 +66,32 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in ('effort', 'routing', 'dispatch', 'quality'):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
-        for phrase in ('once at its trigger', 'stale/lost',
+        for phrase in ('Read references at trigger', 'stale/lost',
                        'before dispatch', 'before delegation/writes',
                        'for recovery/disputed evidence'):
             self.assertIn(phrase, text)
 
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = SKILL.read_text()
-        self.assertIn('Do not preload docs/hooks or copy router into children', text)
+        self.assertIn('No doc/hook preload or router copy to children', text)
         self.assertIn('Report once:', text)
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
-        self.assertIn('No repeated routing banners', text)
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
-        for phrase in ('global byte/character cap', 'smallest outer tool cap',
-                       'all shell/web/nested-tool output', '`rg -m`',
-                       "line counts aren't total byte caps", 'Index/split unknowns',
-                       'Read required rules fully in bounded chunks', 'without replaying effects',
-                       'disclose omissions'):
+        for phrase in ('For text-file reads use', 'cer.ps1" read index',
+                       '--root "<abs>" --path "<relative file>"',
+                       'page with same root/path plus `--cursor <token>`',
+                       'omit for full rules, page to null cursor', 'JSON+CRLF <=4096 bytes',
+                       'Only CLI reads capped', 'total output below outer incl framing',
+                       'capture/serialize fields+cursor', 'emit one page',
+                       'Inner/item/line limits fail', 'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            phrases = (('Total output <= outer cap', 'Index unknowns', 'budget reads',
-                        'capture+serialize fields/cursor', 'page then emit',
-                        'Read rules fully in chunks', 'recover gaps only')
-                       if name == 'astra-architect.toml' else
-                       ('Outer total cap', 'not inner/item caps',
-                        'Index unknowns', 'budget reads', 'capture+serialize fields/cursor',
-                        'page then emit', 'Read rules fully in chunks',
-                        'recover gaps only'))
+            phrases = ('cer.ps1 read index --root <abs> --path <file>',
+                       'page same root/path --cursor <token>', 'JSON+CRLF<=4096',
+                       'rules to null', 'Other tools: total below outer incl framing')
             for phrase in phrases:
                 self.assertIn(phrase, role, name)
 
@@ -117,7 +113,7 @@ class InstructionFootprintTests(unittest.TestCase):
                     self.assertIn(boundary, text)
             else:
                 for boundary in ('write scope', 'retry history across workers',
-                                 'Never weaken assertions', 'current host binding precedes writes'):
+                                 'Never weaken assertions', 'Parent releases current host binding before'):
                     self.assertIn(boundary, text, name)
                 self.assertTrue('No spawning' in text or 'Only parent-authorized Ultra spawns' in text)
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 — 2026-09-30
+
+- Install the existing read-only adapter with ordinary Skills and expose bounded `cer.ps1 read index/page` commands. Each UTF-8 JSON response includes its cursor and line ending within 4096 bytes; cursors bind the file and requested line range.
+- Preserve complete text across long lines, Unicode and CRLF, reject changed files and oversized inputs, and keep Hook activation separate. Other native tools still need their own aggregate output budget; no automatic host interception is claimed.
+
 ## 0.7.0-rc.17 — 2026-09-30 (candidate, not published)
 
 - Index unknown reads and page captured, fully serialized output including continuation cursors under the outer byte budget. Mandatory rules remain complete across bounded ranges.

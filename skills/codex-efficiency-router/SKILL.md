@@ -5,15 +5,17 @@ description: Quality-gated Codex routing; Astra for hard decisions and rare boun
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.0-rc.17 -->
+<!-- CER version: 0.7.0 -->
 
 Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
+For text-file reads use `& "<Skill>/cer.ps1" read index --root "<abs>" --path "<relative file>"`; page with same root/path plus `--cursor <token>`. Python: `-I -B <Skill>/scripts/readonly_reader.py`. Handoff exact reader and verified interpreter paths. Optional index `--start N --lines N`; omit for full rules, page to null cursor. JSON+CRLF <=4096 bytes; <=16 MiB rehash/page.
+
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
 
-## Before any side effect
+## Authority
 
 Unknown identity/effects grant no writes. Children read only on spawn/resume pending parent host-binding check and unit release; without authority/ownership/capacity BLOCK/defer. Preserve edits; no auto-revert. Read dispatch before writes/delegation.
 
@@ -23,7 +25,7 @@ Exhaustion stops blind edits, not diagnosis.
 
 ## Routing
 
-Route on phase/evidence changes, failures or user requests, not each tool. Keep requirement/unit IDs; repair prerequisites first.
+Route on phase/evidence/failure/user changes, not each tool. Keep requirement/unit IDs; repair prerequisites first.
 
 | Role | Model / fixed default | Work |
 | --- | --- | --- |
@@ -52,6 +54,6 @@ Check requirements/correctness, repo checks/reproduction; new tests are not inde
 
 ## Context and reporting
 
-Read each reference once at its trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
+Read references at trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Set global byte/character cap below smallest outer tool cap for all shell/web/nested-tool output plus margin. Index/split unknowns; allocate bounded reads. Capture returns; serialize all emitted fields/cursor, then page under cap. Inner token/per-item caps, `rg -m`, line counts aren't total byte caps. Read required rules fully in bounded chunks, not summaries; resume missing cursor/ranges without replaying effects, shrink batch, disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. Do not preload docs/hooks or copy router into children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay. No repeated routing banners.
+Only CLI reads capped. For other tools cap total output below outer incl framing; index unknowns, capture/serialize fields+cursor, emit one page. Inner/item/line limits fail. Resume gaps; shrink batch; disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or router copy to children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay.

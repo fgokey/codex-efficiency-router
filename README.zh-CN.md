@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.17 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0：随普通 Skill 安装的有界读取器
+
+普通 Skill 安装会部署只读的 `cer.ps1 read index/page` 与 Python 读取器。使用绝对根目录和字面量相对文件路径；可用 `index --start N --lines N` 定位源码范围。沿 `next_cursor` 续读至 null 才算完整覆盖该范围。每次 CLI 响应连同 JSON、游标和换行最多 4096 个 UTF-8 字节；超过 16 MiB 的文件明确报错。该入口不拦截其他工具，也不启用 Hook。
 
 ## v0.7.0-rc.17：有界读取与证据核查
 

@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.0-rc.17 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.7.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.7.0: installed bounded reader
+
+Ordinary Skill installs include `cer.ps1 read index/page` and its read-only Python adapter. Use a literal file path under an absolute root; optional `index --start N --lines N` locates source ranges. Follow `next_cursor` until null to read the selected range completely. Each CLI response fits 4096 UTF-8 bytes including JSON, cursor and line ending; files over 16 MiB fail clearly. The reader does not intercept other tools or activate Hooks.
 
 ## v0.7.0-rc.17: bounded reads and evidence checks
 
