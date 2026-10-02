@@ -53,7 +53,8 @@ class DoctorTests(unittest.TestCase):
     def test_policy_manifest_matches_shipped_models(self):
         policy = json.loads((ROOT / "policy/routing-policy.json").read_text())
         actual = {(v["model"], v["effort"]) for v in policy["models"].values()}
-        self.assertEqual(actual, {(m, e) for _, m, e in EXPECTED.values()})
+        self.assertEqual(actual | {(policy['prior_sol_model'], 'medium')},
+                         {(m, e) for _, m, e in EXPECTED.values()})
         self.assertIn("benefit_gated_deescalation", policy["principles"])
         self.assertIn("bounded_output_envelope_before_batch_reads", policy["principles"])
         self.assertIn("model_roundtrips_are_budgeted_even_with_cached_input", policy["principles"])

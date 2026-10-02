@@ -4,7 +4,7 @@
 
 Ordinary install/update is auto. Users do not choose fixed/adaptive to suit each Codex host. The parent selects a model/effort pair from task evidence, then a supported native binding. No new model level, classifier call, proxy, daemon, hidden CLI or in-flight hot switching is introduced.
 
-Four canonical fixed definitions generate four additional aliases named `cer_auto_<role>` in files `cer-auto-<original-file>.toml`. Aliases preserve model, developer instructions and sandbox fields, add a short auto-effort discovery marker, change the name and remove the top-level effort pin. Auto installs eight bindings; explicit legacy fixed/adaptive overrides install four. A file does not spawn a worker. Extra role discovery text has a cost and is reported separately.
+Five canonical fixed definitions generate five additional aliases named `cer_auto_<role>` in files `cer-auto-<original-file>.toml`. Aliases preserve model, developer instructions and sandbox fields, add a short auto-effort discovery marker, change the name and remove the top-level effort pin. Auto installs ten bindings; explicit legacy fixed/adaptive overrides install five. A file does not spawn a worker. Extra role discovery text has a cost and is reported separately.
 
 ## Admission order
 
@@ -41,7 +41,7 @@ New installations and ordinary upgrades from old manifests use auto. Pre-v0.5 ma
 
 ## Evidence and scope
 
-Source doctor validates four fixed definitions; installed doctor validates all bindings required by that installation. Optional saved catalog checking in auto requires baseline fixed pairs, not every unused high setting. Each actual dispatch must confirm its selected pair. Neither a catalog export nor file validation proves runtime loading. No credentials, model probes or extra sessions are used by maintenance tools.
+Source doctor validates five fixed definitions; installed doctor validates all bindings required by that installation. Optional saved catalog checking in auto requires baseline fixed pairs, not every unused high setting. Each actual dispatch must confirm its selected pair. Neither a catalog export nor file validation proves runtime loading. No credentials, model probes or extra sessions are used by maintenance tools.
 
 Runtime rules live in the Skill; Python is an offline reference, not a hard enforcement layer. Live capability selection, model identity, quality, total tokens and latency remain user-run acceptance. Existing byte/token gates stay in force. Additional alias descriptions are measured, not claimed free.
 

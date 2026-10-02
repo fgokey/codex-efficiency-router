@@ -86,7 +86,7 @@ def token_measurements() -> dict:
         measurements[encoding] = {name: {'tokens': len(enc.encode(s, disallowed_special=())),
                                          'bytes': len(s.encode('utf-8'))} for name, s in text.items()}
     mappings = {}
-    for model in ['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna',
+    for model in ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna',
                   'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']:
         try:
             mappings[model] = tiktoken.encoding_for_model(model).name

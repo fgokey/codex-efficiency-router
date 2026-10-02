@@ -62,10 +62,10 @@ def select_profile(previous: Profile | None, mode: Mode | None = None,
 def render_payload(payload: dict[str, bytes], profile: Profile) -> dict[str, bytes]:
     """Generate native bindings, preserving permissions and instruction content.
 
-    Auto installs four pinned compatibility roles plus four unpinned aliases.
+    Auto installs five pinned compatibility roles plus five unpinned aliases.
     Only ONE binding is chosen per child; files are not running agents. This avoids
     rewriting configurations, inheriting unknown effort, or asking users to switch.
-    Legacy overrides still install only the original four roles.
+    Fixed/adaptive overrides install only the five source roles.
     """
     output = dict(payload)
     text = output[CORE_KEY].decode("utf-8")

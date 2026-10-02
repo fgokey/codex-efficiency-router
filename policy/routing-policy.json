@@ -1,6 +1,6 @@
 {
   "schema_version": 15,
-  "checked_against_openai_docs": "2026-09-23",
+  "checked_against_openai_docs": "2026-10-02",
   "models": {
     "luna": {
       "model": "gpt-6-luna",
@@ -11,7 +11,7 @@
       "effort": "medium"
     },
     "sol": {
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "effort": "medium"
     },
     "astra": {
@@ -24,6 +24,7 @@
     "terra": "gpt-5.6-terra",
     "sol": "gpt-5.6-sol"
   },
+  "prior_sol_model": "gpt-6-sol",
   "principles": [
     "quality_is_a_hard_constraint",
     "one_agent_by_default",
@@ -127,7 +128,7 @@
     ],
     "missing_evidence": "reuse_delegate_defer_or_block"
   },
-  "version": "0.7.1",
+  "version": "0.8.0",
   "purpose": "Offline policy reference, not a Codex runtime config or a live dispatcher",
   "budgets": {
     "core_skill_bytes": 5200,
@@ -208,7 +209,7 @@
   },
   "automatic_bindings": {
     "default_install": "auto",
-    "generation": "four fixed roles and four marked unpinned cer_auto aliases from one canonical set",
+    "generation": "five fixed roles and five marked unpinned cer_auto aliases from one canonical set",
     "selection": "valid unpinned alias plus explicit native effort is mandatory when exposed; otherwise evidenced exact fixed pair; otherwise sufficient parent or blocked",
     "legacy_upgrade": "ordinary update backs up and migrates pre-profile_schema=2 installs; later explicit overrides preserved",
     "no_probe_calls": true,

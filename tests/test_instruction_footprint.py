@@ -66,14 +66,14 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in ('effort', 'routing', 'dispatch', 'quality'):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
-        for phrase in ('Read references at trigger', 'stale/lost',
+        for phrase in ('Read references on trigger/stale/lost',
                        'before dispatch', 'before delegation/writes',
                        'for recovery/disputed evidence'):
             self.assertIn(phrase, text)
 
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = SKILL.read_text()
-        self.assertIn('No doc/hook preload or router copy to children', text)
+        self.assertIn('No doc/hook preload or child router copy', text)
         self.assertIn('Report once:', text)
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
 
@@ -86,7 +86,7 @@ class InstructionFootprintTests(unittest.TestCase):
                        '`page` same root/path, `--cursor TOKEN`',
                        '`index` without range, page to null', 'one <=4096B page',
                        'never read whole files to slice or combine pages/files',
-                       'Only CLI reads capped', 'total output below outer incl framing',
+                       'CLI reads capped', 'total output below outer incl framing',
                        'capture/serialize fields+cursor', 'emit one page',
                        'Inner/item/line limits fail', 'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)

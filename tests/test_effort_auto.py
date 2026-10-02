@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from effort_reference import Configuration as C, Context, EffortEvidence, RoleBinding, plan, PRESETS, dispatch_arguments
 from policy_reference import TaskSignals as S
 from profiles import Profile
+from package import EXPECTED
 
 AUTO = Profile('auto')
 SOL = S(uncertainty=2, coupling=1, risk=1)
@@ -17,16 +18,47 @@ DATA_TRANSFORM = replace(MECHANICAL, workload='data_transform')
 
 
 def host(**kwargs):
-    bindings = {role: RoleBinding(model, effort) for role, model, effort in PRESETS.values()}
-    bindings.update({'cer_auto_' + role: RoleBinding(model, None) for role, model, _ in PRESETS.values()})
+    bindings = {role: RoleBinding(model, effort) for role, model, effort in EXPECTED.values()}
+    bindings.update({'cer_auto_' + role: RoleBinding(model, None) for role, model, _ in EXPECTED.values()})
     args = dict(current=C('astra', 'high'), current_sufficient=True, benefit_clear=True,
                 safe_boundary=True, host_supports_routing=True, host_can_set_effort=True,
-                roles=bindings, catalog={m: frozenset(('low','medium','high')) for _,m,_ in PRESETS.values()})
+                roles=bindings, catalog={m: frozenset(('low','medium','high')) for _,m,_ in EXPECTED.values()})
     args.update(kwargs)
     return Context(**args)
 
 
 class AutomaticBindingTests(unittest.TestCase):
+    def test_sol61_default_and_exact_old_sol_pin(self):
+        self.assertEqual(PRESETS['sol'], ('sol61_engineer', 'gpt-6.1-sol', 'medium'))
+        self.assertEqual(C('sol', 'medium').model, 'gpt-6.1-sol')
+        self.assertEqual(C('sol', 'medium', 'gpt-6-sol').role, 'sol_engineer')
+        c=host(current=C('luna','high'),current_sufficient=False)
+        self.assertEqual(plan(S(),c,AUTO).requested_role,'cer_auto_sol61_engineer')
+        roles=dict(c.roles)
+        roles['sol_engineer']=RoleBinding('gpt-6-sol','medium')
+        roles['cer_auto_sol_engineer']=RoleBinding('gpt-6-sol',None)
+        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high'))
+        old=plan(S(),replace(c,roles=roles,catalog=catalog),AUTO,explicit_model='gpt-6-sol')
+        self.assertEqual((old.requested.model,old.requested_role),
+                         ('gpt-6-sol','cer_auto_sol_engineer'))
+
+    def test_sol61_requires_exact_support_before_old_sol_fallback(self):
+        c=host(current=C('luna','high'),current_sufficient=False)
+        roles=dict(c.roles)
+        roles['sol_engineer']=RoleBinding('gpt-6-sol','medium')
+        roles['cer_auto_sol_engineer']=RoleBinding('gpt-6-sol',None)
+        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high'))
+        missing=dict(roles)
+        del missing['sol61_engineer'];del missing['cer_auto_sol61_engineer']
+        self.assertEqual(plan(S(),replace(c,roles=missing,catalog=catalog),AUTO).action,'blocked')
+        unknown=dict(catalog);del unknown['gpt-6.1-sol']
+        self.assertEqual(plan(S(),replace(c,roles=roles,catalog=unknown),AUTO).action,'blocked')
+        observed=replace(c,roles=roles,catalog=catalog,
+                         unavailable_models={'gpt-6.1-sol':'host rejected selected model'})
+        selected=plan(S(),observed,AUTO)
+        self.assertEqual((selected.requested.model,selected.requested_role),
+                         ('gpt-6-sol','cer_auto_sol_engineer'))
+
     def test_task_difficulty_selects_model_and_explicit_effort_without_root_inheritance(self):
         cases=(
             (MECHANICAL,C('luna','high')),
@@ -47,7 +79,7 @@ class AutomaticBindingTests(unittest.TestCase):
 
     def test_explicit_spawn_fields_only_for_admitted_delegation(self):
         fixed=plan(S(),host(host_can_set_effort=False),AUTO)
-        self.assertEqual(dispatch_arguments(fixed),dict(agent_type='sol_engineer',fork_turns='none'))
+        self.assertEqual(dispatch_arguments(fixed),dict(agent_type='sol61_engineer',fork_turns='none'))
         for d in (plan(S(),host(worker_active=True),AUTO),
                   plan(S(no_subagents=True),host(),AUTO),
                   plan(S(failed_attempts=2),host(),AUTO)):
@@ -56,30 +88,30 @@ class AutomaticBindingTests(unittest.TestCase):
     def test_native_effort_chooses_alias_and_explicit_pair(self):
         d = plan(S(), host(), AUTO)
         self.assertEqual((d.action, d.requested_role, d.binding_kind, d.requested),
-                         ('delegate', 'cer_auto_sol_engineer', 'adaptive', C('sol','medium')))
+                         ('delegate', 'cer_auto_sol61_engineer', 'adaptive', C('sol','medium')))
 
     def test_no_effort_field_uses_exact_fixed_binding(self):
         d = plan(S(), host(host_can_set_effort=False), AUTO)
         self.assertEqual((d.action,d.requested_role,d.binding_kind,d.requested),
-                         ('delegate','sol_engineer','fixed',C('sol','medium')))
+                         ('delegate','sol61_engineer','fixed',C('sol','medium')))
 
     def test_missing_alias_is_not_a_reason_to_reinstall(self):
-        c=host(); roles=dict(c.roles); del roles['cer_auto_sol_engineer']
+        c=host(); roles=dict(c.roles); del roles['cer_auto_sol61_engineer']
         d=plan(S(),replace(c,roles=roles),AUTO)
-        self.assertEqual(d.requested_role,'sol_engineer')
+        self.assertEqual(d.requested_role,'sol61_engineer')
 
     def test_bad_alias_can_use_verified_fixed_binding(self):
-        for bad in (RoleBinding('wrong-model',None),RoleBinding('gpt-5.6-sol','medium'),
-                    RoleBinding('gpt-6-sol','medium')):
-            c=host(); roles=dict(c.roles); roles['cer_auto_sol_engineer']=bad
+        for bad in (RoleBinding('wrong-model',None),RoleBinding('gpt-6-sol',None),
+                    RoleBinding('gpt-6.1-sol','medium')):
+            c=host(); roles=dict(c.roles); roles['cer_auto_sol61_engineer']=bad
             d=plan(S(),replace(c,roles=roles),AUTO)
-            self.assertEqual(d.requested_role,'sol_engineer')
+            self.assertEqual(d.requested_role,'sol61_engineer')
             self.assertEqual(d.binding_kind,'fixed')
 
     def test_bad_compatibility_binding_cannot_fake_selected_pair(self):
-        for bad in (RoleBinding('wrong-model','medium'),RoleBinding('gpt-6-sol','low'),
-                    RoleBinding('gpt-6-sol',None)):
-            c=host(host_can_set_effort=False); roles=dict(c.roles); roles['sol_engineer']=bad
+        for bad in (RoleBinding('wrong-model','medium'),RoleBinding('gpt-6-sol','medium'),
+                    RoleBinding('gpt-6.1-sol','low'),RoleBinding('gpt-6.1-sol',None)):
+            c=host(host_can_set_effort=False); roles=dict(c.roles); roles['sol61_engineer']=bad
             d=plan(S(),replace(c,roles=roles),AUTO, explicit_effort='medium')
             self.assertEqual(d.action,'blocked'); self.assertIsNone(d.requested)
 
@@ -115,13 +147,13 @@ class AutomaticBindingTests(unittest.TestCase):
             self.assertEqual(d.action,'local');self.assertIsNone(d.requested_role)
 
     def test_failed_alias_not_reprobed_then_failed_fallback_stops(self):
-        c=host(unavailable_roles=frozenset(('cer_auto_sol_engineer',)))
-        self.assertEqual(plan(S(),c,AUTO).requested_role,'sol_engineer')
-        c=replace(c,unavailable_roles=frozenset(('cer_auto_sol_engineer','sol_engineer')))
+        c=host(unavailable_roles=frozenset(('cer_auto_sol61_engineer',)))
+        self.assertEqual(plan(S(),c,AUTO).requested_role,'sol61_engineer')
+        c=replace(c,unavailable_roles=frozenset(('cer_auto_sol61_engineer','sol61_engineer')))
         self.assertEqual(plan(S(),c,AUTO,explicit_effort='medium').action,'blocked')
 
     def test_unknown_active_worker_prevents_replay_to_other_binding(self):
-        d=plan(S(),host(worker_active=True,unavailable_roles=frozenset(('cer_auto_sol_engineer',))),AUTO)
+        d=plan(S(),host(worker_active=True,unavailable_roles=frozenset(('cer_auto_sol61_engineer',))),AUTO)
         self.assertEqual(d.action,'defer');self.assertIsNone(d.requested_role)
 
     def test_low_is_opt_in_no_unsupported_compatibility_remap(self):
@@ -157,7 +189,8 @@ class AutomaticBindingTests(unittest.TestCase):
 
     def test_confirmed_new_model_failure_can_use_exact_legacy_binding(self):
         c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6-sol':'host rejected selected model'})
+               unavailable_models={'gpt-6.1-sol':'host rejected selected model',
+                                   'gpt-6-sol':'host rejected older model'})
         roles=dict(c.roles)
         roles['cer_auto_sol_engineer']=RoleBinding('gpt-5.6-sol',None)
         roles['sol_engineer']=RoleBinding('gpt-5.6-sol','medium')
@@ -172,17 +205,21 @@ class AutomaticBindingTests(unittest.TestCase):
         roles=dict(c.roles)
         roles['cer_auto_sol_engineer']=RoleBinding('gpt-5.6-sol',None)
         roles['sol_engineer']=RoleBinding('gpt-5.6-sol','medium')
+        del roles['cer_auto_sol61_engineer'];del roles['sol61_engineer']
         catalog=dict(c.catalog);catalog['gpt-5.6-sol']=frozenset(('medium',))
         self.assertEqual(plan(S(),replace(c,roles=roles,catalog=catalog),AUTO).action,'blocked')
         c=replace(c,roles=roles,catalog=catalog,
-                  unavailable_models={'gpt-6-sol':'host rejected selected model'},keep_model=True)
+                  unavailable_models={'gpt-6.1-sol':'host rejected selected model',
+                                      'gpt-6-sol':'host rejected older model'},keep_model=True)
         self.assertEqual(plan(S(),c,AUTO).action,'blocked')
 
     def test_complex_sol_never_falls_back_to_terra(self):
         s=S(reasoning_bound=False,coupling=2)
         c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6-sol':'host rejected selected model'})
+               unavailable_models={'gpt-6.1-sol':'host rejected selected model',
+                                   'gpt-6-sol':'host rejected older model'})
         roles=dict(c.roles)
+        del roles['cer_auto_sol61_engineer'];del roles['sol61_engineer']
         del roles['cer_auto_sol_engineer'];del roles['sol_engineer']
         catalog=dict(c.catalog);catalog['gpt-5.6-terra']=frozenset(('medium','high'))
         self.assertEqual(plan(s,replace(c,roles=roles,catalog=catalog),AUTO).action,'blocked')
@@ -193,7 +230,7 @@ class AutomaticBindingTests(unittest.TestCase):
                      change_event='classified_failure',failure_kind='environment')
         decision=plan(new_duties,context,AUTO)
         self.assertEqual(decision.requested,C('sol','high'))
-        self.assertEqual(decision.requested_role,'cer_auto_sol_engineer')
+        self.assertEqual(decision.requested_role,'cer_auto_sol61_engineer')
         retained=host(current=C('sol','high'),current_sufficient=True,benefit_clear=False,
                       change_event='classified_failure',failure_kind='environment')
         self.assertEqual(plan(new_duties,retained,AUTO).action,'local')
@@ -208,7 +245,8 @@ class AutomaticBindingTests(unittest.TestCase):
             coordinator_contract_verified=True, single_coordinator=True,
             capacity_available=True, shared_limits_retained=True)
         c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6-sol':'unavailable','gpt-5.6-sol':'unavailable'})
+               unavailable_models={'gpt-6.1-sol':'unavailable','gpt-6-sol':'unavailable',
+                                   'gpt-5.6-sol':'unavailable'})
         catalog=dict(c.catalog);catalog['gpt-5.6-terra']=frozenset(('medium','high','ultra'))
         self.assertEqual(plan(S(),replace(c,catalog=catalog),AUTO,
                               automatic_effort='ultra',effort_evidence=evidence).action,'blocked')

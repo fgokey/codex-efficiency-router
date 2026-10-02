@@ -93,10 +93,10 @@ class EffortObservationTests(unittest.TestCase):
 
     def test_legacy_mismatch_state_cannot_be_overwritten_without_review(self):
         c=context(last_observation='MISMATCH')
-        next_c=record_observation(c,C('sol','high'),'gpt-6-sol','high')
+        next_c=record_observation(c,C('sol','high','gpt-6-sol'),'gpt-6-sol','high')
         self.assertEqual(plan(S(),next_c,ADAPTIVE).action,'prerequisite')
         resolved=self.resolve(c)
-        later=record_observation(resolved,C('sol','high'),'gpt-6-sol','high')
+        later=record_observation(resolved,C('sol','high','gpt-6-sol'),'gpt-6-sol','high')
         self.assertTrue(later.automatic_low_suspended)
         self.assertEqual(later.observation_review,'resolved')
 

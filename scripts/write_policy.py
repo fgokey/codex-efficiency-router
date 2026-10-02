@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 OPERATIONS = ('reasoning', 'read', 'coordinate', 'local_patch', 'mutation', 'unknown')
 ASTRA_WRITE_REASONS = ('none', 'qualified_executor_failure', 'critical_context_loss')
-EXECUTOR_MODELS = frozenset(('gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol',
+EXECUTOR_MODELS = frozenset(('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol',
                              'gpt-5.6-terra', 'gpt-5.6-luna'))
 
 

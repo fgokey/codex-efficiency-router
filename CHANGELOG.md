@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.0 — 2026-10-02
+
+- Default new Sol work to a distinct GPT-6.1 Sol/medium binding while retaining GPT-6 Sol exact pins and evidence-backed fallback in the same Sol lane. Auto installs five fixed roles and five aliases.
+- Keep exact model/effort/catalog checks, Ultra authorization, write guards and safe installation ownership for both Sol generations. The optional defaults template selects 6.1 without changing user configuration.
+
 ## 0.7.1 — 2026-09-30
 
 - Add installed reader `excerpt` for a known line range in one snapshot and `locate` for bounded literal path/line candidates. Keep cursor paging for long ranges and complete rules.

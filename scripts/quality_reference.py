@@ -107,7 +107,7 @@ def mutation_action(*, observed_model: str | None, read_only: bool, binding_matc
         return 'BLOCKED'
     if observed_model is None:
         return 'BLOCKED'
-    executor = observed_model in ('gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol',
+    executor = observed_model in ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol',
                                   'gpt-5.6-terra', 'gpt-5.6-luna')
     if read_only or not binding_match or binding_invalidators or not executor:
         return 'REROUTE'

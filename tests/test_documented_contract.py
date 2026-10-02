@@ -29,8 +29,8 @@ class DocumentedContractTests(unittest.TestCase):
                     for option in re.findall(r'--[a-z][a-z0-9-]*', rest):
                         self.assertIn(option, accepted, f'{filename}: {script}.py {option}')
 
-    def test_exactly_four_roles_match_readme_and_core(self):
-        self.assertEqual(len(EXPECTED), 4)
+    def test_exactly_five_roles_match_readme_and_core(self):
+        self.assertEqual(len(EXPECTED), 5)
         self.assertEqual(set(p.name for p in (ROOT / 'agents').glob('*.toml')), set(EXPECTED))
         for filename, (role, model, effort) in EXPECTED.items():
             data = tomllib.loads((ROOT / 'agents' / filename).read_text())

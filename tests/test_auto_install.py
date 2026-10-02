@@ -32,11 +32,20 @@ class AutomaticInstallTests(unittest.TestCase):
                 for p in d.rglob('*') if p.is_file()}
     def backup(self):return sorted(p for p in self.backups.iterdir() if p.is_dir())[-1]
     def manifest(self):return json.loads((self.skill/MANIFEST).read_text())
+    def prior_sol_inventory(self):
+        # Model the 0.7.1-owned 16 paths without depending on Git history.
+        self.install()
+        m=self.manifest()
+        for name in ('sol61-engineer.toml','cer-auto-sol61-engineer.toml'):
+            (self.agents/name).unlink()
+            del m['files']['agents/'+name]
+        m['version']='0.7.1'
+        (self.skill/MANIFEST).write_text(json.dumps(m))
 
     def test_plain_install_marks_auto_bindings_for_native_discovery(self):
         self.install()
         self.assertEqual(self.manifest()['mode'],'auto')
-        self.assertEqual(len(list(self.agents.glob('*.toml'))),8)
+        self.assertEqual(len(list(self.agents.glob('*.toml'))),10)
         self.assertEqual(doctor.validate_tree(self.skill/'SKILL.md',self.agents,Profile('auto')),[])
         for name,(role,model,effort) in EXPECTED.items():
             fixed=tomllib.loads((self.agents/name).read_text())
@@ -50,6 +59,35 @@ class AutomaticInstallTests(unittest.TestCase):
     def test_plain_reinstall_is_noop(self):
         self.install();before=self.state();backup=self.backup()
         self.install();self.assertEqual(self.state(),before);self.assertEqual(self.backup(),backup)
+
+    def test_071_inventory_adds_both_sol61_roles_with_backup_and_restore(self):
+        self.prior_sol_inventory()
+        before=self.state();old_backup=self.backup()
+        self.assertEqual(len(self.manifest()['files']),16)
+        self.install(dry_run=True)
+        self.assertEqual(self.state(),before);self.assertEqual(self.backup(),old_backup)
+        self.install()
+        self.assertEqual(self.manifest()['version'],'0.8.0')
+        self.assertEqual(len(self.manifest()['files']),18)
+        self.assertEqual(len(list(self.agents.glob('*.toml'))),10)
+        backup=self.backup()
+        self.assertNotEqual(backup,old_backup)
+        manage.restore(backup,'project',self.root)
+        self.assertEqual(self.state(),before)
+
+    def test_071_inventory_refuses_new_unowned_or_changed_old_role(self):
+        self.prior_sol_inventory()
+        new=self.agents/'sol61-engineer.toml'
+        new.write_text('private role')
+        before=self.state()
+        with self.assertRaises(ValueError):self.install(force=True)
+        self.assertEqual(self.state(),before)
+        new.unlink()
+        old=self.agents/'sol-engineer.toml'
+        old.write_bytes(old.read_bytes()+b'\n# local edit\n')
+        before=self.state()
+        with self.assertRaises(ValueError):self.install()
+        self.assertEqual(self.state(),before)
 
     def test_old_fixed_and_adaptive_plain_update_migrates_with_backup(self):
         for mode in ('fixed','adaptive'):

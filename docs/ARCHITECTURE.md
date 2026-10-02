@@ -1,11 +1,11 @@
 # Architecture — v0.5
 
-One Codex-only Skill with four role responsibilities and generated native bindings and offline maintenance tools. Preserve required correctness and authorization while reducing avoidable reasoning, context and coordination. Monetary cost, tokens and elapsed time are separate; no universal savings or quality guarantee.
+One Codex-only Skill with four role responsibilities, five fixed model bindings, generated native aliases and offline maintenance tools. Preserve required correctness and authorization while reducing avoidable reasoning, context and coordination. Monetary cost, tokens and elapsed time are separate; no universal savings or quality guarantee.
 
 ## Layers
 
 1. The current coordinator reads the compact Skill and only needed references: routing, dispatch, effort, quality. No classifier inference, per-turn script or mandatory ledger.
-2. Four canonical roles retain models, policy and permissions. Auto also generates four unpinned aliases; native capabilities choose one binding per child. No runtime file switch or duplicate workers. Leaves do not delegate except one parent-authorized Ultra Sol/Astra coordinator for disjoint leaf units; no recursive/duplicate Router, and Astra subtrees stay read-only. Parent owns requirements/integration.
+2. Five canonical roles retain models, policy and permissions. Auto also generates five unpinned aliases; native capabilities choose one binding per child. No runtime file switch or duplicate workers. Leaves do not delegate except one parent-authorized Ultra Sol/Astra coordinator for disjoint leaf units; no recursive/duplicate Router, and Astra subtrees stay read-only. Parent owns requirements/integration.
 3. Offline tools generate/install profiles, validate structure, compare supplied runs and test reference rules. They are not a live dispatcher or enforcement layer and are not installed as runtime scripts.
 
 ## Joint selection and acceptance
@@ -18,7 +18,7 @@ Only long tasks/recovery need one permitted task checkpoint. Keep failed approac
 
 ## Generation and ownership
 
-Canonical `agents/*.toml` is fixed. Auto derives unpinned aliases and installs eight bindings from four definitions. The parent picks the alias when native explicit effort works or the exact fixed pair otherwise. New and legacy ordinary installs use auto; v0.5+ explicit overrides survive updates. Manifest/backup ownership covers aliases and original files; no credentials or runtime probes.
+Canonical `agents/*.toml` is fixed. Auto derives unpinned aliases and installs ten bindings from five definitions. The parent picks the alias when native explicit effort works or the exact fixed pair otherwise. New and legacy ordinary installs use auto; v0.5+ explicit overrides survive updates. Manifest/backup ownership covers aliases and original files; no credentials or runtime probes.
 
 Hash ownership, collision checks, local-edit detection, backups and ordinary-failure rollback remain. Uninstall removes only owned files; restore is explicit. Per-file atomic replacement is not multi-directory power-loss atomicity. [Lifecycle](INSTALL.md) · [Security](../SECURITY.md).
 

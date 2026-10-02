@@ -10,6 +10,7 @@ from effort_reference import (Configuration as C, Context, EffortEvidence, RoleB
                               plan, recommend, check_observation)
 from policy_reference import TaskSignals as S
 from profiles import Profile
+from package import EXPECTED
 
 ADAPTIVE = Profile('adaptive')
 MECHANICAL = S(mechanical=True, uncertainty=0, risk=1, coupling=0, verifiability=3)
@@ -21,9 +22,9 @@ ASTRA = S(uncertainty=3, risk=3, coupling=2)
 def context(**overrides):
     args = dict(current=C('sol', 'medium'), current_sufficient=False,
                 host_supports_routing=True, host_can_set_effort=True,
-                roles={r: RoleBinding(m, None) for r, m, _ in PRESETS.values()},
+                roles={r: RoleBinding(m, None) for r, m, _ in EXPECTED.values()},
                 catalog={m: frozenset(('low', 'medium', 'high', 'xhigh', 'max'))
-                         for _, m, _ in PRESETS.values()},
+                         for _, m, _ in EXPECTED.values()},
                 safe_boundary=True)
     args.update(overrides)
     return Context(**args)
@@ -154,12 +155,13 @@ class EffortPolicyTests(unittest.TestCase):
             self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
 
     def test_configuration_normalizes_default_model_but_legacy_identity_remains_distinct(self):
-        self.assertEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6-sol'))
+        self.assertEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6.1-sol'))
+        self.assertNotEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6-sol'))
         self.assertNotEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-5.6-sol'))
 
     def test_exact_legacy_pin_is_preserved_and_unavailable_pin_fails_closed(self):
         old = C('sol', 'medium', 'gpt-5.6-sol')
-        roles = {PRESETS['sol'][0]: RoleBinding(old.model, None)}
+        roles = {EXPECTED['sol-engineer.toml'][0]: RoleBinding(old.model, None)}
         catalog = {old.model: frozenset(('medium', 'high'))}
         c = context(current=C('luna', 'high'), roles=roles, catalog=catalog)
         result = plan(S(), c, ADAPTIVE, explicit_model=old.model)
@@ -206,7 +208,7 @@ class EffortPolicyTests(unittest.TestCase):
 
     def test_model_lock_keeps_legacy_sol_while_effort_increases(self):
         old = 'gpt-5.6-sol'
-        bindings = {PRESETS['sol'][0]: RoleBinding(old, None)}
+        bindings = {EXPECTED['sol-engineer.toml'][0]: RoleBinding(old, None)}
         catalog = {old: frozenset(('medium', 'high'))}
         c = context(current=C('sol', 'medium', old), current_sufficient=False,
                     keep_model=True, roles=bindings, catalog=catalog)
@@ -245,7 +247,7 @@ class EffortPolicyTests(unittest.TestCase):
             coordinator_authorized=True,coordinator_contract_verified=True,single_coordinator=True,
             capacity_available=True,shared_limits_retained=True)
         c=context(current=C('luna','high'),current_sufficient=False)
-        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        catalog=dict(c.catalog);catalog['gpt-6.1-sol']=frozenset(('medium','high','ultra'))
         result=plan(SOL,replace(c,catalog=catalog),ADAPTIVE,
                     automatic_effort='ultra',effort_evidence=evidence)
         self.assertEqual(result.requested,C('sol','ultra'))
@@ -270,13 +272,13 @@ class EffortPolicyTests(unittest.TestCase):
                               automatic_effort='ultra',effort_evidence=evidence).action,'blocked')
         self.assertEqual(plan(SOL,c,ADAPTIVE,automatic_effort='ultra',
                               effort_evidence=evidence).action,'blocked')
-        catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        catalog['gpt-6.1-sol']=frozenset(('medium','high','ultra'))
         self.assertEqual(plan(replace(SOL,no_subagents=True),replace(c,catalog=catalog),ADAPTIVE,
                               automatic_effort='ultra',effort_evidence=evidence).action,'blocked')
 
     def test_explicit_ultra_does_not_grant_coordinator_authority(self):
         c=context(current=C('luna','high'),current_sufficient=False)
-        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high','ultra'))
+        catalog=dict(c.catalog);catalog['gpt-6.1-sol']=frozenset(('medium','high','ultra'))
         c=replace(c,catalog=catalog)
         self.assertEqual(plan(SOL,c,ADAPTIVE,explicit_effort='ultra').action,'blocked')
         evidence=EffortEvidence(independent_units=2,disjoint_ownership=True,net_benefit=True,

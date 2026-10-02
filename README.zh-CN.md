@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.7.1 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.0：GPT-6.1 Sol 绑定
+
+普通 Sol 新任务默认选 `gpt-6.1-sol`/medium；独立的 `gpt-6-sol` 角色保留精确钉选及有证据的回退。新别名缺失或宿主目录未知时，不会悄悄转到旧模型。两代标准 API 输入/输出单价相同，但缓存输入分别为 [6.1 的每百万 $0.10](https://developers.openai.com/api/docs/models/gpt-6.1-sol) 和 [6 的 $0.20](https://developers.openai.com/api/docs/models/gpt-6-sol)；不据此推断实际任务总费用。宿主目录可能额外支持 Ultra，仍受原有授权门槛约束。
 
 ## v0.7.1：定位与范围读取
 
@@ -192,10 +196,11 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `medium` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-自动模式从这四份源定义生成四个 `cer_auto_<角色名>` 自适应别名，加上四个固定兼容角色，共 **8 个小型 TOML 文件、4 种职责**。这不是 8 个同时运行的代理，也不增加模型等级；别名增加一段简短的自动档位发现标记、改变名称并去掉档位固定，模型、指令及权限保持一致。新增发现文本会占用少量宿主上下文，不宣称零开销。
+自动模式从这五份源定义生成五个 `cer_auto_<角色名>` 自适应别名，加上五个固定兼容角色，共 **10 个小型 TOML 文件、4 种职责**。这不是 10 个同时运行的代理，也不增加模型等级；别名增加一段简短的自动档位发现标记、改变名称并去掉档位固定，模型、指令及权限保持一致。新增发现文本会占用少量宿主上下文，不宣称零开销。
 
 普通工作使用 Sol/medium；聚焦低风险代码使用 Luna/high，确定性转换可用 Luna/medium。自动 low 仍需主动开启。父代理自动选择 XHigh/Max 时必须记录瓶颈、High 不足及额外档位价值；Ultra 还需精确 Sol/Astra 支持和一个获授权协调者管理互斥叶子任务及共享边界，显式 Ultra 不会自动授予协调权。不强制逐档试错，不静默替代，也不重置失败预算。旧 GPT-5.6 Sol/Luna/Terra 保留为精确显式/回退选项。
 

@@ -5,7 +5,7 @@ description: Quality-gated Codex routing; Astra for hard decisions and rare boun
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.7.1 -->
+<!-- CER version: 0.8.0 -->
 
 Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
@@ -31,7 +31,8 @@ Route on phase/evidence/failure/user changes, not each tool. Keep requirement/un
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` / high | Focused low-risk code; data transforms medium |
 | `terra_executor` | `gpt-5.6-terra` / medium | Legacy explicit/fallback |
-| `sol_engineer` | `gpt-6-sol` / medium | Ordinary work, diagnosis, integration |
+| `sol61_engineer` | `gpt-6.1-sol` / medium | Default Sol |
+| `sol_engineer` | `gpt-6-sol` / medium | Pin/fallback |
 | `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
 
 Select model AND effort via `cer_auto_<role>`; read effort. Avoidable base role is MISMATCH. Exact pins win; fallback needs supported exact pair and observed model unavailability. Legacy `gpt-5.6-sol/luna`: explicit/fallback only. Low opt-in; higher efforts need evidence/support. Ultra: one Sol/Astra coordinator, disjoint leaves, shared limits; no duplicate/recursion. Read routing for Astra admission; parent accepts.
@@ -54,6 +55,6 @@ Check requirements/correctness, repo checks/reproduction; new tests are not inde
 
 ## Context and reporting
 
-Read references at trigger; reread when stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
+Read references on trigger/stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-Only CLI reads capped. For other tools cap total output below outer incl framing; index unknowns, capture/serialize fields+cursor, emit one page. Inner/item/line limits fail. Resume gaps; shrink batch; disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or router copy to children. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay.
+CLI reads capped. For other tools cap total output below outer incl framing; index unknowns, capture/serialize fields+cursor, emit one page. Inner/item/line limits fail. Resume gaps; shrink batch; disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay.

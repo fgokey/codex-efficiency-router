@@ -14,19 +14,26 @@ from profiles import Profile
 from write_policy import OPERATIONS, WriteScope, before_action, diagnostic_action
 
 EFFORTS = ("low", "medium", "high", "xhigh", "max", "ultra")
-PRESETS = {model.rsplit("-", 1)[-1]: (role, model, effort)
-           for role, model, effort in EXPECTED.values()}
+PRESETS = {
+    "luna": EXPECTED["luna-worker.toml"],
+    "terra": EXPECTED["terra-executor.toml"],
+    "sol": EXPECTED["sol61-engineer.toml"],
+    "astra": EXPECTED["astra-architect.toml"],
+}
+MODEL_ROLES = {model: role for role, model, _ in EXPECTED.values()}
+MODEL_ROLES["gpt-5.6-sol"] = EXPECTED["sol-engineer.toml"][0]
 MODEL_LANES = {
     "gpt-6-luna": "luna",
     "gpt-5.6-luna": "luna",
     "gpt-5.6-terra": "terra",
+    "gpt-6.1-sol": "sol",
     "gpt-6-sol": "sol",
     "gpt-5.6-sol": "sol",
     "gpt-6-astra": "astra",
 }
 LEGACY_FALLBACKS = {
     "luna": ("gpt-5.6-luna",),
-    "sol": ("gpt-5.6-sol", "gpt-5.6-terra"),
+    "sol": ("gpt-6-sol", "gpt-5.6-sol", "gpt-5.6-terra"),
 }
 EVENTS = ("initial", "phase", "evidence", "classified_failure", "user", "none")
 
@@ -51,7 +58,7 @@ class Configuration:
 
     @property
     def role(self) -> str:
-        return PRESETS[self.lane][0]
+        return MODEL_ROLES.get(self.model, PRESETS[self.lane][0])
 
 
 @dataclass(frozen=True)

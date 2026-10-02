@@ -4,7 +4,7 @@ Copyable commands for Windows and macOS/Linux are in [README](../README.md#insta
 
 ## What is installed
 
-The complete Skill directory, including four progressive references and UI metadata, plus four canonical roles and, in default auto, four generated native aliases. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
+The complete Skill directory, including four progressive references and UI metadata, plus five canonical roles and, in default auto, five generated native aliases. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
 
 Select either user scope or one explicit existing project root. Keep the repository clone to update/uninstall. `$CODEX_HOME` changes user agent and backup locations, not `~/.agents/skills`. Use the same scope, project and environment for subsequent operations. A project-root flag without project scope is rejected.
 
@@ -32,11 +32,11 @@ Uninstall reads the manifest, checks modifications, backs up affected bytes, rem
 
 ## Automatic default and advanced compatibility
 
-Ordinary `install.py` needs no mode flag. Auto installs four pinned roles and four generated unpinned aliases; parent selection uses only one per child. Pre-v0.5 manifests migrate to auto with a printed notice; backups preserve the old mode and user edits still stop replacement. Old manifests cannot identify deliberate mode preference. A v0.5+ explicit override is persisted with profile schema 2 and respected on updates.
+Ordinary `install.py` needs no mode flag. Auto installs five pinned roles and five generated unpinned aliases; parent selection uses only one per child. Pre-v0.5 manifests migrate to auto with a printed notice; backups preserve the old mode and user edits still stop replacement. Old manifests cannot identify deliberate mode preference. A v0.5+ explicit override is persisted with profile schema 2 and respected on updates.
 
 Advanced compatibility only (not required for normal use): `--mode fixed`, `--mode adaptive` or `--mode auto`. Existing fixed/adaptive automation remains supported. `--allow-low` is optional and separately gated; `--no-allow-low` disables it. Fixed cannot enable low. These options do not inspect credentials or prove native host capability.
 
-Explicit restore retains the original mode/bytes, including legacy manifests; it does not migrate them. Auto uninstall removes all eight owned bindings, not unrelated aliases or user files. Switching an advanced override removes obsolete owned aliases safely. A collision on any generated filename blocks before writes, even with force.
+Explicit restore retains the original mode/bytes, including legacy manifests; it does not migrate them. Auto uninstall removes all ten owned bindings, not unrelated aliases or user files. Switching an advanced override removes obsolete owned aliases safely. A collision on any generated filename blocks before writes, even with force.
 
 Python CLI flags are canonical. PowerShell wrappers forward `--scope`, `--dry-run`, etc., not PowerShell-style aliases. There is no `--no-restore`; restoration is `install.py --restore`. Actual dynamic-vs-compatibility selection needs no configuration change. See [acceptance](ACCEPTANCE.md).
 

@@ -120,7 +120,7 @@ def instruction_footprint(skill_file: Path, agent_dir: Path, profile: Profile = 
     """Measure validated source text, never infer tokenizer counts or host billing.
 
     Full text includes the core once and one separator per reference. Role values
-    are separate prompts, NOT four agents that necessarily run or a task total.
+    are separate prompts, NOT five agents that necessarily run or a task total.
     Called only by explicit doctor, not on activation, dispatch or tool events.
     """
     core = skill_file.read_text(encoding="utf-8")

@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.7.1 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.0: GPT-6.1 Sol binding
+
+New ordinary Sol work defaults to `gpt-6.1-sol`/medium. The separate `gpt-6-sol` role remains available for exact pins and evidence-backed fallback; neither an unavailable new alias nor an unknown catalog silently selects the older model. Standard API input/output prices are equal for these two models, while cached input is [$0.10 per million for 6.1](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and [$0.20 for 6](https://developers.openai.com/api/docs/models/gpt-6-sol); actual task cost is unmeasured. The live host catalog may offer Ultra beyond the API page's listed effort settings, subject to the existing Ultra authorization gate.
 
 ## v0.7.1: locate and excerpt
 
@@ -220,10 +224,11 @@ Only one binding is selected per child. No model calls just to probe capability,
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `medium` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-Auto generates four `cer_auto_<role>` unpinned aliases alongside the four fixed bindings: **eight small TOML files, four responsibilities**, not eight running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
+Auto generates five `cer_auto_<role>` unpinned aliases alongside the five fixed bindings: **ten small TOML files, four responsibilities**, not ten running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
 
 Ordinary work uses Sol/medium; focused low-risk code uses Luna/high, while deterministic conversion may use Luna/medium. Automatic low stays opt-in. Parent-selected XHigh/Max requires reviewed bottleneck, High-limit and value evidence. Ultra also requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work with shared bounds; explicit Ultra does not grant that authority. No mandatory ladder or silent substitute. Legacy GPT-5.6 Sol/Luna/Terra remain exact explicit/fallback options.
 
