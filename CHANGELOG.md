@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 — 2026-10-04
+
+- Let `page` omit its cursor for the first full-file page, so small rules need one call. Keep existing index/range cursors, the 4096-byte envelope and fail-closed file identity checks.
+- Point Skill and role instructions to the direct first page; retain explicit invalid-cursor rejection.
+
 ## 0.8.0 — 2026-10-02
 
 - Default new Sol work to a distinct GPT-6.1 Sol/medium binding while retaining GPT-6 Sol exact pins and evidence-backed fallback in the same Sol lane. Auto installs five fixed roles and five aliases.

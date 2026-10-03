@@ -174,6 +174,92 @@ class NativeGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'cursor size'):
             reader['cursor_token'](identity,0,0,1)
 
+    def test_reader_page_without_cursor_reads_small_and_empty_files_once(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        for raw in (b'', 'small 汉🙂\\\"\r\nlast\n'.encode('utf-8')):
+            with self.subTest(raw=raw):
+                self.file.write_bytes(raw)
+                before=(self.file.read_bytes(),self.file.stat().st_mtime_ns)
+                result=subprocess.run([*cli,'page',*common],capture_output=True,timeout=10)
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertLessEqual(len(result.stdout)+len(result.stderr)+1,4096)
+                value=json.loads(result.stdout)
+                self.assertEqual(value['op'],'page')
+                self.assertEqual(value['data'],raw.decode('utf-8'))
+                self.assertIsNone(value['next_cursor'])
+                request={'op':'page','path':'sentinel.txt'}
+                self.assertEqual(json.loads(reader['run'](self.root,request)),value)
+                self.assertEqual((self.file.read_bytes(),self.file.stat().st_mtime_ns),before)
+
+    def test_reader_page_without_cursor_continues_exactly_and_rejects_changed_file(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        expected=('汉🙂\\\"\r\n'*1500)+'tail'
+        self.file.write_bytes(expected.encode('utf-8'))
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        result=subprocess.run([*cli,'page',*common],capture_output=True,timeout=10)
+        pieces=[]
+        first=None
+        for _ in range(30):
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertLessEqual(len(result.stdout)+len(result.stderr)+1,4096)
+            value=json.loads(result.stdout)
+            pieces.append(value['data'])
+            cursor=value['next_cursor']
+            if first is None:
+                first=cursor
+            if cursor is None:
+                break
+            result=subprocess.run([*cli,'page',*common,'--cursor',cursor],
+                                  capture_output=True,timeout=10)
+        else:
+            self.fail('first-page cursor did not terminate')
+        self.assertGreaterEqual(len(pieces),2)
+        self.assertEqual(''.join(pieces),expected)
+        self.assertIsNotNone(first)
+        index=json.loads(reader['run'](self.root,{'op':'index','path':'sentinel.txt'}))
+        old=json.loads(reader['run'](self.root,{'op':'page','path':'sentinel.txt',
+                                              'cursor':index['cursor']}))
+        self.assertEqual(old['data'],pieces[0])
+        before=self.file.stat()
+        self.file.write_bytes(expected.replace('tail','fail').encode('utf-8'))
+        os.utime(self.file,ns=(before.st_atime_ns,before.st_mtime_ns))
+        stale=subprocess.run([*cli,'page',*common,'--cursor',first],
+                             capture_output=True,timeout=10)
+        self.assertEqual(stale.returncode,2)
+        self.assertEqual(stale.stdout,b'')
+        self.assertLessEqual(len(stale.stderr)+1,4096)
+
+    def test_reader_page_first_read_rejects_explicit_bad_cursor_and_invalid_bounds(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        for cursor in ('',None,False,0,[]):
+            with self.subTest(cursor=cursor),self.assertRaises(ValueError):
+                reader['run'](self.root,{'op':'page','path':'sentinel.txt','cursor':cursor})
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        for extra in (['--cursor',''],['--cursor','malformed'],
+                      ['--max-bytes','255'],['--max-bytes','4097'],['--start','1']):
+            with self.subTest(extra=extra):
+                result=subprocess.run([*cli,'page',*common,*extra],capture_output=True,timeout=10)
+                self.assertEqual(result.returncode,2)
+                self.assertEqual(result.stdout,b'')
+                self.assertLessEqual(len(result.stderr)+1,4096)
+        for path in ('../sentinel.txt',str(self.file),'.','sentinel*.txt'):
+            with self.subTest(path=path):
+                result=subprocess.run([*cli,'page','--root',str(self.root),'--path',path],
+                                      capture_output=True,timeout=10)
+                self.assertEqual(result.returncode,2)
+                self.assertEqual(result.stdout,b'')
+                self.assertLessEqual(len(result.stderr)+1,4096)
+        for raw in (b'\xff',b'x'*(16*1024*1024+1)):
+            self.file.write_bytes(raw)
+            result=subprocess.run([*cli,'page',*common],capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,2)
+            self.assertEqual(result.stdout,b'')
+            self.assertLessEqual(len(result.stderr)+1,4096)
+
     def test_reader_cli_gbk_environment_and_exact_cap(self):
         self.file.write_text('汉🙂\\"'*1500,encoding='utf-8')
         cli=[sys.executable,'-B',str(ROOT/'hooks/readonly_reader.py')]

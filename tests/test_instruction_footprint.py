@@ -83,8 +83,8 @@ class InstructionFootprintTests(unittest.TestCase):
                        'handoff both paths',
                        'excerpt --root ABS --path FILE --start N --lines N',
                        'locate --root ABS --path DIR --query Q',
-                       '`page` same root/path, `--cursor TOKEN`',
-                       '`index` without range, page to null', 'one <=4096B page',
+                       '`page --root ABS --path FILE`',
+                       'same root/path `--cursor TOKEN` to null', 'one <=4096B page',
                        'never read whole files to slice or combine pages/files',
                        'CLI reads capped', 'total output below outer incl framing',
                        'capture/serialize fields+cursor', 'emit one page',
@@ -93,7 +93,7 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
             phrases = ('Use handed-off Python -I -B <reader>',
-                       'excerpt known, locate unknown, index/page full rules',
+                       'excerpt known, locate unknown, page full rules',
                        'one page, no full-file slicing/merging',
                        'Other tools total <outer incl framing')
             for phrase in phrases:

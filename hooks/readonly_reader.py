@@ -16,7 +16,7 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.8.0'
+VERSION = '0.8.1'
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
@@ -34,8 +34,9 @@ HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
     excluding .git,node_modules,dist,build,.next,temp. PARTIAL means narrow scope.
   index --root ABS --path RELFILE [--start N --lines N] [--max-bytes N]
     Returns cursor, size and SHA; omit range for complete rules/full-file reads.
-  page --root ABS --path RELFILE --cursor TOKEN [--max-bytes N]
-    Repeats until next_cursor is null; rejects changed files or stale cursors.
+  page --root ABS --path RELFILE [--cursor TOKEN] [--max-bytes N]
+    Omit cursor for the first full-file page. Continue until next_cursor is null;
+    rejects changed files or stale cursors.
 Paths are literal and relative to ABS. max-bytes is 256..4096, default 4096.
 Use a verified Python executable with -I -B and this script for repeated reads.
 """
@@ -109,8 +110,9 @@ def validate(request: object) -> dict:
         cap = request.get('max_bytes', PAGE_BYTES)
         if type(cap) is not int or not 256 <= cap <= PAGE_BYTES:
             raise ValueError('max_bytes must be 256..4096')
-        if op == 'page' and (not isinstance(request.get('cursor'), str) or not request['cursor']):
-            raise ValueError('page requires a cursor from index/previous page')
+        if op == 'page' and 'cursor' in request and (not isinstance(request['cursor'], str)
+                                                   or not request['cursor']):
+            raise ValueError('page cursor must be a nonempty string')
         if op == 'index' and ('lines' in request) != ('start' in request):
             raise ValueError('index range requires both start and lines')
         if op == 'excerpt' and not {'start', 'lines'} <= set(request):
@@ -238,7 +240,7 @@ def indexed_page(root: Path, request: dict, path: Path) -> str:
     raw, identity = snapshot(root, path)
     cap = request.get('max_bytes', PAGE_BYTES)
     content = raw.decode('utf-8')  # Never replace invalid bytes or normalize CRLF.
-    if request['op'] in ('index', 'excerpt'):
+    if request['op'] in ('index', 'excerpt') or 'cursor' not in request:
         first, last = 0, len(content)
         if 'start' in request:
             lines = content.splitlines(keepends=True)

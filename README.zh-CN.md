@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.0 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.1 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.1：一次首读
+
+`page --root ABS --path FILE` 一次读完小文件；大文件返回续页游标。4096 字节响应上限和文件变更拒绝保持生效。
 
 ## v0.8.0：GPT-6.1 Sol 绑定
 
@@ -10,7 +14,7 @@
 
 ## v0.7.1：定位与范围读取
 
-已知行号时，用已验证的 Python 直接调用已安装读取器：`python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N`（1–200 行）。未知位置先用 `locate --root ABS --path DIR --query LITERAL` 获取有界的文件/行号候选，不输出正文；`--help` 列出参数。长范围用游标续 `page`；完整规则用无范围 `index` 后读 `page` 至空游标。每次仅输出一页，不整文件分页后截取，也不合并多页/多文件大输出。`cer.ps1 read` 保留便捷入口。定位遵循 rg 默认忽略/隐藏规则，排除常见构建目录及超过 16 MiB 的文件；PARTIAL 要缩小范围。仅经过此读取器的输出受边界保护。
+已知行号时，用已验证的 Python 直接调用已安装读取器：`python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N`（1–200 行）。未知位置先用 `locate --root ABS --path DIR --query LITERAL` 获取有界的文件/行号候选，不输出正文；`--help` 列出参数。长范围用游标续 `page`；完整规则先用 `page --root ABS --path FILE`，仅在 `next_cursor` 非空时续页；原有 `index`/`page` 游标保持兼容。每次仅输出一页，不整文件分页后截取，也不合并多页/多文件大输出。`cer.ps1 read` 保留便捷入口。定位遵循 rg 默认忽略/隐藏规则，排除常见构建目录及超过 16 MiB 的文件；PARTIAL 要缩小范围。仅经过此读取器的输出受边界保护。
 
 ## v0.7.0：随普通 Skill 安装的有界读取器
 

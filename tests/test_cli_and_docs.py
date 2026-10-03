@@ -66,6 +66,11 @@ class CliAndDocsTests(unittest.TestCase):
                 self.assertLessEqual(len(result.stdout) + len(result.stderr), 4096)
                 return result
             common = ("--root", str(project), "--path", "source.txt")
+            (project / "small.txt").write_text("small 汉🙂", encoding="utf-8")
+            first = read("page", "--root", str(project), "--path", "small.txt")
+            self.assertEqual(first.returncode, 0, first.stderr.decode("utf-8", "replace"))
+            self.assertEqual(json.loads(first.stdout)["data"], "small 汉🙂")
+            self.assertIsNone(json.loads(first.stdout)["next_cursor"])
             index = read("index", *common)
             self.assertEqual(index.returncode, 0, index.stderr.decode("utf-8", "replace"))
             cursor = json.loads(index.stdout)["cursor"]

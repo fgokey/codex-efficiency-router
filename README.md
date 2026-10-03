@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.0 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.1 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.1: first page in one call
+
+`page --root ABS --path FILE` reads a complete small file in one call. Larger files return a continuation cursor; the 4096-byte response limit and changed-file rejection still apply.
 
 ## v0.8.0: GPT-6.1 Sol binding
 
@@ -10,7 +14,7 @@ New ordinary Sol work defaults to `gpt-6.1-sol`/medium. The separate `gpt-6-sol`
 
 ## v0.7.1: locate and excerpt
 
-For a known line range, call the installed reader directly with verified Python: `python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N` (1–200 lines). If the location is unknown, use `locate --root ABS --path DIR --query LITERAL` first; it returns bounded path/line candidates, not source text. `--help` lists all options. Continue a long excerpt with `page` and its cursor. Use `index`/ `page` through a null cursor for complete rules. Emit one page at a time; do not read whole files to slice a few lines or combine pages/files into an oversized response. `cer.ps1 read` remains a convenience. Locate respects rg's normal ignore/hidden rules, excludes common build directories and files over 16 MiB; PARTIAL means narrow the search. Only calls through this reader are bounded.
+For a known line range, call the installed reader directly with verified Python: `python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N` (1–200 lines). If the location is unknown, use `locate --root ABS --path DIR --query LITERAL` first; it returns bounded path/line candidates, not source text. `--help` lists all options. Continue a long excerpt with `page` and its cursor. For complete rules, start with `page --root ABS --path FILE` and follow `next_cursor` only when non-null. Existing `index`/`page` cursors remain supported. Emit one page at a time; do not read whole files to slice a few lines or combine pages/files into an oversized response. `cer.ps1 read` remains a convenience. Locate respects rg's normal ignore/hidden rules, excludes common build directories and files over 16 MiB; PARTIAL means narrow the search. Only calls through this reader are bounded.
 
 ## v0.7.0: installed bounded reader
 
