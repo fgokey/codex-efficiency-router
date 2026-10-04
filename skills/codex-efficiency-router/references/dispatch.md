@@ -1,6 +1,6 @@
 # Native dispatch and guard
 
-Only parent-assigned Ultra Sol/Astra leaves may spawn disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority, exact repo/ref/destination/checks; grants none.
+Only parent-assigned Ultra Sol/Astra leaves may spawn disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority, exact repo/ref/destination/checks; grants none. Net benefit deducts context preparation/copy, handoff and parent review costs.
 
 Compare roots before writes. Required native parent file-change attribution needs support; model/review/open-review prove none. Missing/unknown stops.
 

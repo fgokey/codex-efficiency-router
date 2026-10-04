@@ -35,7 +35,7 @@ class DocumentedContractTests(unittest.TestCase):
         for filename, (role, model, effort) in EXPECTED.items():
             data = tomllib.loads((ROOT / 'agents' / filename).read_text())
             self.assertEqual((data['name'], data['model'], data['model_reasoning_effort']), (role, model, effort))
-            for path in ('README.md', 'README.zh-CN.md', f'skills/{PROJECT}/SKILL.md'):
+            for path in ('README.md', 'README.zh-CN.md', f'skills/{PROJECT}/references/effort.md'):
                 rows = [line for line in (ROOT / path).read_text(encoding='utf-8').splitlines()
                         if line.startswith('|') and f'`{role}`' in line]
                 self.assertEqual(len(rows), 1, (path, role))
@@ -62,6 +62,16 @@ class DocumentedContractTests(unittest.TestCase):
             (skill / 'references/extra.md').write_text('padding ' * 2000)
             errors = doctor.validate_tree(skill / 'SKILL.md', ROOT / 'agents')
             self.assertTrue(any('ALL references' in error for error in errors))
+
+    def test_staged_role_reference_is_validated_and_missing_preset_still_fails(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            skill = Path(tmp) / PROJECT
+            shutil.copytree(ROOT / 'skills' / PROJECT, skill)
+            self.assertEqual(doctor.validate_tree(skill / 'SKILL.md', ROOT / 'agents'), [])
+            path=skill/'references/effort.md';original=path.read_text(encoding='utf-8')
+            bad=original.replace('gpt-6-astra','missing-model')
+            self.assertNotEqual(bad,original);path.write_text(bad,encoding='utf-8')
+            self.assertIn('missing Astra preset',doctor.validate_tree(skill / 'SKILL.md', ROOT / 'agents'))
 
     def test_ambiguous_or_duplicate_metadata_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

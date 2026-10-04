@@ -1,5 +1,24 @@
 # Native Canary: explicit, scoped, operator-witnessed
 
+## Minimal execution inspection
+
+`python -B scripts/canary.py inspect` (or `cer.ps1 canary inspect`) reads one JSON object from stdin, at most 16 KiB; it creates no files or model calls. Output, including CRLF, is at most 4096 bytes. Supply only relevant public Skill pages and minimal native metadata/observations, never unrelated conversation content or secrets. This is evidence inspection, not a monitoring engine or Hook registration.
+
+Input has `source: "operator-witnessed-native"`, `expected`, and an `events` array (at most 128). `expected` holds independently reviewed `session`, `owner`, `role`, `cwd`, `model`, `effort`, `sandbox`, `approval`, `skill_path`, and `skill_sha256`. Optional `requested_spawn` holds the actual canonical spawn parameters; the shared Guard validator compares its model/effort request with observations, granting no identity or authority.
+
+| Event kind | Minimal observed fields |
+| --- | --- |
+| `session_meta` | `session`, `owner`, `role`, copied from native session metadata |
+| `turn_context` | `session`, `cwd`, `model`, `effort`, `sandbox`, `approval`, copied from native current-turn context |
+| `resume` | Record only a real restart/resume; it invalidates preceding binding evidence. Ordinary turns retain the same session metadata. |
+| `read_page` | `path`, full-file `sha256`, input `cursor`, `next_cursor`, exact public Skill `data`; ordered chain begins with null cursor and ends at null next cursor |
+| `output` | Actual serialized `bytes`, additional `framing_bytes`, Boolean `truncated`; count the entire tool/batch response, not individual items |
+| `progress` | Stable minimal `snapshot`, Boolean `active`, actual `action`, saved `offset`; two unchanged snapshots need one `TAIL_DELTA`, then `BACKOFF`, rather than repeated tails |
+
+Read evidence requires the complete page chain to hash to the independently reviewed Skill hash; a Skill name or version claim cannot pass. Binding checks every supplied metadata/context event against expected fields and every known model/effort against the requested spawn. Earlier contradictions or missing fields remain FAIL/UNKNOWN even after a complete later event or resume/rebind. A complete metadata event awaiting its context is not itself a missing field; resume clears the current proof, and a complete rebind can restore it without erasing earlier anomalies. Output checks each independently verifiable fact: known size/framing overflow or `truncated=true` is FAIL even if another field is missing or invalid. Count Reader CLI stdout separately from the complete outer tool response; CLI success does not establish a bounded host wrapper. Backoff is derived from successive observations, not accepted as a PASS flag. Results are separate `read_evidence`, `binding`, `output`, `backoff`: verified failure takes precedence over a gap; gaps are UNKNOWN and cannot be hidden by another valid observation. Unrelated event kinds are ignored. Missing evidence is UNKNOWN.
+
+`evidence_basis=caller-supplied`, `host_enforcement=UNKNOWN` and `task_coverage=UNKNOWN` remain explicit even when the supplied observations pass. The inspector does not authenticate excerpts, prove that a whole task obeyed the rules, or make an unregistered Hook effective. Native `Agent` parameter shape is not validated; only canonical `spawn_agent` has the new request preflight.
+
 ## Evidence boundary
 
 These scripts **do not invoke Codex, start nested agents or spend model credits**.

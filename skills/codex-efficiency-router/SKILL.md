@@ -5,9 +5,9 @@ description: Multi-step repo work/delegation/large evidence reads; first load SK
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.8.4 -->
+<!-- CER version: 0.8.5 -->
 
-Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
+Keep quality/authority/parent model; no classifier or hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
@@ -17,41 +17,33 @@ Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-v
 
 ## Authority
 
-Unknown identity/effects grant no writes. Spawn/resume children read-only until parent checks host binding/releases unit; authority/ownership/capacity gaps BLOCK/defer. Keep edits; no auto-revert. Read dispatch before writes/delegation.
+Unknown identity/effects grant no writes. Spawn/resume children read-only until parent verifies/releases binding/unit; authority/ownership/capacity gaps BLOCK/defer. Keep edits; no auto-revert. Read dispatch before writes/delegation.
 
-Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; bounded shell/diff/source/log review needs host permission. Its one bounded local repair unit needs two failed qualified executor attempts or material critical-context loss, authority, current-workspace target, exclusive ownership, checks, no observed active strict Guard. Shared attempts/absolute ceiling. Executors own shell/build/test/publish/deploy effects.
+Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; bounded review needs host permission. Its one bounded local repair unit needs two failed qualified executor attempts or material critical-context loss, authority, current-workspace target, exclusive ownership/checks, no observed active strict Guard; shared attempts/absolute ceiling. Executors own shell/build/test/publish/deploy.
 
 Exhaustion stops blind edits, not diagnosis.
 
 ## Routing
 
-Keep requirement/unit IDs. Route by phase/evidence/failure/user changes; fix prerequisites first.
+Keep requirement/unit IDs; route by phase/evidence/failure/user changes; fix prerequisites.
 
-| Role | Model / fixed default | Work |
-| --- | --- | --- |
-| `luna_worker` | `gpt-6-luna` / high | Focused low-risk code; data transforms medium |
-| `terra_executor` | `gpt-5.6-terra` / medium | Legacy explicit/fallback |
-| `sol61_engineer` | `gpt-6.1-sol` / medium | Default Sol |
-| `sol_engineer` | `gpt-6-sol` / medium | Pin/fallback |
-| `astra_architect` | `gpt-6-astra` / high | Exceptional read-only reasoning |
-
-Select model AND effort via `cer_auto_<role>`; read effort. Avoidable base role is MISMATCH. Exact pins win; fallback: supported exact pair and observed model unavailability. Legacy `gpt-5.6-sol/luna`: explicit/fallback only. Low opt-in; higher efforts need evidence/support. Ultra: one Sol/Astra coordinator, disjoint leaves/shared limits; no duplicate/recursion. Read routing for Astra admission; parent accepts.
+Select model AND effort via `cer_auto_<role>`; dispatch loads role table/effort. Avoidable base role is MISMATCH; exact pins win. Low opt-in; higher efforts need evidence/support. Astra admission needs routing and parent acceptance.
 
 ## Delegate
 
-Keep enough authorized work local. Delegate for capability/ownership/benefit; same-model needs contextual value AND net benefit. Default one leaf; only qualified Ultra coordinates disjoint leaves. Two writers max; no agent per file, recursive Ultra or permission bypass.
+Keep enough authorized work local. Delegate for capability/ownership/benefit; same-model needs contextual value AND net benefit. Default one leaf; qualified Sol/Astra Ultra only: disjoint leaves/shared limits, no duplicate/recursion. Two writers max; no agent per file or permission bypass.
 
 ## Handoff
 
-Handoff: outcomes, revision/dirt, rule paths, rationale/invariants, scope/checks, binding/attempts. Read rules; gaps block affected work. Check semantic invariants, platform/macros, consumers, validation. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild across affected states; else PARTIAL/BLOCKED. Requirements win; contrary evidence reopens decisions. Run dispatch preflight.
+Handoff only owned unit: outcomes, revision/dirt, rule paths, rationale/invariants, scope/checks, binding/attempts; `fork_turns=none`. Read rules; gaps block affected work. Check semantic invariants, platform/macros, consumers, validation. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild across affected states; else PARTIAL/BLOCKED. Requirements win; contrary evidence reopens decisions. Run dispatch preflight.
 
-Child: current evidence, roots, paths/status/diff, checks/gaps, owned/prior dirt. Child PASS is unit evidence, never parent PASS. Parent reviews all diffs/actual validation, rechecks corrections, closes blockers, accepts integration; keep workers for checks/fixes; close after all delivery/acceptance.
+Child: current evidence, roots, paths/status/diff, checks/gaps, owned/prior dirt; unit PASS never parent PASS. Parent reviews all diffs/actual validation, rechecks fixes, closes blockers/accepts integration. Keep workers through checks/delivery/acceptance.
 
 ## Recovery
 
-Classify failures. Patch mismatch: inspect expected/current context, encoding/line endings; one justified repair, then same-signature repeat stops blind retry. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction. Exhaustion needs diagnosis and justified absolute ceiling.
+Classify failures. Patch mismatch: inspect context/encoding/line endings; one justified repair, then repeat stops blind retry. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction; exhaustion needs diagnosis and justified absolute ceiling.
 
-Check requirements/correctness, repo checks/reproduction; new tests are not independent proof. Do not weaken assertions. Reuse evidence. Unrun is UNKNOWN, not PASS; required gaps mean PARTIAL/BLOCKED.
+Check requirements/correctness, repo checks/reproduction; new tests are not independent proof. Do not weaken assertions. Reuse only scope-bound current evidence (quality). Unrun is UNKNOWN, not PASS; required gaps mean PARTIAL/BLOCKED.
 
 ## Context and reporting
 

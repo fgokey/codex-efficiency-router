@@ -75,8 +75,30 @@ class NativeGuardTests(unittest.TestCase):
         self.assertTrue(self.denied(self.hook(data={'model':'gpt-5.6-sol','agent_type':'terra_executor'})))
 
     def test_astra_reasoning_tools_and_orchestration_remain_available(self):
-        for tool in ('spawn_agent','send_input','wait','close_agent','update_plan','read_file'):
+        for tool in ('send_input','wait','close_agent','update_plan','read_file'):
             self.assertEqual(self.hook(tool),{})
+
+    def test_spawn_requires_explicit_role_effort_and_no_history_for_every_model(self):
+        valid={'agent_type':'cer_auto_sol61_engineer','reasoning_effort':'high',
+               'fork_turns':'none','message':'read-only source review'}
+        for model in ('gpt-6-astra','gpt-6.1-sol','unknown'):
+            self.assertEqual(self.hook('spawn_agent',model,valid),{})
+            for bad in ({}, {**valid,'agent_type':'default'}, {**valid,'fork_turns':'all'},
+                        {**valid,'fork_turns':'2'}, {k:v for k,v in valid.items() if k!='reasoning_effort'},
+                        {**valid,'model':'gpt-6-astra'}, {**valid,'agent_type':'cer_auto_unknown'}):
+                with self.subTest(model=model,bad=bad):
+                    self.assertTrue(self.denied(self.hook('spawn_agent',model,bad)))
+
+    def test_spawn_preserves_fixed_roles_and_explicit_legacy_model_pins(self):
+        for data in ({'agent_type':'sol61_engineer','fork_turns':'none'},
+                     {'agent_type':'astra_architect','fork_turns':'none'},
+                     {'agent_type':'default','model':'gpt-5.6-sol','reasoning_effort':'high','fork_turns':'none'},
+                     {'agent_type':'custom_reader','model':'gpt-6-luna','reasoning_effort':'low','fork_turns':'none'}):
+            self.assertEqual(self.hook('spawn_agent','gpt-6-astra',data),{})
+        for data in ({'agent_type':'sol61_engineer','fork_turns':'none','reasoning_effort':'high'},
+                     {'agent_type':'default','model':'inherit','reasoning_effort':'high','fork_turns':'none'}):
+            self.assertTrue(self.denied(self.hook('spawn_agent','gpt-6.1-sol',data)))
+        self.assertEqual(self.hook('Agent','gpt-6-astra',{}),{})
 
     def test_guarded_read_rewrite_runs_and_preserves_workspace(self):
         before={p.name:p.read_bytes() for p in self.root.iterdir()}
@@ -110,6 +132,48 @@ class NativeGuardTests(unittest.TestCase):
     def test_reader_search_is_literal_not_executable(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         self.assertEqual(reader['run'](self.root,{'op':'search','path':'sentinel.txt','query':'before'}),'1: before')
+
+    def test_legacy_cli_and_guard_protocol_page_exact_selected_text(self):
+        self.file.write_text('界🙂'*3000+'\nlast\n',encoding='utf-8')
+        expected='1: '+'界🙂'*3000+'\n2: last'
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        cursor=None;parts=[];seen=set()
+        for _ in range(50):
+            args=[*cli,'read','--root',str(self.root),'--path','sentinel.txt','--lines','2']
+            if cursor:args.extend(['--cursor',cursor])
+            result=subprocess.run(args,capture_output=True,timeout=10)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertLessEqual(len(result.stdout),4096)
+            value=json.loads(result.stdout);self.assertTrue(value['data']);parts.append(value['data'])
+            cursor=value['next_cursor']
+            if cursor is None:break
+            self.assertNotIn(cursor,seen);seen.add(cursor)
+        else:self.fail('legacy CLI did not finish')
+        self.assertEqual(''.join(parts),expected)
+        command=self.hook('Bash',data={'command':'cer-read '+json.dumps({'op':'read','path':'sentinel.txt','lines':2})})['hookSpecificOutput']['updatedInput']['command']
+        argv=['pwsh','-NoProfile','-NonInteractive','-Command',command] if os.name=='nt' else ['/bin/sh','-c',command]
+        result=subprocess.run(argv,cwd=self.root,capture_output=True,timeout=15)
+        self.assertEqual(result.returncode,0,result.stderr);self.assertLessEqual(len(result.stdout),4096)
+        self.assertIsNotNone(json.loads(result.stdout)['next_cursor'])
+
+    def test_git_capture_limit_remains_partial_after_paging(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        code,captured,truncated=reader['bounded_process']([sys.executable,'-c','import sys;sys.stdout.write("x"*160000)'],self.root,dict(os.environ))
+        self.assertEqual(len(captured),reader['LIMIT']);self.assertTrue(truncated)
+        fake='界🙂'*10000
+        from unittest.mock import patch
+        with patch.dict(reader['one'].__globals__,bounded_process=lambda *args,**kwargs:(0,fake.encode(),True)):
+            cursor=None;parts=[]
+            for _ in range(150):
+                request={'op':'diff','path':'sentinel.txt'}
+                if cursor:request['cursor']=cursor
+                value=json.loads(reader['run'](self.root,request))
+                self.assertLessEqual(len(json.dumps(value,ensure_ascii=False,separators=(',',':')).encode())+2,4096)
+                self.assertEqual(value['status'],'PARTIAL');self.assertIn('capture',value['hint'])
+                self.assertTrue(value['data']);parts.append(value['data']);cursor=value['next_cursor']
+                if cursor is None:break
+            else:self.fail('git capture did not finish')
+        self.assertIn(fake,''.join(parts))
 
     def test_reader_cli_pages_exact_text_with_bounded_utf8_output(self):
         expected=('汉🙂"\\' * 1800) + '\r\n' + ('A' * 6000) + '\nend'

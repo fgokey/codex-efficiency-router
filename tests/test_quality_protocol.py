@@ -1,6 +1,8 @@
 """Finite declared-input checks; NOT a live Codex behavioral evaluation."""
 import sys
 import unittest
+import hashlib
+import tempfile
 from dataclasses import replace
 from itertools import product
 from pathlib import Path
@@ -8,10 +10,39 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from quality_reference import (Contract, Evidence, Failure, FinalReview, Unit, completion, handoff,
                                mutation_action, patch_action, progress_action, read_action, retry,
-                               roundtrip_action, resume, tool_action)
+                               roundtrip_action, resume, tool_action, validation_fingerprint, reuse_validation)
 
 
 class QualityProtocolTests(unittest.TestCase):
+    def test_validation_reuse_binds_actual_file_dependency_command_scope_and_environment(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);source=root/'source.py';dependency=root/'dependency.txt'
+            source.write_bytes(b'v1');dependency.write_bytes(b'd1')
+            def state():
+                return {'repo':str(root),'commit':'a'*40,
+                        'files':(('source.py',hashlib.sha256(source.read_bytes()).hexdigest()),),
+                        'dependencies':(('dependency.txt',hashlib.sha256(dependency.read_bytes()).hexdigest()),),
+                        'commands':(('python','-m','unittest','module'),),'scope':('source.py',),
+                        'environment':hashlib.sha256(b'python-version+platform').hexdigest()}
+            old=state();receipt={'fingerprint':validation_fingerprint(old),'verdict':'PASS'}
+            def decide(current,**kwargs):
+                return reuse_validation(old,current,receipt,scope_known=True,**kwargs)
+            self.assertEqual(decide(state()),'REUSE')
+            source.write_bytes(b'v2');self.assertEqual(decide(state()),'REVALIDATE');source.write_bytes(b'v1')
+            dependency.write_bytes(b'd2');self.assertEqual(decide(state()),'REVALIDATE');dependency.write_bytes(b'd1')
+            for field,value in (('commands',(('python','different'),)),('scope',('other.py',)),
+                                ('environment','b'*64),('repo',str(root/'other'))):
+                self.assertNotEqual(decide({**old,field:value}),'REUSE')
+            moved={**old,'commit':'b'*40}
+            self.assertEqual(decide(moved),'UNKNOWN')
+            self.assertEqual(decide(moved,changed_paths=('README.md',)),'REUSE')
+            for path in ('source.py','dependency.txt'):
+                self.assertEqual(decide(moved,changed_paths=(path,)),'REVALIDATE')
+            self.assertEqual(reuse_validation(old,old,receipt,scope_known=False),'UNKNOWN')
+            self.assertEqual(reuse_validation(old,old,{**receipt,'fingerprint':'0'*64},scope_known=True),'UNKNOWN')
+            self.assertEqual(reuse_validation(old,old,{**receipt,'verdict':'UNKNOWN'},scope_known=True),'UNKNOWN')
+            self.assertEqual(reuse_validation(old,{**old,'dependencies':None},receipt,scope_known=True),'UNKNOWN')
+
     def setUp(self):
         self.contract = Contract('r1', 'code+tests+env-v1', ('behavior', 'integration'))
         self.evidence = tuple(Evidence(item, 'PASS', 'r1', self.contract.state, 'command', 'Observed exit 0; expected output matched')

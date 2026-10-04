@@ -2,7 +2,15 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.4 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.5：明确委派与有界证据
+
+canonical `spawn_agent` 预检查在执行者/协调白名单放行前拒绝未绑定的 default/inherit、缺 effort 和历史继承。固定角色及明确的模型/effort pin 保留；实际宿主绑定和用户授权仍须独立核验。`Agent` 参数形状尚未验证。只有已注册的原生 Hook 才会执行此检查，本地测试不证明宿主强制。
+
+读取器旧 `read/search/list/diff/status` 的 CLI 输出也按整体 4096 字节分页，包含 JSON、cursor 和 CRLF。编码协议的小结果保留原文本，大结果返回 JSON 页；相同请求加 cursor 续读。过大的 batch 明确失败并要求拆分。Git 最多捕获 128 KiB，读完捕获前缀仍为 PARTIAL；文件读取上限仍为 16 MiB。其他工具仍需各自捕获/投影预算。
+
+先独立读 core，仅按阶段触发引用；角色表位于 dispatch 前的 effort 引用。`quality_reference.reuse_validation` 核调用者提供的仓库/提交、文件/依赖哈希、命令、范围、环境和 PASS 证据，变化或未知不能错误复用。`python -B scripts/canary.py inspect` 从 stdin 读最小执行观察（16 KiB），分别输出读取/绑定/输出/退避结果（4 KiB）；证据依据为调用者提供，宿主强制和全任务覆盖仍 UNKNOWN。见 [Canary](docs/CANARY.md)。
 
 ## v0.8.4：大 JSON 定点读取
 

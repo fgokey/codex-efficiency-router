@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.5 — 2026-10-05
+
+- Validate canonical spawn bindings before executor/coordination passthrough; preserve fixed roles and explicit exact pins. Host identity and authority still require independent verification; unregistered Hooks do not enforce this preflight.
+- Bound legacy reader and batch output to 4096 bytes including cursor/framing; page selected text and keep capped Git output explicitly PARTIAL. Move the role table into the dispatch-stage effort reference.
+- Check scope-bound validation reuse and minimal execution evidence for reads, binding, output and backoff. Missing evidence, host enforcement and whole-task coverage remain UNKNOWN; inspection creates no files or model calls.
+
 ## 0.8.4 — 2026-10-04
 
 - Add bounded, streaming JSON Pointer value/member pages for large UTF-8 evidence files; validate and hash the whole source per page without loading a DOM. Preserve old 16 MiB file-read limits and the 4096-byte output envelope.

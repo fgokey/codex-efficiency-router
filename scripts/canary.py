@@ -11,14 +11,17 @@ sys.dont_write_bytecode = True
 import argparse
 from datetime import datetime, timedelta, timezone
 import json
+import hashlib
 import math
 from pathlib import Path
 import re
+import runpy
 import subprocess
 from uuid import uuid4
 
 from manage import reject_links, read_bytes
 from write_guard import inspect_status, loads, encode
+from quality_reference import progress_action
 
 OWNER = 'cer-native-canary'
 SEED = b'CER read-only canary fixture\n'
@@ -31,6 +34,106 @@ CASES = {
     'executor_write_allowed': ('apply_patch', 'success'),
 }
 FILES = ('plan.json', 'observations.json', 'read.txt', 'astra-patch.txt', 'astra-shell.txt', 'executor.txt')
+
+
+def inspect_execution(observations: object) -> dict:
+    """Check minimal operator-witnessed excerpts; does not authenticate the host."""
+    result = dict.fromkeys(('read_evidence', 'binding', 'output', 'backoff'), 'UNKNOWN')
+    result.update(host_enforcement='UNKNOWN', task_coverage='UNKNOWN', evidence_basis='caller-supplied', source='operator-witnessed-native',
+                  limitation='Supplied excerpts are witnesses, not proof of Hook registration or enforcement.')
+    if not isinstance(observations, dict) or observations.get('source') != result['source']:
+        return result
+    expected = observations.get('expected', {})
+    events = observations.get('events', [])
+    if not isinstance(expected, dict) or not isinstance(events, list) or len(events) > 128:
+        raise ValueError('expected object and at most 128 minimal events required')
+    meta = context = None
+    body = hashlib.sha256(); cursor = None; read_started = read_done = False; read_bad = read_missing = False
+    output_seen = output_bad = output_missing = False
+    previous = saved_offset = None; unchanged = 0; delta_seen = backoff_seen = backoff_bad = backoff_missing = False
+    binding_keys = ('session', 'owner', 'role', 'cwd', 'model', 'effort', 'sandbox', 'approval')
+    binding_bad = False
+    binding_missing = not all(isinstance(expected.get(k), str) and expected[k] for k in binding_keys)
+    requested_model = requested_effort = None
+    if 'requested_spawn' in observations:
+        try:
+            validate = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'hooks/astra_write_guard.py'))['validate_spawn']
+            requested_model, requested_effort = validate(observations['requested_spawn'])
+        except (ValueError, TypeError):
+            binding_bad = True
+    for event in events:
+        if not isinstance(event, dict): raise ValueError('event must be an object')
+        kind = event.get('kind')
+        if kind == 'resume':
+            meta = context = None
+        elif kind in ('session_meta', 'turn_context'):
+            fields = ('session', 'owner', 'role') if kind == 'session_meta' else ('session', 'cwd', 'model', 'effort', 'sandbox', 'approval')
+            for key in fields:
+                value = event.get(key)
+                if not isinstance(value, str) or not value:
+                    binding_missing = True
+                elif isinstance(expected.get(key), str) and expected[key] and value != expected[key]:
+                    binding_bad = True
+            if kind == 'session_meta':
+                meta = event
+            else:
+                context = event
+                for key, requested in (('model', requested_model), ('effort', requested_effort)):
+                    if requested is not None and isinstance(event.get(key), str) and event[key] and event[key] != requested:
+                        binding_bad = True
+        elif kind == 'read_page':
+            if not expected.get('skill_path') or not expected.get('skill_sha256'): continue
+            data = event.get('data')
+            if (not all(k in event for k in ('data', 'path', 'sha256', 'cursor', 'next_cursor'))
+                    or not isinstance(data, str) or (event['next_cursor'] is not None and not isinstance(event['next_cursor'], str))):
+                read_missing = True; continue
+            if (read_done or event.get('cursor') != cursor
+                    or event.get('path') != expected.get('skill_path')
+                    or event.get('sha256') != expected.get('skill_sha256')):
+                read_bad = True; continue
+            body.update(data.encode('utf-8')); read_started = True
+            cursor = event.get('next_cursor'); read_done = cursor is None
+        elif kind == 'output':
+            size, framing = event.get('bytes'), event.get('framing_bytes')
+            size_known = type(size) is int and size >= 0
+            framing_known = type(framing) is int and framing >= 0
+            truncation_known = type(event.get('truncated')) is bool
+            output_missing |= not (size_known and framing_known and truncation_known)
+            output_seen |= size_known and framing_known and truncation_known
+            output_bad |= ((size_known and size > 4096) or (framing_known and framing > 4096)
+                           or (size_known and framing_known and size + framing > 4096)
+                           or (truncation_known and event['truncated']))
+        elif kind == 'progress':
+            snapshot, action = event.get('snapshot'), event.get('action')
+            if not isinstance(snapshot, str) or type(event.get('active')) is not bool or not isinstance(action, str):
+                backoff_missing = True; previous = saved_offset = None; delta_seen = False; continue
+            changed = previous is None or snapshot != previous
+            unchanged = 0 if changed else unchanged + 1
+            if changed: delta_seen = False
+            wanted = progress_action(worker_active=event['active'], progress_changed=changed,
+                                     unchanged_polls=unchanged, tail_cursor_current=delta_seen)
+            backoff_bad |= action != wanted
+            if action == 'TAIL_DELTA':
+                if not isinstance(event.get('offset'), str) or not event['offset'] or saved_offset is None:
+                    backoff_missing = True
+                elif event['offset'] != saved_offset:
+                    backoff_bad = True
+                delta_seen = True
+            elif action == 'WAIT_COMPACT' and isinstance(event.get('offset'), str):
+                saved_offset = event['offset']
+            backoff_seen |= action == 'BACKOFF'
+            previous = snapshot
+    if read_bad:
+        result['read_evidence'] = 'FAIL'
+    elif not read_missing and read_started and read_done and isinstance(expected.get('skill_sha256'), str):
+        result['read_evidence'] = 'PASS' if body.hexdigest() == expected['skill_sha256'] else 'FAIL'
+    if binding_bad: result['binding'] = 'FAIL'
+    elif not binding_missing and meta is not None and context is not None: result['binding'] = 'PASS'
+    if output_bad: result['output'] = 'FAIL'
+    elif output_seen and not output_missing: result['output'] = 'PASS'
+    if backoff_bad: result['backoff'] = 'FAIL'
+    elif backoff_seen and not backoff_missing: result['backoff'] = 'PASS'
+    return result
 
 
 def now():
@@ -252,8 +355,17 @@ def main():
     v = sub.add_parser('verify'); v.add_argument('--run-dir', type=Path, required=True)
     v.add_argument('--output', type=Path, required=True)
     c = sub.add_parser('cleanup'); c.add_argument('--run-dir', type=Path, required=True)
+    sub.add_parser('inspect', help='check minimal native observations from stdin (16 KiB); creates no files')
     args = parser.parse_args()
     try:
+        if args.action == 'inspect':
+            raw = sys.stdin.buffer.read(16385)
+            if len(raw) > 16384: raise ValueError('inspection input exceeds 16 KiB')
+            report = inspect_execution(loads(raw))
+            wire = json.dumps(report, ensure_ascii=True, separators=(',', ':'))
+            if len(wire.encode()) + 2 > 4096: raise ValueError('inspection output exceeds 4 KiB')
+            print(wire)
+            return 1 if 'FAIL' in report.values() else 0
         if args.action == 'prepare':
             run = prepare(args.project_root, args.scope)
             print(json.dumps({'run_dir': str(run), 'status': 'PREPARED_NOT_RUN',
@@ -279,7 +391,7 @@ def main():
         replace(args.output, encode(report))
         print(json.dumps(report, indent=2))
         return 0 if report['result'] == 'PASS' else 1
-    except (ValueError, OSError, TypeError, subprocess.SubprocessError) as exc:
+    except (ValueError, OSError, TypeError, RecursionError, subprocess.SubprocessError) as exc:
         print(f'Canary: FAILED: {exc}', file=sys.stderr)
         return 2
 

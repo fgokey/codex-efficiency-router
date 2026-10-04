@@ -87,11 +87,15 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
     if core_bytes > INSTRUCTION_BUDGETS["core_skill_bytes"]:
         errors.append("Skill exceeds the project core instruction budget")
     full_bytes = core_bytes
+    has_astra_preset = "gpt-6-astra" in text
     for reference in sorted((skill_file.parent / "references").rglob("*.md")):
         if not reference.resolve().is_relative_to(skill_file.parent.resolve()):
             errors.append(f"reference escapes Skill: {reference.name}")
             continue
-        full_bytes += len(reference.read_text(encoding="utf-8").encode("utf-8")) + 1
+        reference_text = reference.read_text(encoding="utf-8")
+        full_bytes += len(reference_text.encode("utf-8")) + 1
+        if reference.relative_to(skill_file.parent).as_posix() == "references/effort.md":
+            has_astra_preset |= "gpt-6-astra" in reference_text
     if full_bytes > INSTRUCTION_BUDGETS["full_skill_bytes"]:
         errors.append("core plus ALL references exceeds the project full instruction budget")
     for heading in HEADINGS:
@@ -102,7 +106,7 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
             path = (skill_file.parent / link.split("#")[0]).resolve()
             if not path.is_relative_to(skill_file.parent.resolve()) or not path.is_file():
                 errors.append(f"reference not packaged with Skill: {link}")
-    if "gpt-6-astra" not in text:
+    if not has_astra_preset:
         errors.append("missing Astra preset")
     metadata = skill_file.parent / "agents/openai.yaml"
     if not metadata.is_file():

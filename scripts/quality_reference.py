@@ -6,6 +6,9 @@ read checkpoints, inspect code, grade an LLM response or prove model compliance.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
+import json
+import re
 from typing import Literal
 
 Verdict = Literal['PASS', 'FAIL', 'UNKNOWN']
@@ -56,6 +59,53 @@ def tool_action(*, known: bool, invalidated: bool) -> ToolAction:
     flag(known)
     flag(invalidated)
     return 'DISCOVER' if invalidated or not known else 'REUSE'
+
+
+def validation_fingerprint(state: object) -> str | None:
+    """Hash supplied verification scope; does not collect or authenticate evidence."""
+    if not isinstance(state, dict) or set(state) != {'repo', 'commit', 'files', 'dependencies',
+                                                   'commands', 'scope', 'environment'}:
+        return None
+    if (not isinstance(state['repo'], str) or not state['repo']
+            or not isinstance(state['commit'], str) or not re.fullmatch(r'[0-9a-f]{40,64}', state['commit'])
+            or not isinstance(state['environment'], str)
+            or not re.fullmatch(r'[0-9a-f]{64}', state['environment'])):
+        return None
+    for field in ('files', 'dependencies'):
+        pairs = state[field]
+        if not isinstance(pairs, tuple) or any(not isinstance(pair, tuple) or len(pair) != 2
+                or not isinstance(pair[0], str) or not pair[0] or not isinstance(pair[1], str)
+                or not re.fullmatch(r'[0-9a-f]{64}', pair[1]) for pair in pairs):
+            return None
+        if len({pair[0] for pair in pairs}) != len(pairs): return None
+    scope = state['scope']; commands = state['commands']
+    if (not isinstance(scope, tuple) or not scope or any(not isinstance(p, str) or not p for p in scope)
+            or len(set(scope)) != len(scope) or set(scope) != {p for p, _ in state['files']}
+            or not isinstance(commands, tuple) or not commands
+            or any(not isinstance(command, tuple) or not command
+                   or any(not isinstance(arg, str) or not arg for arg in command) for command in commands)):
+        return None
+    return hashlib.sha256(json.dumps(state, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def reuse_validation(previous: object, current: object, evidence: object, *, scope_known: bool,
+                     changed_paths: tuple[str, ...] | None = None) -> Literal['REUSE', 'REVALIDATE', 'UNKNOWN']:
+    """Reuse only a passing receipt bound to known files/dependencies/commands/scope/environment."""
+    flag(scope_known)
+    old = validation_fingerprint(previous); new = validation_fingerprint(current)
+    if not scope_known or old is None or new is None or not isinstance(evidence, dict): return 'UNKNOWN'
+    if set(evidence) != {'fingerprint', 'verdict'} or evidence['fingerprint'] != old:
+        return 'UNKNOWN'
+    if evidence['verdict'] == 'UNKNOWN': return 'UNKNOWN'
+    if evidence['verdict'] != 'PASS': return 'REVALIDATE'
+    if old == new: return 'REUSE'
+    if any(previous[key] != current[key] for key in previous if key != 'commit'): return 'REVALIDATE'
+    if changed_paths is None: return 'UNKNOWN'
+    if (not isinstance(changed_paths, tuple)
+            or any(not isinstance(path, str) or not path for path in changed_paths)):
+        return 'UNKNOWN'
+    affected = set(current['scope']) | {name for name, _ in current['dependencies']}
+    return 'REVALIDATE' if affected.intersection(changed_paths) else 'REUSE'
 
 
 def roundtrip_action(*, work_due: bool, checks: int, independent: bool,

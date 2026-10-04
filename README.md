@@ -2,7 +2,15 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.4 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.5 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.5: explicit dispatch and bounded evidence
+
+Canonical `spawn_agent` preflight rejects unbound default/inherit, missing effort and inherited history before executor/coordination passthrough. Fixed roles and explicit exact model/effort pins remain valid; native host binding and user authority still need independent checks. The `Agent` parameter shape is unverified. This check only runs where the native Hook is registered; local tests do not prove host enforcement.
+
+Legacy reader `read/search/list/diff/status` CLI responses now page selected text within 4096 bytes including JSON, cursor and CRLF. Encoded small results retain their text format; large ones return a JSON page. Continue with the same request plus `cursor`; oversized batches fail and must be split. Git captures at most 128 KiB and reports PARTIAL even after the captured prefix is exhausted. File-read limits remain 16 MiB. Other tools need their own capture/projection budget.
+
+Load the core alone, then references only for the named phase; the fixed-role table lives in the dispatch-stage effort reference. `quality_reference.reuse_validation` checks supplied repo/commit, file/dependency hashes, commands, scope, environment and PASS receipt; unknown or changed inputs prevent reuse. `python -B scripts/canary.py inspect` reads minimal execution observations from stdin (16 KiB) and emits separate read/binding/output/backoff results (4 KiB), with caller-supplied evidence basis and host enforcement/task coverage UNKNOWN. See [Canary](docs/CANARY.md).
 
 ## v0.8.4: large JSON projection
 

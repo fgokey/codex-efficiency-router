@@ -18,7 +18,7 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.8.4'
+VERSION = '0.8.5'
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
@@ -30,9 +30,14 @@ JSON_MEMBER_LIMIT = 16384
 JSON_KEYS_BYTES = 1024 * 1024
 BATCH_LIMIT = 16
 OPS = frozenset(('read', 'list', 'search', 'diff', 'status', 'index', 'page', 'excerpt', 'locate', 'json'))
+LEGACY_OPS = frozenset(('read', 'list', 'search', 'diff', 'status'))
 PAGE_BYTES = 4096
 EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
+  read|search|list|diff|status --root ABS --path PATH [--cursor TOKEN] [--max-bytes N]
+    Pages retain selected-request semantics; read/search keep line numbers. search needs --query.
+    Git capture <=128 KiB; PARTIAL means narrow scope. Encoded small legacy results stay text;
+    larger results return JSON pages. Encoded batches fit 4096 bytes incl frames/CRLF or fail.
   json --root ABS --path RELFILE --pointer POINTER [--mode value|members] [--cursor TOKEN]
     String-form JSON Pointer; value returns exact JSON text pages, members lists direct children.
     Every page validates/hashes the whole source (<=256 MiB), using 64 KiB reads; no DOM/cache.
@@ -85,13 +90,17 @@ def validate(request: object) -> dict:
                 raise ValueError('nested batches are not supported')
             if item.get('op') in ('index', 'page', 'excerpt', 'locate', 'json'):
                 raise ValueError('index/page/excerpt/locate/json cannot be batched')
+            if 'cursor' in item or 'max_bytes' in item:
+                raise ValueError('batch members cannot request pages; split batch')
             validate(item)
         return request
     if not isinstance(op, str) or op not in OPS:
         raise ValueError('reader needs read/list/search/diff/status/index/page/excerpt/locate/json or batch')
     fields = {'op', 'path'} | {
-        'read': {'start', 'lines'}, 'search': {'query', 'lines'},
-        'diff': {'staged'}, 'status': set(), 'list': set(),
+        'read': {'start', 'lines', 'cursor', 'max_bytes'},
+        'search': {'query', 'lines', 'cursor', 'max_bytes'},
+        'diff': {'staged', 'cursor', 'max_bytes'},
+        'status': {'cursor', 'max_bytes'}, 'list': {'cursor', 'max_bytes'},
         'index': {'max_bytes', 'start', 'lines'}, 'page': {'max_bytes', 'cursor'},
         'excerpt': {'max_bytes', 'start', 'lines'},
         'locate': {'max_bytes', 'query', 'glob'},
@@ -122,11 +131,11 @@ def validate(request: object) -> dict:
         raise ValueError('search requires a nonempty literal query')
     if type(request.get('staged', False)) is not bool:
         raise ValueError('staged must be boolean')
-    if op in ('index', 'page', 'excerpt', 'locate', 'json'):
+    if op in OPS:
         cap = request.get('max_bytes', PAGE_BYTES)
         if type(cap) is not int or not 256 <= cap <= PAGE_BYTES:
             raise ValueError('max_bytes must be 256..4096')
-        if op in ('page', 'json') and 'cursor' in request and (not isinstance(request['cursor'], str)
+        if op in LEGACY_OPS | {'page', 'json'} and 'cursor' in request and (not isinstance(request['cursor'], str)
                                                    or not request['cursor']):
             raise ValueError('page cursor must be a nonempty string')
         if op == 'index' and ('lines' in request) != ('start' in request):
@@ -670,7 +679,7 @@ def locate(root: Path, request: dict, path: Path) -> str:
     return envelope(result, cap)
 
 
-def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str:
+def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str | tuple[str, dict, bool]:
     # Revalidate before each operation as well as the full-batch preflight.
     resolve(root, str(path))
     op = request['op']
@@ -680,6 +689,10 @@ def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str:
         return locate(root, request, path)
     if op == 'json':
         return json_page(root, request, path)
+    before = path.stat() if path.exists() else None
+    source = {'path': path.relative_to(root).as_posix(), 'exists': before is not None}
+    if before is not None:
+        source.update(dev=before.st_dev, ino=before.st_ino, mtime_ns=before.st_mtime_ns, size=before.st_size)
     if op in ('diff', 'status'):
         binary = shutil.which('git')
         if not binary:
@@ -700,23 +713,31 @@ def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str:
         result = f'git exit={code}\n' + data.decode('utf-8', errors='replace')
         if truncated:
             result += '\n[truncated; request a narrower path]'
-        return clip(result)
+        return result, source, not truncated and code == 0
     if op == 'list':
-        names = []
+        names = []; complete = True
         with os.scandir(path) as entries:
             for item in entries:
                 if len(names) == 200:
                     names.append('[truncated; first 200 directory entries]')
+                    complete = False
                     break
                 suffix = '@' if item.is_symlink() else '/' if item.is_dir(follow_symlinks=False) else ''
                 names.append(item.name + suffix)
-        return clip('\n'.join(sorted(names)))
+        if path.stat().st_mtime_ns != before.st_mtime_ns:
+            raise ValueError('directory changed while being read')
+        return '\n'.join(sorted(names)), source, complete
     # Enforce the aggregate budget on actual bytes as well as preflight sizes.
     # At most one extra detection byte is read, then the whole request fails.
     with path.open('rb') as stream:
         raw = stream.read(remaining[0] + 1)
     if len(raw) > remaining[0]:
         raise ValueError('files grew beyond aggregate read budget')
+    after = path.stat()
+    if len(raw) != before.st_size or any(getattr(before, field) != getattr(after, field)
+            for field in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns')):
+        raise ValueError('file changed while being read')
+    source['source_sha256'] = hashlib.sha256(raw).hexdigest()
     remaining[0] -= len(raw)
     output = []
     for number, line in enumerate(raw.decode('utf-8', errors='replace').splitlines(), 1):
@@ -724,37 +745,74 @@ def one(root: Path, request: dict, path: Path, remaining: list[int]) -> str:
             continue
         if op == 'search' and request['query'] not in line:
             continue
-        output.append(f'{number}: {line[:4096]}')
+        output.append(f'{number}: {line}')
         if len(output) >= request.get('lines', 120):
             break
-    return clip('\n'.join(output))
+    return '\n'.join(output), source, True
 
 
-def run(root: Path, request: dict) -> str:
+def legacy_page(root: Path, request: dict, result: tuple[str, dict, bool], json_output: bool) -> str:
+    text, source, complete = result; cap = request.get('max_bytes', PAGE_BYTES)
+    if complete and not json_output and 'cursor' not in request and len(text.encode('utf-8')) + 2 <= cap:
+        return text
+    selected = {key: value for key, value in request.items() if key not in ('cursor', 'max_bytes')}
+    identity = {**source, 'root': root.as_posix(),
+                'request_sha256': hashlib.sha256(json.dumps(selected, sort_keys=True,
+                    separators=(',', ':'), ensure_ascii=True).encode()).hexdigest(),
+                'sha256': hashlib.sha256(text.encode('utf-8')).hexdigest()}
+    start, first, last = (0, 0, len(text))
+    if 'cursor' in request:
+        start, first, last = cursor_offset(request['cursor'], identity, len(text))
+        if (first, last) != (0, len(text)): raise ValueError('legacy cursor range mismatch')
+    cursor_token(identity, last, first, last)
+    def page(end):
+        value = {'op': request['op'], 'data': text[start:end],
+                 'status': 'COMPLETE' if complete else 'PARTIAL', 'scope': 'selected-request',
+                 'next_cursor': cursor_token(identity, end, first, last) if end < last else None,
+                 'sha256': identity['sha256']}
+        if not complete: value['hint'] = 'capture incomplete; narrow path/query; do not infer omitted evidence'
+        return value
+    end = min(last, start + PAGE_BYTES)
+    try: return envelope(page(end), cap)
+    except ValueError: pass
+    low, high, best = start + 1, end - 1, start
+    while low <= high:
+        mid = (low + high) // 2
+        try: envelope(page(mid), cap); best = mid; low = mid + 1
+        except ValueError: high = mid - 1
+    if best == start: raise ValueError('max_bytes cannot hold one character and its cursor')
+    return envelope(page(best), cap)
+
+
+def run(root: Path, request: dict, *, json_output: bool = False) -> str:
     checked = preflight(root, request)  # ALL invalid paths fail before any read/git.
     root = root.resolve(strict=True)
     results = []
     size = 0
     remaining = [READ_LIMIT]
     for index, (item, path) in enumerate(checked):
-        text = one(root, item, path, remaining)
+        result = one(root, item, path, remaining)
+        if request['op'] != 'batch':
+            return legacy_page(root, item, result, json_output) if item['op'] in LEGACY_OPS else result
+        text, _, complete = result
+        if not complete: raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
         if request['op'] == 'batch':
             text = f'[{index + 1}:{item["op"]}]\n' + text
         size += len(text.encode('utf-8')) + (1 if results else 0)
-        if size > LIMIT:
+        if size + 2 > PAGE_BYTES:
             # No partial batch output is emitted. All operations are read-only.
-            raise ValueError('aggregate output exceeds 128 KiB; split batch')
+            raise ValueError('aggregate output exceeds 4 KiB including frames/CRLF; split batch')
         results.append(text)
     return '\n'.join(results)
 
 
 def cli_request(args: list[str]) -> tuple[Path, dict]:
-    if not args or args[0] not in ('index', 'page', 'excerpt', 'locate', 'json') or len(args[1:]) % 2:
-        raise ValueError('usage: excerpt|locate|index|page|json --root ROOT --path RELATIVE [options]; use --help')
+    if not args or args[0] not in OPS or len(args[1:]) % 2:
+        raise ValueError('usage: read|search|list|diff|status|excerpt|locate|index|page|json --root ROOT --path RELATIVE [options]; use --help')
     values = {}
     for key, value in zip(args[1::2], args[2::2]):
         if key not in ('--root', '--path', '--cursor', '--max-bytes',
-                       '--start', '--lines', '--query', '--glob', '--pointer', '--mode') or key in values:
+                       '--start', '--lines', '--query', '--glob', '--pointer', '--mode', '--staged') or key in values:
             raise ValueError('unknown or duplicate reader CLI option')
         values[key] = value
     if '--root' not in values or '--path' not in values:
@@ -767,6 +825,9 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
         request['max_bytes'] = int(values['--max-bytes'])
     if '--cursor' in values:
         request['cursor'] = values['--cursor']
+    if '--staged' in values:
+        if values['--staged'] not in ('true', 'false'): raise ValueError('staged must be true or false')
+        request['staged'] = values['--staged'] == 'true'
     for key in ('query', 'glob', 'pointer', 'mode'):
         if '--' + key in values:
             request[key] = values['--' + key]
@@ -779,13 +840,15 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
 
 def main() -> int:
     cap = PAGE_BYTES
+    json_output = False
     try:
         if sys.argv[1:] == ['--help'] or (len(sys.argv) == 3 and sys.argv[2] == '--help'
-                                         and sys.argv[1] in ('index', 'page', 'excerpt', 'locate', 'json')):
+                                         and sys.argv[1] in OPS):
             sys.stdout.buffer.write(HELP.encode('utf-8'))
             return 0
-        if len(sys.argv) > 1 and sys.argv[1] in ('index', 'page', 'excerpt', 'locate', 'json'):
+        if len(sys.argv) > 1 and sys.argv[1] in OPS:
             root, request = cli_request(sys.argv[1:])
+            json_output = True
             cap = request.get('max_bytes', PAGE_BYTES)
         else:
             if len(sys.argv) != 3 or len(sys.argv[2]) > (INPUT_LIMIT + 2) // 3 * 4:
@@ -793,7 +856,7 @@ def main() -> int:
             raw = base64.b64decode(sys.argv[2], altchars=b'-_', validate=True)
             request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
             root = Path(sys.argv[1])
-        sys.stdout.buffer.write(run(root, request).encode('utf-8') + b'\n')
+        sys.stdout.buffer.write(run(root, request, json_output=json_output).encode('utf-8') + b'\n')
         return 0
     except (ValueError, OSError, TypeError, UnicodeError, RecursionError, subprocess.SubprocessError) as exc:
         message = clip(f'CER read failed: {exc}', cap - 2)

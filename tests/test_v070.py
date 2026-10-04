@@ -6,6 +6,7 @@ import contextlib
 import copy
 from datetime import timedelta
 import io
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -247,6 +248,21 @@ class BatchReaderV070(TempCase):
         result = self.run_reader({'op': 'read', 'path': 'a.txt', 'lines': 200})
         self.assertLessEqual(len(result.encode()), self.reader['LIMIT'])
 
+    def test_legacy_output_total_including_cursor_and_batch_framing_is_4k(self):
+        (self.root/'a.txt').write_text(('界🙂'*1500)+'\nlast\n',encoding='utf-8')
+        request={'op':'read','path':'a.txt','lines':2};parts=[];seen=set()
+        while True:
+            result=self.run_reader(request)
+            self.assertLessEqual(len(result.encode('utf-8'))+2,4096)
+            page=json.loads(result);parts.append(page['data']);cursor=page['next_cursor']
+            if cursor is None:break
+            self.assertTrue(page['data']);self.assertNotIn(cursor,seen);seen.add(cursor)
+            request={**request,'cursor':cursor}
+        self.assertEqual(''.join(parts),'1: '+('界🙂'*1500)+'\n2: last')
+        (self.root/'a.txt').write_text('x'*2040,encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'aggregate output'):
+            self.run_reader({'op':'batch','requests':[{'op':'read','path':'a.txt'}]*2})
+
     def test_aggregate_output_overflow_no_partial_return(self):
         (self.root / 'a.txt').write_text(('x' * 4096 + '\n') * 200, encoding='utf-8')
         with self.assertRaises(ValueError):
@@ -276,6 +292,102 @@ class BatchReaderV070(TempCase):
 
 
 class CanaryV070(TempCase):
+    def execution_fixture(self):
+        body='version: 0.8.5\npublic Skill body\n';sha=hashlib.sha256(body.encode()).hexdigest()
+        expected={'session':'s1','owner':'root','role':'cer_auto_sol61_engineer','cwd':str(self.root),
+                  'model':'gpt-6.1-sol','effort':'high','sandbox':'danger-full-access','approval':'never',
+                  'skill_path':'Skill/SKILL.md','skill_sha256':sha}
+        events=[{'kind':'session_meta',**{k:expected[k] for k in ('session','owner','role')}},
+                {'kind':'turn_context',**{k:expected[k] for k in ('session','cwd','model','effort','sandbox','approval')}},
+                {'kind':'read_page','path':expected['skill_path'],'sha256':sha,'cursor':None,'next_cursor':'c1','data':body[:10]},
+                {'kind':'read_page','path':expected['skill_path'],'sha256':sha,'cursor':'c1','next_cursor':None,'data':body[10:]},
+                {'kind':'output','bytes':4094,'framing_bytes':2,'truncated':False}]
+        events.extend({'kind':'progress','snapshot':'unchanged','active':True,'action':action,'offset':'saved-offset'}
+                      for action in ('WAIT_COMPACT','WAIT_COMPACT','TAIL_DELTA','BACKOFF'))
+        return {'source':'operator-witnessed-native','expected':expected,'events':events}
+
+    def test_execution_inspection_separates_missing_and_failing_evidence(self):
+        data=self.execution_fixture();result=canary.inspect_execution(data)
+        for key in ('read_evidence','binding','output','backoff'):self.assertEqual(result[key],'PASS')
+        self.assertEqual(result['host_enforcement'],'UNKNOWN')
+        self.assertEqual(result['evidence_basis'],'caller-supplied');self.assertEqual(result['task_coverage'],'UNKNOWN')
+        requested=copy.deepcopy(data);requested['requested_spawn']={'agent_type':'cer_auto_sol61_engineer','reasoning_effort':'high','fork_turns':'none'}
+        self.assertEqual(canary.inspect_execution(requested)['binding'],'PASS')
+        requested['requested_spawn']={'agent_type':'default'}
+        self.assertEqual(canary.inspect_execution(requested)['binding'],'FAIL')
+        for kind,key in (('read_page','read_evidence'),('turn_context','binding'),('output','output'),('progress','backoff')):
+            missing=copy.deepcopy(data);missing['events']=[e for e in missing['events'] if e['kind']!=kind]
+            self.assertEqual(canary.inspect_execution(missing)[key],'UNKNOWN')
+        for malformed,key in (({'kind':'output','bytes':2},'output'),
+                              ({'kind':'output','bytes':'2','framing_bytes':2,'truncated':False},'output'),
+                              ({'kind':'progress','snapshot':'unchanged'},'backoff'),
+                              ({'kind':'progress','snapshot':'unchanged','active':'true','action':'BACKOFF'},'backoff'),
+                              ({'kind':'read_page','data':'body'},'read_evidence')):
+            for position in (0,len(data['events'])):
+                mixed=copy.deepcopy(data);mixed['events'].insert(position,malformed)
+                self.assertEqual(canary.inspect_execution(mixed)[key],'UNKNOWN')
+        mixed=copy.deepcopy(data);mixed['events'].extend([{'kind':'output','bytes':2},
+                    {'kind':'output','bytes':4096,'framing_bytes':2,'truncated':False}])
+        self.assertEqual(canary.inspect_execution(mixed)['output'],'FAIL')
+        unrelated=copy.deepcopy(data);unrelated['events'].append({'kind':'unrelated'})
+        self.assertEqual(canary.inspect_execution(unrelated)['output'],'PASS')
+        for index,field,value,key in ((3,'data','wrong body','read_evidence'),(1,'model','gpt-6-astra','binding'),
+                                      (4,'framing_bytes',3,'output'),(4,'truncated',True,'output'),
+                                      (7,'offset','wrong offset','backoff'),(8,'action','TAIL_DELTA','backoff')):
+            bad=copy.deepcopy(data);bad['events'][index][field]=value
+            self.assertEqual(canary.inspect_execution(bad)[key],'FAIL')
+        ordinary=copy.deepcopy(data);ordinary['events'].append(copy.deepcopy(data['events'][1]))
+        self.assertEqual(canary.inspect_execution(ordinary)['binding'],'PASS')
+        resumed=copy.deepcopy(data);resumed['events'].append({'kind':'resume'})
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'UNKNOWN')
+        resumed['events'].append(copy.deepcopy(data['events'][1]))
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'UNKNOWN')
+        resumed['events'].append(copy.deepcopy(data['events'][0]))
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'PASS')
+
+    def test_execution_inspection_retains_binding_gaps_and_known_output_failures(self):
+        data=self.execution_fixture()
+        for index,field,value,verdict in ((0,'owner','other-parent','FAIL'),(0,'role','default','FAIL'),
+                                         (1,'model','gpt-6-astra','FAIL'),(1,'session','other-session','FAIL'),
+                                         (0,'owner',None,'UNKNOWN'),(1,'effort',None,'UNKNOWN'),(1,'effort',42,'UNKNOWN')):
+            event={**data['events'][index],field:value}
+            if value is None:event.pop(field)
+            for position in (0,len(data['events'])):
+                mixed=copy.deepcopy(data);mixed['events'].insert(position,event)
+                self.assertEqual(canary.inspect_execution(mixed)['binding'],verdict)
+                mixed['events'].extend([{'kind':'resume'},*copy.deepcopy(data['events'][:2])])
+                self.assertEqual(canary.inspect_execution(mixed)['binding'],verdict)
+        for position in (0,len(data['events'])):
+            event={**data['events'][1],'model':'gpt-6-astra'};event.pop('effort')
+            mixed=copy.deepcopy(data);mixed['events'].insert(position,event)
+            self.assertEqual(canary.inspect_execution(mixed)['binding'],'FAIL')
+        for pair in (data['events'][:2],list(reversed(data['events'][:2]))):
+            rebinding=copy.deepcopy(data);rebinding['events'].extend([{'kind':'resume'},*copy.deepcopy(pair)])
+            self.assertEqual(canary.inspect_execution(rebinding)['binding'],'PASS')
+        for field,value in (('model','gpt-6-astra'),('effort','medium')):
+            mixed=copy.deepcopy(data);mixed['expected'].pop(field)
+            mixed['requested_spawn']={'agent_type':'cer_auto_sol61_engineer','reasoning_effort':'high','fork_turns':'none'}
+            mixed['events'].insert(0,{**data['events'][1],field:value})
+            self.assertEqual(canary.inspect_execution(mixed)['binding'],'FAIL')
+        for event in ({'kind':'output','bytes':4095,'framing_bytes':2},
+                      {'kind':'output','bytes':4095,'framing_bytes':2,'truncated':'false'},
+                      {'kind':'output','bytes':'unknown','framing_bytes':2,'truncated':True},
+                      {'kind':'output','bytes':2,'framing_bytes':None,'truncated':True}):
+            for position in (0,len(data['events'])):
+                mixed=copy.deepcopy(data);mixed['events'].insert(position,event)
+                self.assertEqual(canary.inspect_execution(mixed)['output'],'FAIL')
+
+    def test_execution_inspection_cli_is_bounded_and_creates_no_files(self):
+        command=[sys.executable,'-B',str(ROOT/'scripts/canary.py'),'inspect']
+        before=set(self.root.iterdir())
+        result=subprocess.run(command,input=json.dumps(self.execution_fixture()).encode(),cwd=self.root,capture_output=True)
+        self.assertEqual(result.returncode,0,result.stderr);self.assertLessEqual(len(result.stdout),4096)
+        self.assertEqual(json.loads(result.stdout)['binding'],'PASS')
+        for raw in (b'x'*16385,b'{"events":[],"events":[]}',b'{"n":NaN}'):
+            bad=subprocess.run(command,input=raw,cwd=self.root,capture_output=True)
+            self.assertEqual(bad.returncode,2,bad.stderr);self.assertEqual(bad.stdout,b'')
+        self.assertEqual(set(self.root.iterdir()),before)
+
     def prepare_fixture(self):
         self.install(); run = canary.prepare(self.root)
         plan = json.loads((run / 'plan.json').read_text())
