@@ -10,7 +10,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
+import tracemalloc
 import unittest
+from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[1]
 GUARD=ROOT/'hooks/astra_write_guard.py'
@@ -593,6 +596,307 @@ class NativeGuardTests(unittest.TestCase):
         self.assertEqual(set(output),{'hookSpecificOutput'})
         self.assertNotIn('continue',output)
         self.assertEqual(output['hookSpecificOutput']['permissionDecision'],'deny')
+
+
+class JsonReaderTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        self.root=Path(self.tmp.name).resolve();self.file=self.root/'data.json'
+        self.reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+
+    def call(self, pointer='', mode='value', **options):
+        request={'op':'json','path':'data.json','pointer':pointer,'mode':mode,**options}
+        return json.loads(self.reader['run'](self.root,request))
+
+    def test_json_pointer_selects_small_value(self):
+        self.file.write_bytes(b'{"a/b":{"~key":[null,{"":42}]}}')
+        page=self.call('/a~1b/~0key/1/')
+        self.assertEqual(page['data'],'42')
+        self.assertIsNone(page['next_cursor'])
+
+    def test_json_large_source_preserves_old_read_limit(self):
+        with self.file.open('wb') as stream:
+            stream.write(b'{"padding":"')
+            for _ in range(17):stream.write(b'x'*(1024*1024))
+            stream.write(b'","tail":7}')
+        with self.assertRaisesRegex(ValueError,'16 MiB'):
+            self.reader['run'](self.root,{'op':'page','path':'data.json'})
+        self.assertEqual(self.call('/tail')['data'],'7')
+
+    def cli(self, *args):
+        return subprocess.run([sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),
+                               'json','--root',str(self.root),'--path','data.json',*args],
+                              capture_output=True,timeout=30)
+
+    def test_json_cli_and_native_protocol(self):
+        self.file.write_text('{"value": [true,null,1e400]}',encoding='utf-8')
+        result=self.cli('--pointer','/value/2')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(json.loads(result.stdout)['data'],'1e400')
+        event={'hook_event_name':'PreToolUse','model':'gpt-6-astra','session_id':'shared-parent',
+               'cwd':str(self.root),'tool_name':'Bash',
+               'tool_input':{'command':'cer-read '+json.dumps(
+                   {'op':'json','path':'data.json','pointer':'/value','mode':'members'})}}
+        hook=subprocess.run([sys.executable,'-I','-B',str(GUARD)],input=json.dumps(event),
+                            capture_output=True,text=True,encoding='utf-8',timeout=10)
+        self.assertEqual(hook.returncode,0,hook.stderr)
+        output=json.loads(hook.stdout)['hookSpecificOutput']
+        self.assertNotEqual(output.get('permissionDecision'),'deny')
+        self.assertIn('updatedInput',output)
+        command=output['updatedInput']['command']
+        argv=['pwsh','-NoProfile','-NonInteractive','-Command',command] if os.name=='nt' else ['/bin/sh','-c',command]
+        actual=subprocess.run(argv,cwd=self.root,capture_output=True,timeout=15)
+        self.assertEqual(actual.returncode,0,actual.stderr)
+        self.assertEqual([item['index'] for item in json.loads(actual.stdout)['members']],[0,1,2])
+        event['tool_input']['command']='cer-read '+json.dumps({'op':'json','path':'data.json','pointer':'#/value'})
+        rejected=subprocess.run([sys.executable,'-I','-B',str(GUARD)],input=json.dumps(event),
+                                capture_output=True,text=True,encoding='utf-8',timeout=10)
+        self.assertEqual(json.loads(rejected.stdout)['hookSpecificOutput']['permissionDecision'],'deny')
+
+    def test_json_pointer_rfc_boundaries(self):
+        self.file.write_text('{"":0,"~1":1,"01":2,"é":3,"a":[4]}',encoding='utf-8')
+        for pointer,expected in (('/', '0'),('/~01','1'),('/01','2'),('/é','3'),('/a/0','4')):
+            self.assertEqual(self.call(pointer)['data'],expected)
+        for pointer in ('#','a','/~','/~2','/a/01','/a/-','/a/+0','/a/０','/a/1','/e\u0301'):
+            with self.subTest(pointer=pointer),self.assertRaises(ValueError):self.call(pointer)
+        self.assertEqual(self.call()['data'],self.file.read_text(encoding='utf-8'))
+
+    def test_json_value_pages_preserve_utf8_crlf_and_cross_block_escapes(self):
+        expected='{\r\n"a":"'+('汉🙂\\\\\\\"\\uD83D\\uDE42'*350)+'"\r\n}'
+        padding=b'x'*(65536-len(b'{"padding":"')-1)
+        self.file.write_bytes(b'{"padding":"'+padding+b'\xf0\x9f\x99\x82","target":'+
+                              expected.encode('utf-8')+b'}')
+        page=self.call('/target');parts=[];cursors=set()
+        while True:
+            encoded=json.dumps(page,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+            self.assertLessEqual(len(encoded)+2,4096)
+            parts.append(page['data']);cursor=page['next_cursor']
+            if cursor is None:break
+            self.assertNotIn(cursor,cursors);cursors.add(cursor)
+            page=self.call('/target',cursor=cursor)
+        self.assertGreater(len(parts),1)
+        self.assertEqual(''.join(parts),expected)
+        self.file.write_bytes(b'{"x":"'+b'a'*(65536-8)+b'\\uD83D\\uDE42","y":2}')
+        self.assertEqual(self.call('/y')['data'],'2')
+        self.file.write_text(json.dumps({'x':'a'*20000}),encoding='utf-8')
+        page=self.call('/x');cursor=page['next_cursor']
+        import base64
+        state=json.loads(base64.urlsafe_b64decode(cursor+'='*(-len(cursor)%4)))
+        state.pop('check');offset=state.pop('offset');first=state.pop('first');last=state.pop('last')
+        enlarged={**page,'data':page['data']+'a',
+                  'next_cursor':self.reader['cursor_token'](state,offset+1,first,last)}
+        with self.assertRaisesRegex(ValueError,'envelope'):
+            self.reader['envelope'](enlarged,4096)
+
+    def test_json_members_paginate_direct_children_only(self):
+        value={f'key/{i}~':{'nested':[i]} for i in range(300)}
+        self.file.write_text(json.dumps({'root':value}),encoding='utf-8')
+        page=self.call('/root','members');members=[];cursors=set()
+        while True:
+            self.assertLessEqual(len(json.dumps(page,ensure_ascii=False,separators=(',',':')).encode())+2,4096)
+            members.extend(page['members']);cursor=page['next_cursor']
+            if cursor is None:break
+            self.assertTrue(page['members']);self.assertNotIn(cursor,cursors);cursors.add(cursor)
+            page=self.call('/root','members',cursor=cursor)
+        self.assertEqual([item['key'] for item in members],list(value))
+        self.assertTrue(all(item['type']=='object' for item in members))
+        self.assertEqual(members[0]['pointer'],'/root/key~10~0')
+        self.assertEqual(self.call(members[-1]['pointer'])['data'],'{"nested": [299]}')
+        self.file.write_text('[[],{},null,true,"s",2]',encoding='utf-8')
+        items=self.call('','members')['members']
+        self.assertEqual([item['index'] for item in items],list(range(6)))
+        self.assertEqual([item['type'] for item in items],['array','object','null','boolean','string','number'])
+        self.file.write_text('{}',encoding='utf-8')
+        self.assertEqual(self.call('','members')['members'],[])
+
+    def test_json_invalid_source_is_rejected_even_after_selected_value(self):
+        cases=[b'{"ok":1,"later":NaN}',b'{"ok":1,"later":Infinity}',
+               b'{"ok":1,"later":01}',b'{"ok":1,"later":1.}',b'{"ok":1,"later":1e+}',
+               b'{"ok":1,"later":"\\q"}',b'{"ok":1,"later":"\\uXX00"}',
+               b'{"ok":1,"later":"\\uD800"}',b'{"ok":1,"later":"\\uDC00"}',
+               b'{"ok":1,"later":"\x00"}',b'{"ok":1,"later":"\xff"}',
+               b'{"ok":1,"later":2,}',b'{"ok":1} false',b'{"ok":1',b'{"ok":1,"later":[1,]}']
+        for raw in cases:
+            with self.subTest(raw=raw):
+                self.file.write_bytes(raw)
+                result=self.cli('--pointer','/ok')
+                self.assertEqual(result.returncode,2,result.stdout)
+                self.assertEqual(result.stdout,b'')
+                self.assertLessEqual(len(result.stderr)+1,4096)
+
+    def test_json_duplicates_depth_and_key_budgets(self):
+        for raw,pointer,mode in ((b'{"x":1,"x":2}','/x','value'),
+                                 (b'{"x":{"v":1},"x":{"v":2}}','/x/v','value'),
+                                 (b'{"x":1,"x":2}','','members')):
+            self.file.write_bytes(raw)
+            with self.assertRaisesRegex(ValueError,'duplicate'):self.call(pointer,mode)
+        self.file.write_bytes(b'{"skip":{"x":1,"x":2},"ok":3}')
+        self.assertEqual(self.call('/ok')['data'],'3')
+        self.file.write_bytes(b'['*64+b'0'+b']'*64)
+        self.assertEqual(self.call()['data'],'['*64+'0'+']'*64)
+        self.file.write_bytes(b'['*65+b'0'+b']'*65)
+        with self.assertRaisesRegex(ValueError,'depth'):self.call()
+        self.file.write_text(json.dumps({'k'*(16*1024):0}),encoding='utf-8')
+        self.assertTrue(self.call()['data'])
+        self.file.write_text(json.dumps({'k'*(16*1024+1):0}),encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'key'):self.call()
+        self.file.write_text(json.dumps({str(i):0 for i in range(16385)}),encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'16384'):self.call('','members')
+        self.file.write_text(json.dumps({str(i)+'k'*6000:0 for i in range(175)}),encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'1 MiB'):self.call('','members')
+        with self.file.open('wb') as stream:stream.truncate(256*1024*1024+1)
+        with self.assertRaisesRegex(ValueError,'256 MiB'):self.call()
+
+    def test_json_cursor_is_bound_to_source_pointer_mode_and_boundary(self):
+        raw=json.dumps({'x':'汉🙂'*4000,'y':list(range(400))},ensure_ascii=False).encode('utf-8')
+        self.file.write_bytes(raw);cursor=self.call('/x')['next_cursor']
+        self.assertIsNotNone(cursor)
+        for pointer,mode,token in (('/y','value',cursor),('/x','members',cursor),('/x','value',cursor+'!')):
+            with self.subTest(pointer=pointer,mode=mode),self.assertRaises(ValueError):
+                self.call(pointer,mode,cursor=token)
+        import base64
+        state=json.loads(base64.urlsafe_b64decode(cursor+'='*(-len(cursor)%4)))
+        state.pop('check');offset=state.pop('offset');first=state.pop('first');last=state.pop('last')
+        fake=self.reader['cursor_token'](state,first+2,first,last)
+        with self.assertRaises(UnicodeError):self.call('/x',cursor=fake)
+        (self.root/'other.json').write_bytes(raw)
+        with self.assertRaises(ValueError):
+            self.reader['run'](self.root,{'op':'json','path':'other.json','pointer':'/x','cursor':cursor})
+        before=self.file.stat();self.file.write_bytes(raw.replace(b', 399]',b', 398]'))
+        os.utime(self.file,ns=(before.st_atime_ns,before.st_mtime_ns))
+        self.assertEqual(self.file.stat().st_size,before.st_size)
+        with self.assertRaisesRegex(ValueError,'cursor'):self.call('/x',cursor=cursor)
+        self.file.write_bytes(raw);member_cursor=self.call('/y','members')['next_cursor']
+        state=json.loads(base64.urlsafe_b64decode(member_cursor+'='*(-len(member_cursor)%4)))
+        state.pop('check');offset=state.pop('offset');first=state.pop('first');last=state.pop('last')
+        fake=self.reader['cursor_token'](state,offset+1,first,last)
+        with self.assertRaisesRegex(ValueError,'boundary'):self.call('/y','members',cursor=fake)
+
+    def test_json_bad_inputs_paths_batch_and_small_caps_fail_closed(self):
+        self.file.write_text('{"x":"'+'a'*5000+'"}',encoding='utf-8')
+        for options in ({'max_bytes':256},{'max_bytes':4097},{'max_bytes':True},
+                        {'cursor':''},{'cursor':'x'*2049},{'mode':'depth'}, {'depth':1}):
+            with self.subTest(options=options),self.assertRaises(ValueError):self.call('/x',**options)
+        for path in ('../data.json','*.json','C:/data.json','data\\x.json','.'):
+            with self.subTest(path=path),self.assertRaises(ValueError):
+                self.reader['run'](self.root,{'op':'json','path':path,'pointer':''})
+        with self.assertRaisesRegex(ValueError,'batched'):
+            self.reader['run'](self.root,{'op':'batch','requests':[{'op':'json','path':'data.json','pointer':''}]})
+        self.file.write_text('{"x":1}',encoding='utf-8')
+        for args in (('--pointer','/x','--pointer','/x'),('--pointer','/x','--mode','no'),(),
+                     ('--pointer','/x','--max-bytes','256')):
+            result=self.cli(*args)
+            # A terminal one-byte value fits 256 bytes; unfinished values above do not.
+            if args==('--pointer','/x','--max-bytes','256'):
+                self.assertEqual(result.returncode,0,result.stderr)
+            else:
+                self.assertEqual(result.returncode,2,result.stdout);self.assertEqual(result.stdout,b'')
+
+    def test_json_symlink_refused(self):
+        self.file.write_text('{}',encoding='utf-8');link=self.root/'link.json'
+        try:link.symlink_to(self.file)
+        except OSError:self.skipTest('symlink privilege unavailable')
+        with self.assertRaisesRegex(ValueError,'symlink|reparse'):
+            self.reader['run'](self.root,{'op':'json','path':'link.json','pointer':''})
+
+    def test_json_reparse_refused_without_windows_privilege(self):
+        self.file.write_text('{}',encoding='utf-8');original=Path.lstat
+        class Reparse:
+            st_file_attributes=0x400
+        def attributes(path,*args,**kwargs):
+            return Reparse() if path==self.file else original(path,*args,**kwargs)
+        with mock.patch.object(Path,'is_symlink',return_value=False),mock.patch.object(Path,'lstat',attributes):
+            with self.assertRaisesRegex(ValueError,'reparse'):
+                self.call()
+
+    def test_json_giant_number_and_skipped_objects_do_not_accumulate(self):
+        with self.file.open('wb') as stream:
+            stream.write(b'{"number":1')
+            for _ in range(32):stream.write(b'9'*65536)
+            stream.write(b'.')
+            for _ in range(32):stream.write(b'9'*65536)
+            stream.write(b'e+')
+            for _ in range(32):stream.write(b'9'*65536)
+            stream.write(b',"objects":[')
+            for index in range(20000):
+                if index:stream.write(b',')
+                stream.write(b'{"same":0,"same":1}')
+            stream.write(b'],"tail":1}')
+        tracemalloc.start()
+        try:
+            self.assertEqual(self.call('/tail')['data'],'1')
+            _,peak=tracemalloc.get_traced_memory()
+        finally:tracemalloc.stop()
+        self.assertLess(peak,8*1024*1024)
+        print(f'JSON_NUMBER_RESOURCE source_bytes={self.file.stat().st_size} peak_bytes={peak}')
+
+    def test_json_132_mib_small_values_have_bounded_reads_and_memory(self):
+        block=b'x'*(1024*1024)
+        with self.file.open('wb') as stream:
+            stream.write(b'{"head":1,"catalog":'+json.dumps({str(i):[i] for i in range(300)}).encode()+b',"padding":"')
+            for _ in range(66):stream.write(block)
+            stream.write(b'","middle":2,"more":"')
+            for _ in range(66):stream.write(block)
+            stream.write(b'","tail":3}')
+        before=self.file.stat();metrics=[];original=Path.open
+        class BoundedFile:
+            def __init__(self,stream):self.stream=stream
+            def __enter__(self):return self
+            def __exit__(self,*args):return self.stream.__exit__(*args)
+            def fileno(self):return self.stream.fileno()
+            def seek(self,*args):return self.stream.seek(*args)
+            def read(self,count=-1):
+                if not 0<=count<=65536:raise AssertionError(f'unbounded read: {count}')
+                data=self.stream.read(count);metrics.append((count,len(data)));return data
+        def opening(path,*args,**kwargs):
+            stream=original(path,*args,**kwargs)
+            return BoundedFile(stream) if path==self.file and args==('rb',) else stream
+        started=time.monotonic();tracemalloc.start()
+        try:
+            with mock.patch.object(Path,'open',opening):
+                for pointer,expected in (('/head','1'),('/middle','2'),('/tail','3')):
+                    self.assertEqual(self.call(pointer)['data'],expected)
+            _,peak=tracemalloc.get_traced_memory()
+        finally:tracemalloc.stop()
+        self.assertLess(peak,8*1024*1024)
+        self.assertEqual(max(count for count,_ in metrics),65536)
+        self.assertLessEqual(sum(size for _,size in metrics),3*(before.st_size+4096))
+        self.assertEqual((self.file.stat().st_size,self.file.stat().st_mtime_ns),(before.st_size,before.st_mtime_ns))
+        print(f'JSON_RESOURCE source_bytes={before.st_size} peak_bytes={peak} '
+              f'max_read={max(count for count,_ in metrics)} elapsed_s={time.monotonic()-started:.3f}')
+        page=self.call('/catalog','members');members=[];pages=0
+        while True:
+            self.assertLessEqual(len(json.dumps(page,ensure_ascii=False,separators=(',',':')).encode())+2,4096)
+            pages+=1;members.extend(page['members']);cursor=page['next_cursor']
+            if cursor is None:break
+            self.assertTrue(page['members'])
+            page=self.call('/catalog','members',cursor=cursor)
+        self.assertGreater(pages,1)
+        self.assertEqual([item['key'] for item in members],[str(i) for i in range(300)])
+        import io
+        from types import SimpleNamespace
+        changed=False
+        class MutatingFile(BoundedFile):
+            def read(self,count=-1):
+                nonlocal changed
+                data=super().read(count)
+                if not data and not changed:
+                    changed=True
+                    with original(self_path,'r+b') as writer:writer.seek(8);writer.write(b'9')
+                    os.utime(self_path,ns=(before.st_atime_ns,before.st_mtime_ns+1000000000))
+                return data
+        self_path=self.file
+        def changing_open(path,*args,**kwargs):
+            stream=original(path,*args,**kwargs)
+            return MutatingFile(stream) if path==self.file and args==('rb',) else stream
+        out=io.BytesIO();err=io.BytesIO()
+        with mock.patch.object(Path,'open',changing_open),mock.patch.object(sys,'argv',[
+                'reader.py','json','--root',str(self.root),'--path','data.json','--pointer','/tail']),\
+                mock.patch.object(sys,'stdout',SimpleNamespace(buffer=out)),\
+                mock.patch.object(sys,'stderr',SimpleNamespace(buffer=err)):
+            code=self.reader['main']()
+        self.assertTrue(changed);self.assertEqual(code,2);self.assertEqual(out.getvalue(),b'')
+        self.assertIn(b'changed',err.getvalue());self.assertLessEqual(len(err.getvalue())+1,4096)
 
 
 if __name__=='__main__':unittest.main()

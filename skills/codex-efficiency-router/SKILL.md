@@ -1,17 +1,17 @@
 ---
 name: codex-efficiency-router
-description: Quality-gated routing; first load SKILL alone in bounded pages. Astra for hard decisions/rare bounded root repairs; skip tiny work/concurrent routers.
+description: Multi-step repo work/delegation/large evidence reads; first load SKILL alone in bounded pages; skip tiny work/concurrent routers.
 ---
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.8.3 -->
+<!-- CER version: 0.8.4 -->
 
 Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
-Verified Python `-I -B <Skill>/scripts/readonly_reader.py`; handoff both. All ops: `--root ABS --path PATH`. Files/rules: `page`, same root/path `--cursor TOKEN` to null; unknown: `locate --query Q`; current located lines: `excerpt --start N --lines N` (count 1..200). Check exit before JSON; fix limits/page/locate on error. Page <=4096B; no full-file slicing/merging pages/files.
+Verified Python `-I -B <Skill>/scripts/readonly_reader.py`; handoff both. All ops: `--root ABS --path PATH`. Files/rules: `page`, same root/path `--cursor TOKEN` to null; unknown: `locate --query Q`; current located lines: `excerpt --start N --lines N` (count 1..200). JSON: `json --help`. Check exit before JSON; fix limits/page/locate on error. Page <=4096B; no full-file slicing/merging pages/files.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
 

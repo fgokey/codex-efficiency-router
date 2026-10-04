@@ -2,7 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.3 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.4 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.4: large JSON projection
+
+Use `python -I -B <Skill>/scripts/readonly_reader.py json --root ABS --path FILE --pointer /path` for exact JSON value text, or add `--mode members` for direct child keys/indexes, types and pointers. Follow a non-null `next_cursor` with the same command/pointer/mode and `--cursor TOKEN`; check exit before parsing. Each page validates and hashes the whole UTF-8 source in 64 KiB reads (256 MiB scan limit), without a DOM or cache, so each page costs O(file size). Depth is limited to 64, keys to 16 KiB, and member directories to 16384 entries/1 MiB decoded keys. Responses including cursor and CRLF stay within 4096 bytes; old file-read limits stay at 16 MiB. Only string-form JSON Pointer is supported; changed sources and resource-limit violations fail explicitly.
 
 ## v0.8.3: worker lifecycle and bounded tool results
 

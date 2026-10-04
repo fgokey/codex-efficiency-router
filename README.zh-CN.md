@@ -2,7 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.3 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.4 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+
+## v0.8.4：大 JSON 定点读取
+
+用 `python -I -B <Skill>/scripts/readonly_reader.py json --root ABS --path FILE --pointer /path` 获取原样 JSON 值文本，加 `--mode members` 获取直接子成员的键/索引、类型和 Pointer。`next_cursor` 非空时，用相同命令、Pointer、模式加 `--cursor TOKEN` 续页；先检查退出码再解析。每页以 64 KiB 块重新验证并计算完整 UTF-8 源文件的 SHA（扫描上限 256 MiB），不建立 DOM 或缓存，因此每页耗时为 O(文件大小)。深度最多 64，键最多 16 KiB，成员目录最多 16384 项且解码后键合计最多 1 MiB。响应连游标和 CRLF 最多 4096 字节；旧读取操作仍限 16 MiB。仅支持字符串形式 JSON Pointer，源文件变更或资源超限明确失败。
 
 ## v0.8.3：执行器生命周期和工具结果限量输出
 

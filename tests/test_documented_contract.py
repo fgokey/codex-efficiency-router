@@ -72,7 +72,7 @@ class DocumentedContractTests(unittest.TestCase):
             for bad in (original.replace('description: ', 'description: malformed: ', 1),
                         original.replace('name: codex-efficiency-router',
                                          'name: codex-efficiency-router\nname: duplicate'),
-                        original.replace('description: Quality-gated', 'description: # missing')):
+                        original.replace('description: ', 'description: # missing ', 1)):
                 with self.subTest(text=bad[:120]):
                     self.assertNotEqual(bad, original)
                     path.write_text(bad)

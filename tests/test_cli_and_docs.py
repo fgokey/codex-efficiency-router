@@ -100,6 +100,16 @@ class CliAndDocsTests(unittest.TestCase):
             help_result = read("--help")
             self.assertEqual(help_result.returncode, 0, help_result.stderr.decode("utf-8", "replace"))
             self.assertIn(b"locate", help_result.stdout)
+            self.assertIn(b"json", help_result.stdout)
+            (project / 'large.json').write_text('{"array":[1,{"nested":2}]}',encoding='utf-8')
+            projected=read('json','--root',str(project),'--path','large.json',
+                           '--pointer','/array','--mode','members')
+            self.assertEqual(projected.returncode,0,projected.stderr.decode('utf-8','replace'))
+            self.assertLessEqual(len(projected.stdout)+len(projected.stderr),4096)
+            self.assertEqual([item['type'] for item in json.loads(projected.stdout)['members']],
+                             ['number','object'])
+            invalid=read('json','--root',str(project),'--path','large.json','--pointer','#/array')
+            self.assertEqual(invalid.returncode,2);self.assertEqual(invalid.stdout,b'')
             if shutil.which("rg"):
                 located = read("locate", "--root", str(project), "--path", "source.txt",
                                "--query", "汉")

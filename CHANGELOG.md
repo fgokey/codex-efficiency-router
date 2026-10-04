@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.4 — 2026-10-04
+
+- Add bounded, streaming JSON Pointer value/member pages for large UTF-8 evidence files; validate and hash the whole source per page without loading a DOM. Preserve old 16 MiB file-read limits and the 4096-byte output envelope.
+- Make discovery explicit for multi-step repository work, delegation and large evidence reads; retain existing instruction budgets and permissions.
+
 ## 0.8.3 — 2026-10-04
 
 - Keep workers available for remaining checks or corrections; close after delivery and parent acceptance. Resume invalidates the old release: return read-only, verify the new host binding, then release separately without assuming the model persists.
