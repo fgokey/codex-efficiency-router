@@ -2,9 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.2 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.3 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-## v0.8.2: reader entry and error recovery
+## v0.8.3: worker lifecycle and bounded tool results
+
+Keep workers available for remaining checks or corrections and close after parent acceptance. A real resume invalidates the old release: return read-only, verify the new host binding, then release separately; the model may change. Capture large tool results, select necessary fields and retain cursors before counting serialized output plus framing and emitting one page. Existing reader algorithms and instruction budgets are unchanged.
 
 First load SKILL alone in bounded pages. Use `page` for known files/rules, and `excerpt` only for current located lines (count 1–200); check exit status before parsing JSON. Invalid ranges retain nonzero exit and empty stdout, with limits/file line count and page/locate recovery guidance. v0.8.1 already introduced `page --root ABS --path FILE` without a cursor for the first page; the 4096-byte limit and changed-file rejection remain.
 

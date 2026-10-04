@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.3 — 2026-10-04
+
+- Keep workers available for remaining checks or corrections; close after delivery and parent acceptance. Resume invalidates the old release: return read-only, verify the new host binding, then release separately without assuming the model persists.
+- Capture large tool results, select fields and retain cursors before counting serialized output plus framing and emitting one page. Keep existing reader algorithms, negative cases and instruction budgets.
+
 ## 0.8.2 — 2026-10-04
 
 - Add a bounded, separate first-load hint to the Skill description; clarify page for known files and excerpt only for current located lines. Check exit status before JSON parsing.

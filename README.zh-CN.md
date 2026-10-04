@@ -2,9 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.2 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.3 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-## v0.8.2：读取入口和错误恢复
+## v0.8.3：执行器生命周期和工具结果限量输出
+
+还有检查或修正时保留执行器，父级验收完成后再关闭。真实恢复会使旧授权失效：先只读返回，核验新的宿主绑定，再单独授权；不能假定模型保持不变。大工具结果先保存在工具内部，只选必要字段并保留续页游标；统计序列化结果和外层包装的总量后，再输出一页。现有读取算法和指令预算不变。
 
 首次单独分页加载 SKILL。已知文件或完整规则用 `page`，只有已定位的当前行范围才用 `excerpt`（行数 1–200）；解析 JSON 前先检查退出码。非法范围仍非零退出且 stdout 为空，错误提示给出限制或实际行数以及 page/locate 恢复方向。0.8.1 已支持 `page --root ABS --path FILE` 不带游标读取首个页面；4096 字节上限和文件变更拒绝保持生效。
 

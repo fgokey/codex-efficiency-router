@@ -88,7 +88,8 @@ class InstructionFootprintTests(unittest.TestCase):
                        'Check exit before JSON', 'fix limits/page/locate on error',
                        'no full-file slicing/merging pages/files',
                        'total output below outer incl framing',
-                       'serialize fields+cursor, one page',
+                       'capture result, select fields, retain cursor, serialize/count',
+                       'then emit one page',
                        'Inner/item/line caps fail', 'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:

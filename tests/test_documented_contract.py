@@ -84,7 +84,8 @@ class DocumentedContractTests(unittest.TestCase):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
                        'Do not weaken assertions', 'contrary evidence', 'revision/dirt',
-                       'same-model handoff', 'AND net benefit', 'without authority/ownership/capacity',
+                       'same-model needs contextual value AND net benefit',
+                       'authority/ownership/capacity gaps BLOCK/defer',
                        'no classifier', 'no agent per file',
                        'higher efforts need evidence/support'):
             self.assertIn(phrase, core)
@@ -92,7 +93,7 @@ class DocumentedContractTests(unittest.TestCase):
     def test_semantic_loss_and_review_evidence_are_required(self):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         quality = (ROOT / 'skills' / PROJECT / 'references/quality.md').read_text()
-        for phrase in ('changed semantic invariants', 'Loss/eviction/coalescing',
+        for phrase in ('Check semantic invariants', 'Loss/eviction/coalescing',
                        'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
             self.assertIn(phrase, core)
         for phrase in ('Findings cite before/after or requirement violation', 'label hypotheses',
@@ -110,13 +111,13 @@ class DocumentedContractTests(unittest.TestCase):
         core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         self.assertIn('Run dispatch preflight', core)
-        for phrase in ('every root', 'exact changed paths/status',
-                       'owned/prior dirt', 'Parent checks each diff/status',
+        for phrase in ('all roots', 'exact paths/status',
+                       'owned/prior dirt', 'Parent checks all diffs/status',
                        'review/open-review', 'unstaged review',
-                       'workspace roots', 'native parent file-change attribution',
-                       'model name and review/open-review do not prove it',
-                       'Missing/unknown support stops',
-                       'Never edit for attribution'):
+                       'Compare roots before writes', 'native parent file-change attribution',
+                       'model/review/open-review prove none',
+                       'Missing/unknown stops',
+                       'never edit for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
             instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
@@ -176,7 +177,7 @@ class DocumentedContractTests(unittest.TestCase):
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
         core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
-        for phrase in ('rule paths','rationale','context gaps block affected work'):
+        for phrase in ('rule paths','rationale','Read rules; gaps block affected work'):
             self.assertIn(phrase,core)
         for name in EXPECTED:
             role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()

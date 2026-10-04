@@ -72,7 +72,7 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(policy["context_efficiency"], {
             "mandatory_rules": "separate bounded chunks until the required text is complete",
             "unknown_size": "index, summarize or split before combining; line count alone does not bound content volume",
-            "batch": "one global byte or character cap fits all shell, web and nested-tool output plus margin within the smallest outer tool cap",
+            "batch": "capture shell, web and nested-tool results, select needed fields and retain cursors; serialize/count their total output plus framing before emitting one page within the smallest outer tool cap",
             "mixed_command": "every result counts against the outer envelope",
             "truncation": "recover only the missing relevant range from its cursor without replaying effects; disclose omitted evidence",
             "tool_discovery": "reuse known schemas until host or state invalidation",
@@ -81,7 +81,7 @@ class DoctorTests(unittest.TestCase):
             "search_limits": "rg -m and line counts limit each file's matches or lines, not total bytes",
         })
         self.assertEqual(policy["mutation_admission"], {
-            "writer_binding": "parent verifies host-observed model, effort, role, permission and owner once per scoped repair unit; reuse until invalidated by those fields, session resume or contradictory evidence",
+            "writer_binding": "parent verifies current agent/session host-observed model, effort, role, permission and owner once per scoped repair unit; same-session reuse until those fields change or contradictory evidence appears; real resume voids release, returns read-only, then parent checks new host binding and sends a separate release; resumed model may change",
             "repair_unit": "implementation, source/build config, formatting, targeted tests and self-check need no per-command reauthorization",
             "separate_units": "binary copy, runtime/permission config, deployment and destructive recovery remain separately bounded",
             "policy_denial": "stop exact or equivalent replay until a supported permission change",

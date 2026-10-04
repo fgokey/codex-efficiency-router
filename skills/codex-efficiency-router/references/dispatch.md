@@ -1,16 +1,14 @@
 # Native dispatch and guard
 
-Leaves spawn only as parent-assigned Ultra Sol/Astra for disjoint work; children non-Ultra, Astra subtrees read-only; no duplicates. Handoff: authority, exact repo/ref/destination/checks; grants none.
+Only parent-assigned Ultra Sol/Astra leaves may spawn disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority, exact repo/ref/destination/checks; grants none.
 
-## Native change summary and review
+Compare roots before writes. Required native parent file-change attribution needs support; model/review/open-review prove none. Missing/unknown stops.
 
-Before writes compare workspace roots. If required, verify native parent file-change attribution; model name and review/open-review do not prove it. Missing/unknown support stops.
+Return all roots, exact paths/status, owned/prior dirt. Parent checks all diffs/status and opens unstaged review; never edit for attribution.
 
-Return every root, exact changed paths/status, owned/prior dirt. Parent checks each diff/status; opens unstaged review. Never edit for attribution.
+Spawn read-only; parent verifies current agent/session host-observed model/effort/role/permission/owner, explicitly releases unit for writes. ID/config/claims/old logs fail. Host metadata; gaps need bounded `session_meta`/`turn_context`, not tails/full scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release if binding holds; real restart/resume or contradiction rechecks. Resume voids release: read-only return, parent checks new host binding, separate RELEASE; model may change.
 
-Spawn/resume child read-only. Parent verifies current agent/session host-observed model/effort/role/permission/owner, then explicitly releases unit for writes. ID/config/claims/old logs fail. Prefer host metadata; fill gaps via bounded `session_meta`/`turn_context`, not arbitrary tails/full scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release if fields/owner hold; real restart/resume or contradiction rechecks.
-
-Unit: source/build config/format/targeted tests/self-check. Bound binary copy, runtime config, deploy, destructive recovery separately; reconcile first.
+Unit: source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: separate bounds, reconcile first.
 
 Policy denial stops equivalent replay/repackaging until supported permission change; `approval=never` gives no manual boundary.
 
