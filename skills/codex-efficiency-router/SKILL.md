@@ -1,17 +1,17 @@
 ---
 name: codex-efficiency-router
-description: Quality-gated Codex routing; Astra for hard decisions and rare bounded root repairs. Skip tiny work and concurrent routers.
+description: Quality-gated routing; first load SKILL alone in bounded pages. Astra for hard decisions/rare bounded root repairs; skip tiny work/concurrent routers.
 ---
 
 # Codex Efficiency Router
 
-<!-- CER version: 0.8.1 -->
+<!-- CER version: 0.8.2 -->
 
 Preserve quality, authority, parent model; no classifier, hidden CLI/API/config edits.
 
 Installation: fixed; automatic low: disabled.
 
-Text: verified Python `-I -B <Skill>/scripts/readonly_reader.py`; handoff both paths. Known: `excerpt --root ABS --path FILE --start N --lines N`; unknown: `locate --root ABS --path DIR --query Q`. Full rules: `page --root ABS --path FILE`; same root/path `--cursor TOKEN` to null. Emit one <=4096B page; never read whole files to slice or combine pages/files.
+Verified Python `-I -B <Skill>/scripts/readonly_reader.py`; handoff both. All ops: `--root ABS --path PATH`. Files/rules: `page`, same root/path `--cursor TOKEN` to null; unknown: `locate --query Q`; current located lines: `excerpt --start N --lines N` (count 1..200). Check exit before JSON; fix limits/page/locate on error. Page <=4096B; no full-file slicing/merging pages/files.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
 
@@ -57,4 +57,4 @@ Check requirements/correctness, repo checks/reproduction; new tests are not inde
 
 Read references on trigger/stale/lost: [effort.md](references/effort.md) before dispatch; [routing.md](references/routing.md) for Astra admission; [dispatch.md](references/dispatch.md) before delegation/writes; [quality.md](references/quality.md) for recovery/disputed evidence.
 
-CLI reads capped. For other tools cap total output below outer incl framing; index unknowns, capture/serialize fields+cursor, emit one page. Inner/item/line limits fail. Resume gaps; shrink batch; disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay.
+Other tools: total output below outer incl framing; index unknowns, serialize fields+cursor, one page. Inner/item/line caps fail. Resume gaps, shrink batches, disclose omissions. Reuse tools; act on change/due. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Honor disable/no-subagent/no-escalation. Report requested/observed; UNKNOWN/MISMATCH suspends auto-low. Resolve MISMATCH before continuation. Never invent identity/savings/enforcement/cleanup; reconcile unknown effects before replay.

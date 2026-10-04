@@ -69,11 +69,12 @@ class DocumentedContractTests(unittest.TestCase):
             shutil.copytree(ROOT / 'skills' / PROJECT, skill)
             path = skill / 'SKILL.md'
             original = path.read_text()
-            for bad in (original.replace('routing; Astra', 'routing: Astra'),
+            for bad in (original.replace('description: ', 'description: malformed: ', 1),
                         original.replace('name: codex-efficiency-router',
                                          'name: codex-efficiency-router\nname: duplicate'),
                         original.replace('description: Quality-gated', 'description: # missing')):
                 with self.subTest(text=bad[:120]):
+                    self.assertNotEqual(bad, original)
                     path.write_text(bad)
                     self.assertTrue(any('frontmatter' in error
                                         for error in doctor.validate_tree(path, ROOT / 'agents')))

@@ -79,23 +79,24 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = SKILL.read_text()
-        for phrase in ('verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
-                       'handoff both paths',
-                       'excerpt --root ABS --path FILE --start N --lines N',
-                       'locate --root ABS --path DIR --query Q',
-                       '`page --root ABS --path FILE`',
-                       'same root/path `--cursor TOKEN` to null', 'one <=4096B page',
-                       'never read whole files to slice or combine pages/files',
-                       'CLI reads capped', 'total output below outer incl framing',
-                       'capture/serialize fields+cursor', 'emit one page',
-                       'Inner/item/line limits fail', 'Resume gaps', 'disclose omissions'):
+        for phrase in ('first load SKILL alone in bounded pages',
+                       'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
+                       'handoff both', 'All ops: `--root ABS --path PATH`',
+                       'current located lines: `excerpt --start N --lines N` (count 1..200)',
+                       'unknown: `locate --query Q`', 'Files/rules: `page`',
+                       'same root/path `--cursor TOKEN` to null', 'Page <=4096B',
+                       'Check exit before JSON', 'fix limits/page/locate on error',
+                       'no full-file slicing/merging pages/files',
+                       'total output below outer incl framing',
+                       'serialize fields+cursor, one page',
+                       'Inner/item/line caps fail', 'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            phrases = ('Use handed-off Python -I -B <reader>',
-                       'excerpt known, locate unknown, page full rules',
-                       'one page, no full-file slicing/merging',
-                       'Other tools total <outer incl framing')
+            phrases = ('Given Python -I -B <reader>', 'page files',
+                       'excerpt located lines (count 1..200)', 'Check exit before JSON',
+                       'One page, no full-file slicing/merging',
+                       'other totals <outer incl framing')
             for phrase in phrases:
                 self.assertIn(phrase, role, name)
 

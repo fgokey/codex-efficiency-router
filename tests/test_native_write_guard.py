@@ -174,6 +174,70 @@ class NativeGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'cursor size'):
             reader['cursor_token'](identity,0,0,1)
 
+    def test_reader_line_range_errors_preserve_cli_failure_and_allow_recovery(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        expected=''.join(f'line {number}\n' for number in range(1,241))
+        self.file.write_text(expected,encoding='utf-8',newline='')
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        for start,lines,message in ((0,1,'start must be an integer >=1'),
+                                    (1,0,'lines must be an integer in 1..200'),
+                                    (1,201,'lines must be an integer in 1..200'),
+                                    (1,212,'lines must be an integer in 1..200'),
+                                    (288,60,'file has 240 lines')):
+            with self.subTest(start=start,lines=lines):
+                result=subprocess.run([*cli,'excerpt',*common,'--start',str(start),
+                                       '--lines',str(lines)],capture_output=True,timeout=10)
+                self.assertEqual(result.returncode,2)
+                self.assertEqual(result.stdout,b'')
+                self.assertIn(message,result.stderr.decode('utf-8'))
+                self.assertIn('page',result.stderr.decode('utf-8'))
+                self.assertLessEqual(len(result.stderr),4096)
+        for key in ('start','lines'):
+            with self.subTest(boolean=key), self.assertRaisesRegex(ValueError,'integer'):
+                reader['validate']({'op':'excerpt','path':'sentinel.txt','start':1,'lines':1,key:True})
+        for op,args,wanted in (('excerpt',['--start','1','--lines','200'],
+                               ''.join(expected.splitlines(keepends=True)[:200])),
+                              ('page',[],expected)):
+            chunks=[]
+            result=subprocess.run([*cli,op,*common,*args,'--max-bytes','1024'],
+                                  capture_output=True,timeout=10)
+            for _ in range(20):
+                self.assertEqual(result.returncode,0,result.stderr)
+                self.assertEqual(result.stderr,b'')
+                self.assertLessEqual(len(result.stdout)+1,1024)
+                value=json.loads(result.stdout)
+                chunks.append(value['data'])
+                if value['next_cursor'] is None:
+                    break
+                result=subprocess.run([*cli,'page',*common,'--cursor',value['next_cursor'],
+                                       '--max-bytes','1024'],capture_output=True,timeout=10)
+            else:
+                self.fail('reader did not complete within 20 pages')
+            self.assertEqual(''.join(chunks),wanted)
+
+    @unittest.skipUnless(shutil.which('rg'),'rg unavailable')
+    def test_reader_out_of_range_recovers_with_locate(self):
+        expected=''.join(f'line {number}\n' for number in range(1,241))
+        self.file.write_text(expected,encoding='utf-8',newline='')
+        cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]
+        common=['--root',str(self.root),'--path','sentinel.txt']
+        failed=subprocess.run([*cli,'excerpt',*common,'--start','288','--lines','60'],
+                              capture_output=True,timeout=10)
+        self.assertEqual(failed.returncode,2)
+        self.assertEqual(failed.stdout,b'')
+        self.assertIn(b'locate',failed.stderr)
+        located=subprocess.run([*cli,'locate',*common,'--query','line 225'],
+                               capture_output=True,timeout=10)
+        self.assertEqual(located.returncode,0,located.stderr)
+        line=json.loads(located.stdout)['candidates'][0]['line']
+        result=subprocess.run([*cli,'excerpt',*common,'--start',str(line),'--lines','16'],
+                              capture_output=True,timeout=10)
+        self.assertEqual(result.returncode,0,result.stderr)
+        value=json.loads(result.stdout)
+        self.assertEqual(value['data'],''.join(expected.splitlines(keepends=True)[224:]))
+        self.assertIsNone(value['next_cursor'])
+
     def test_reader_page_without_cursor_reads_small_and_empty_files_once(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         cli=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py')]

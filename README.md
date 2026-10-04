@@ -2,11 +2,11 @@
 
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.1 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.2 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-## v0.8.1: first page in one call
+## v0.8.2: reader entry and error recovery
 
-`page --root ABS --path FILE` reads a complete small file in one call. Larger files return a continuation cursor; the 4096-byte response limit and changed-file rejection still apply.
+First load SKILL alone in bounded pages. Use `page` for known files/rules, and `excerpt` only for current located lines (count 1–200); check exit status before parsing JSON. Invalid ranges retain nonzero exit and empty stdout, with limits/file line count and page/locate recovery guidance. v0.8.1 already introduced `page --root ABS --path FILE` without a cursor for the first page; the 4096-byte limit and changed-file rejection remain.
 
 ## v0.8.0: GPT-6.1 Sol binding
 

@@ -67,7 +67,7 @@ class AutomaticInstallTests(unittest.TestCase):
         self.install(dry_run=True)
         self.assertEqual(self.state(),before);self.assertEqual(self.backup(),old_backup)
         self.install()
-        self.assertEqual(self.manifest()['version'],'0.8.1')
+        self.assertEqual(self.manifest()['version'],'0.8.2')
         self.assertEqual(len(self.manifest()['files']),18)
         self.assertEqual(len(list(self.agents.glob('*.toml'))),10)
         backup=self.backup()

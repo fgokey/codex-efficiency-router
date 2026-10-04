@@ -2,11 +2,11 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.1 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.2 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
-## v0.8.1：一次首读
+## v0.8.2：读取入口和错误恢复
 
-`page --root ABS --path FILE` 一次读完小文件；大文件返回续页游标。4096 字节响应上限和文件变更拒绝保持生效。
+首次单独分页加载 SKILL。已知文件或完整规则用 `page`，只有已定位的当前行范围才用 `excerpt`（行数 1–200）；解析 JSON 前先检查退出码。非法范围仍非零退出且 stdout 为空，错误提示给出限制或实际行数以及 page/locate 恢复方向。0.8.1 已支持 `page --root ABS --path FILE` 不带游标读取首个页面；4096 字节上限和文件变更拒绝保持生效。
 
 ## v0.8.0：GPT-6.1 Sol 绑定
 

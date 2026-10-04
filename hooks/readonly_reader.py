@@ -16,7 +16,7 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.8.1'
+VERSION = '0.8.2'
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
@@ -101,7 +101,9 @@ def validate(request: object) -> dict:
     for key, default in (('start', 1), ('lines', 120)):
         value = request.get(key, default)
         if type(value) is not int or value < 1 or (key == 'lines' and value > 200):
-            raise ValueError('invalid line range')
+            limit = 'an integer >=1' if key == 'start' else 'an integer in 1..200'
+            raise ValueError(f'{key} must be {limit}; use page for a full file, '
+                             'or locate before excerpt with current line numbers')
     if op == 'search' and (not isinstance(request.get('query'), str) or not request['query']):
         raise ValueError('search requires a nonempty literal query')
     if type(request.get('staged', False)) is not bool:
@@ -245,7 +247,8 @@ def indexed_page(root: Path, request: dict, path: Path) -> str:
         if 'start' in request:
             lines = content.splitlines(keepends=True)
             if request['start'] > max(1, len(lines)):
-                raise ValueError('start exceeds file line count')
+                raise ValueError(f'start exceeds file line count (file has {len(lines)} lines); '
+                                 'use page for the full file or locate current lines before excerpt')
             first = sum(map(len, lines[:request['start'] - 1]))
             last = first + sum(map(len, lines[request['start'] - 1:
                                                request['start'] - 1 + request['lines']]))

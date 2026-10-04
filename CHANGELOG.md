@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.2 — 2026-10-04
+
+- Add a bounded, separate first-load hint to the Skill description; clarify page for known files and excerpt only for current located lines. Check exit status before JSON parsing.
+- Report reader line limits and actual file line counts with page/locate recovery guidance; retain nonzero exit, empty stdout and all paging/identity boundaries.
+
 ## 0.8.1 — 2026-10-04
 
 - Let `page` omit its cursor for the first full-file page, so small rules need one call. Keep existing index/range cursors, the 4096-byte envelope and fail-closed file identity checks.
