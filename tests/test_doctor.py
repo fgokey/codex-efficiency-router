@@ -1,4 +1,6 @@
 import copy
+import tempfile
+from unittest.mock import patch
 import json
 import shutil
 import sys
@@ -17,6 +19,91 @@ class DoctorTests(unittest.TestCase):
         return {"result": {"data": [
             {"model": model, "supportedReasoningEfforts": [{"reasoningEffort": effort}]}
             for _, model, effort in EXPECTED.values()], "nextCursor": None}}
+
+    def test_instruction_chain_follows_links_not_orphan_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            entry = root / 'SKILL.md'
+            entry.write_text('[quality](quality.md)', encoding='utf-8')
+            (root / 'quality.md').write_text('reachable contract', encoding='utf-8')
+            (root / 'orphan.md').write_text('unreachable contract', encoding='utf-8')
+            chain = doctor.instruction_chain(entry)
+            self.assertEqual(set(chain), {'SKILL.md', 'quality.md'})
+            self.assertNotIn('unreachable contract', '\n'.join(chain.values()))
+            entry.write_text('[missing](missing.md)', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'not packaged'):
+                doctor.instruction_chain(entry)
+            entry.write_text('[escape](../outside.md)', encoding='utf-8')
+            with self.assertRaisesRegex(ValueError, 'not packaged'):
+                doctor.instruction_chain(entry)
+
+    def test_cheap_entry_cannot_move_root_readonly_boundary_into_reference(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'skill'
+            shutil.copytree(ROOT / 'skills' / PROJECT, root)
+            entry = root / 'SKILL.md'
+            text = entry.read_text(encoding='utf-8')
+            entry.write_text(text.replace('Root Astra defaults read-only', 'Root Astra'), encoding='utf-8')
+            dispatch = root / 'references/dispatch.md'
+            dispatch.write_text(dispatch.read_text(encoding='utf-8') + '\nRoot Astra defaults read-only\n', encoding='utf-8')
+            self.assertIn('Root Astra defaults read-only', '\n'.join(doctor.instruction_chain(entry).values()))
+            errors = doctor.validate_tree(entry, ROOT / 'agents')
+            self.assertIn('missing entry authority boundary: Root Astra defaults read-only', errors)
+
+    def test_preflight_checks_every_profile_before_tests(self):
+        profiles = doctor.source_profiles(ROOT)
+        self.assertEqual([row['mode'] for row in profiles], ['fixed', 'auto', 'adaptive'])
+        for row in profiles:
+            self.assertLessEqual(row['full_bytes'], 9600)
+        with patch('manage.source_files', return_value={}), patch('profiles.render_payload') as render:
+            render.side_effect = lambda payload, profile: {'skill/SKILL.md': b'x' * (9601 if profile.mode == 'adaptive' else 1)}
+            with self.assertRaisesRegex(ValueError, 'adaptive'):
+                doctor.source_profiles(ROOT)
+        with patch.object(doctor, 'source_profiles', side_effect=ValueError('bad profile')), \
+                patch.object(doctor, 'target_tests') as tests:
+            with self.assertRaisesRegex(ValueError, 'bad profile'):
+                doctor.preflight(ROOT)
+            tests.assert_not_called()
+
+    def test_preflight_is_source_only_and_bounds_failure_output(self):
+        with self.assertRaisesRegex(ValueError, "this repository"):
+            doctor.preflight(ROOT.parent)
+        tests = {'run':8, 'passed':0, 'success':False, 'skipped':0, 'failures':8, 'errors':0,
+                 'details':[{'id':'test'+str(i),'reason':'界'*500} for i in range(8)], 'omitted_details':0}
+        with patch.object(doctor, 'source_profiles', return_value=[]), patch.object(doctor, 'target_tests', return_value=tests):
+            report = doctor.preflight(ROOT)
+        self.assertEqual(report['policy'], 'FAIL')
+        self.assertEqual(report['target_tests']['failures'], 8)
+        self.assertGreater(report['target_tests']['omitted_details'], 0)
+        self.assertLessEqual(len(json.dumps(report, ensure_ascii=False).encode('utf-8')) + 2, 3072)
+        self.assertEqual(report['enforcement'], 'NOT_VERIFIED')
+
+    def test_preflight_unexpected_success_and_subtests_cannot_pass(self):
+        class Samples(unittest.TestCase):
+            @unittest.expectedFailure
+            def test_expected_failure(self):
+                self.fail('known failure')
+
+            @unittest.expectedFailure
+            def test_unexpected_success(self):
+                pass
+
+            def test_subtests(self):
+                for value in range(2):
+                    with self.subTest(value=value):
+                        self.fail('subtest failure')
+
+        suite = unittest.defaultTestLoader.loadTestsFromTestCase(Samples)
+        with patch.object(unittest.defaultTestLoader, 'discover', side_effect=[suite] + [unittest.TestSuite() for _ in range(4)]):
+            report = doctor.target_tests(ROOT)
+        self.assertFalse(report['success'])
+        self.assertEqual(report['run'], 3)
+        self.assertEqual(report['passed'], 0)
+        self.assertEqual(report['expected_failures'], 1)
+        self.assertEqual(report['unexpected_successes'], 1)
+        self.assertEqual(report['failures'], 2)
+        with patch.object(doctor, 'source_profiles', return_value=[]), patch.object(doctor, 'target_tests', return_value=report):
+            self.assertEqual(doctor.preflight(ROOT)['policy'], 'FAIL')
 
     def test_source_integrity(self):
         self.assertEqual(doctor.validate_tree(ROOT / "skills" / PROJECT / "SKILL.md", ROOT / "agents"), [])

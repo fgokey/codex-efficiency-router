@@ -15,6 +15,10 @@ from profiles import Profile
 SKILL = ROOT / 'skills' / PROJECT / 'SKILL.md'
 
 
+def contract_text():
+    return '\n'.join(doctor.instruction_chain(SKILL).values())
+
+
 class InstructionFootprintTests(unittest.TestCase):
     def test_tightened_source_budgets(self):
         # These limits are smaller than rc.1, not raised to make compression pass.
@@ -66,19 +70,32 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in ('effort', 'routing', 'dispatch', 'quality'):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
-        for phrase in ('Read references on trigger/stale/lost',
-                       'before dispatch', 'before delegation/writes',
-                       'for recovery/disputed evidence'):
+        for phrase in ('before dispatch/lane changes', 'for Astra admission',
+                       'before delegation, binding or delivery review',
+                       'for large evidence, semantic/lifecycle changes, failure or disputed validation'):
             self.assertIn(phrase, text)
 
-    def test_no_blanket_loading_or_full_router_in_children(self):
+    def test_entry_is_cheap_but_does_not_grant_authority(self):
         text = SKILL.read_text()
+        self.assertLessEqual(len(text.encode('utf-8')), 2048)
+        for phrase in ('Q&A, status', 'low-risk single-owner work', 'no routing, references or children',
+                       'repo rules, current permissions/read-only roles',
+                       'Unknown identity/effects grant no writes', 'exact pins', 'Low is opt-in',
+                       'If an executor is required, use routing', 'Root Astra defaults read-only',
+                       'read dispatch for exceptions'):
+            self.assertIn(phrase, text)
+        chain = doctor.instruction_chain(SKILL)
+        self.assertEqual(set(chain), {'SKILL.md', 'references/dispatch.md', 'references/effort.md',
+                                     'references/quality.md', 'references/routing.md'})
+
+    def test_no_blanket_loading_or_full_router_in_children(self):
+        text = contract_text()
         self.assertIn('No doc/hook preload or child router copy', text)
         self.assertIn('Report once:', text)
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
-        text = SKILL.read_text()
+        text = contract_text()
         for phrase in ('first load SKILL alone in bounded pages',
                        'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
                        'handoff both', 'All ops: `--root ABS --path PATH`',
@@ -102,7 +119,7 @@ class InstructionFootprintTests(unittest.TestCase):
                 self.assertIn(phrase, role, name)
 
     def test_monitoring_uses_one_delta_then_backoff(self):
-        text = SKILL.read_text()
+        text = contract_text()
         for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
                        'no repeat tails/polls/nudges until change'):
             self.assertIn(phrase, text)
@@ -123,8 +140,8 @@ class InstructionFootprintTests(unittest.TestCase):
                     self.assertIn(boundary, text, name)
                 self.assertTrue('No spawning' in text or 'Only parent-authorized Ultra spawns' in text)
 
-    def test_readonly_diagnosis_and_limits_remain_in_core(self):
-        text = SKILL.read_text()
+    def test_readonly_diagnosis_and_limits_remain_reachable(self):
+        text = contract_text()
         for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
                        'one bounded local repair unit', 'Unknown identity/effects grant no writes',
                        'no auto-revert', 'Two writers max',

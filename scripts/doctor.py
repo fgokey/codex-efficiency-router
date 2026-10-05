@@ -53,6 +53,28 @@ def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile 
     return errors
 
 
+def instruction_chain(skill_file: Path) -> dict[str, str]:
+    """Read only local Markdown reachable from the entrypoint's actual links."""
+    root = skill_file.parent.resolve()
+    pending = [skill_file.resolve()]
+    chain = {}
+    while pending:
+        path = pending.pop()
+        if not path.is_relative_to(root) or not path.is_file():
+            raise ValueError(f"reference not packaged with Skill: {path.name}")
+        key = path.relative_to(root).as_posix()
+        if key in chain:
+            continue
+        text = path.read_text(encoding="utf-8")
+        chain[key] = text
+        for link in re.findall(r"\]\(([^)]+)\)", text):
+            if "://" not in link:
+                target = (path.parent / link.split("#")[0]).resolve()
+                if target.suffix == ".md":
+                    pending.append(target)
+    return chain
+
+
 def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile()) -> list[str]:
     errors = []
     try:
@@ -84,6 +106,10 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
     if MARKER.findall(text) != [expected_marker]:
         errors.append("Skill installation marker does not match manifest/source profile")
     core_bytes = len(text.encode("utf-8"))
+    for required in ("Root Astra defaults read-only", "Astra leaves and read-only roles NEVER write",
+                     "Unknown identity/effects grant no writes"):
+        if required not in text:
+            errors.append(f"missing entry authority boundary: {required}")
     if core_bytes > INSTRUCTION_BUDGETS["core_skill_bytes"]:
         errors.append("Skill exceeds the project core instruction budget")
     full_bytes = core_bytes
@@ -106,6 +132,13 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
             path = (skill_file.parent / link.split("#")[0]).resolve()
             if not path.is_relative_to(skill_file.parent.resolve()) or not path.is_file():
                 errors.append(f"reference not packaged with Skill: {link}")
+    try:
+        chain = instruction_chain(skill_file)
+        for name in ("dispatch", "effort", "quality", "routing"):
+            if f"references/{name}.md" not in chain:
+                errors.append(f"required policy reference is unreachable: {name}")
+    except (OSError, ValueError) as exc:
+        errors.append(str(exc))
     if not has_astra_preset:
         errors.append("missing Astra preset")
     metadata = skill_file.parent / "agents/openai.yaml"
@@ -174,12 +207,77 @@ def validate_catalog(data: object, profile: Profile = Profile()) -> list[str]:
     return errors
 
 
+def source_profiles(root: Path) -> list[dict]:
+    from manage import source_files
+    from profiles import render_payload
+    payload = source_files(root)
+    result = []
+    for mode in ("fixed", "auto", "adaptive"):
+        rendered = render_payload(payload, Profile(mode))
+        references = [v for k, v in rendered.items() if k.startswith("skill/references/") and k.endswith(".md")]
+        core = len(rendered["skill/SKILL.md"])
+        full = core + sum(map(len, references)) + len(references)
+        if core > INSTRUCTION_BUDGETS["core_skill_bytes"] or full > INSTRUCTION_BUDGETS["full_skill_bytes"]:
+            raise ValueError(f"{mode} rendered instruction budget exceeded")
+        result.append({"mode": mode, "core_bytes": core, "full_bytes": full,
+                       "margin_bytes": INSTRUCTION_BUDGETS["full_skill_bytes"] - full})
+    return result
+
+
+def target_tests(root: Path) -> dict:
+    import contextlib
+    import io
+    import unittest
+    patterns = ("test_doctor.py", "test_instruction_footprint.py", "test_documented_contract.py",
+                "test_profiles.py", "test_v070.py")
+    if any(not (root / "tests" / name).is_file() for name in patterns):
+        raise ValueError("preflight target tests are missing")
+    class CountedResult(unittest.TextTestResult):
+        passed = 0
+
+        def addSuccess(self, test):
+            super().addSuccess(test)
+            self.passed += 1
+
+    capture = io.StringIO()
+    with contextlib.redirect_stdout(capture), contextlib.redirect_stderr(capture):
+        suite = unittest.TestSuite(unittest.defaultTestLoader.discover(str(root / "tests"), pattern=name)
+                                   for name in patterns)
+        result = unittest.TextTestRunner(stream=capture, resultclass=CountedResult).run(suite)
+    if not result.testsRun:
+        raise ValueError("preflight discovered no target tests")
+    failures = result.failures + result.errors + [(test, "unexpected success") for test in result.unexpectedSuccesses]
+    details = []
+    for test, trace in failures[:8]:
+        reason = next((line for line in trace.splitlines()
+                       if line.startswith(("AssertionError", "ValueError", "ImportError", "unexpected success"))), "test failed")
+        details.append({"id": test.id(), "reason": reason[:120]})
+    return {"run": result.testsRun, "passed": result.passed, "success": result.wasSuccessful(),
+            "skipped": len(result.skipped), "failures": len(result.failures), "errors": len(result.errors),
+            "expected_failures": len(result.expectedFailures), "unexpected_successes": len(result.unexpectedSuccesses),
+            "details": details, "omitted_details": max(0, len(failures) - len(details))}
+
+
+def preflight(root: Path) -> dict:
+    if root.resolve() != Path(__file__).resolve().parents[1]:
+        raise ValueError("preflight requires this repository's source tree")
+    profiles = source_profiles(root)
+    tests = target_tests(root)
+    report = {"policy": "PASS" if tests["success"] else "FAIL",
+              "profiles": profiles, "target_tests": tests, "enforcement": "NOT_VERIFIED"}
+    while len(json.dumps(report, ensure_ascii=False).encode("utf-8")) + 2 > 3072 and tests["details"]:
+        tests["details"].pop()
+        tests["omitted_details"] += 1
+    return report
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", dest="as_json")
     parser.add_argument("--scope", choices=("user", "project"), default="user")
     parser.add_argument("--project-root", type=Path)
     parser.add_argument("--source-tree", type=Path)
+    parser.add_argument("--preflight", action="store_true", help="source profiles and related contract tests; no models/install")
     parser.add_argument("--catalog", type=Path, help="exported, fully paginated model/list JSON; no live probing")
     return parser
 
@@ -188,6 +286,12 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.preflight:
+            if not args.source_tree or args.catalog:
+                parser.error("--preflight requires --source-tree and no --catalog")
+            report = preflight(args.source_tree.resolve())
+            print(json.dumps(report, ensure_ascii=False))
+            return int(report["policy"] != "PASS")
         profile = Profile()
         if args.source_tree:
             root = args.source_tree.resolve()

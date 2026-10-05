@@ -95,6 +95,14 @@ def inspect_execution(observations: object) -> dict:
             cursor = event.get('next_cursor'); read_done = cursor is None
         elif kind == 'output':
             size, framing = event.get('bytes'), event.get('framing_bytes')
+            if 'serialized_result' in event:
+                raw = event['serialized_result']
+                if isinstance(raw, str):
+                    actual = len(raw.encode('utf-8'))
+                    output_bad |= type(size) is int and size >= 0 and size != actual
+                    size = actual
+                else:
+                    output_missing = True
             size_known = type(size) is int and size >= 0
             framing_known = type(framing) is int and framing >= 0
             truncation_known = type(event.get('truncated')) is bool
@@ -105,8 +113,14 @@ def inspect_execution(observations: object) -> dict:
                            or (truncation_known and event['truncated']))
         elif kind == 'progress':
             snapshot, action = event.get('snapshot'), event.get('action')
-            if not isinstance(snapshot, str) or type(event.get('active')) is not bool or not isinstance(action, str):
+            # Only execution state and substantive result identity are comparable.
+            # Commentary, repeated query/wait cursors and rewritten prompts are not progress.
+            valid_snapshot = (isinstance(snapshot, dict) and set(snapshot) == {'state', 'result'}
+                              and isinstance(snapshot['state'], str) and bool(snapshot['state'].strip())
+                              and isinstance(snapshot['result'], str))
+            if not valid_snapshot or type(event.get('active')) is not bool or not isinstance(action, str):
                 backoff_missing = True; previous = saved_offset = None; delta_seen = False; continue
+            snapshot = (snapshot['state'], snapshot['result'])
             changed = previous is None or snapshot != previous
             unchanged = 0 if changed else unchanged + 1
             if changed: delta_seen = False

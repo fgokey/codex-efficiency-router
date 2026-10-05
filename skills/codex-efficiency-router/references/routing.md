@@ -1,7 +1,7 @@
 # Astra admission
 
-Core gates apply; counts/prerequisite gaps never qualify. First use any cheap falsification; Astra needs hard judgment AND no cheap falsification.
+Counts/prerequisite gaps never qualify. Use cheap falsification first; hard judgment AND no cheap falsification required.
 
-Astra: consequential open API/ownership, trust/data invariants, competing causes, migration/recovery order, novel algorithms/protocols or qualified Sol failure. Settled contracts/checks stay with executors.
+Consequential API/ownership, trust/data invariants, competing causes, migration/recovery, novel algorithm/protocol or qualified Sol failure; settled contracts/checks stay with executors.
 
-Return evidence/precise fixes. Leaves stay read-only; plans grant no rollout authority. Contrary evidence reopens decisions. Offline routing proves no quality/savings.
+Return evidence/fixes; leaves read-only; plans grant no rollout authority. Contrary evidence reopens decisions; offline routing proves no quality/savings.

@@ -16,6 +16,10 @@ import doctor
 from package import EXPECTED, INSTRUCTION_BUDGETS, PROJECT
 
 
+def contract_text():
+    return '\n'.join(doctor.instruction_chain(ROOT / 'skills' / PROJECT / 'SKILL.md').values())
+
+
 class DocumentedContractTests(unittest.TestCase):
     def test_readme_cli_options_match_real_parsers(self):
         modules = {'install': install, 'uninstall': uninstall, 'doctor': doctor}
@@ -91,7 +95,7 @@ class DocumentedContractTests(unittest.TestCase):
 
     def test_core_safety_contract_survives_compression(self):
         # Wording sentinels prevent accidental deletion, not semantic-quality proof.
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
                        'Do not weaken assertions', 'contrary evidence', 'revision/dirt',
                        'same-model needs contextual value AND net benefit',
@@ -101,7 +105,7 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn(phrase, core)
 
     def test_semantic_loss_and_review_evidence_are_required(self):
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         quality = (ROOT / 'skills' / PROJECT / 'references/quality.md').read_text()
         for phrase in ('Check semantic invariants', 'Loss/eviction/coalescing',
                        'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
@@ -118,7 +122,7 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn(phrase, dispatch)
 
     def test_native_change_summary_is_preflighted_before_delegation(self):
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         self.assertIn('Run dispatch preflight', core)
         for phrase in ('all roots', 'exact paths/status',
@@ -136,7 +140,7 @@ class DocumentedContractTests(unittest.TestCase):
                 self.assertIn(phrase, instructions)
 
     def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
         for text in (core, effort):
             self.assertIn('`cer_auto_<role>`', text)
@@ -146,7 +150,7 @@ class DocumentedContractTests(unittest.TestCase):
         self.assertIn('exact role/catalog pair', effort)
 
     def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         for phrase in ('one bounded local repair unit', 'two failed qualified executor attempts',
                        'current-workspace target', 'no observed active strict Guard'):
@@ -155,7 +159,7 @@ class DocumentedContractTests(unittest.TestCase):
         self.assertIn('UNKNOWN may deny', dispatch)
 
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
-        core = (ROOT / 'skills' / PROJECT / 'SKILL.md').read_text()
+        core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         for phrase in ('host-observed', 'explicitly releases unit for writes',
                        'ID/config/claims/old logs fail', 'Same-session turns reuse release',
@@ -186,7 +190,7 @@ class DocumentedContractTests(unittest.TestCase):
         self.assertIn('grants none',dispatch)
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
-        core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
+        core=contract_text()
         for phrase in ('rule paths','rationale','Read rules; gaps block affected work'):
             self.assertIn(phrase,core)
         for name in EXPECTED:
@@ -195,7 +199,7 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertRegex(role,r'(?:missing critical context blocks|critical (?:context )?gaps block) affected work',name)
 
     def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
-        core=(ROOT/'skills'/PROJECT/'SKILL.md').read_text()
+        core=contract_text()
         effort=(ROOT/'skills'/PROJECT/'references/effort.md').read_text()
         self.assertIn('Resolve MISMATCH before continuation',core)
         for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase review',

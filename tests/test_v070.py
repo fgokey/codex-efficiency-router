@@ -302,9 +302,49 @@ class CanaryV070(TempCase):
                 {'kind':'read_page','path':expected['skill_path'],'sha256':sha,'cursor':None,'next_cursor':'c1','data':body[:10]},
                 {'kind':'read_page','path':expected['skill_path'],'sha256':sha,'cursor':'c1','next_cursor':None,'data':body[10:]},
                 {'kind':'output','bytes':4094,'framing_bytes':2,'truncated':False}]
-        events.extend({'kind':'progress','snapshot':'unchanged','active':True,'action':action,'offset':'saved-offset'}
+        events.extend({'kind':'progress','snapshot':{'state':'working','result':''},'active':True,'action':action,'offset':'saved-offset'}
                       for action in ('WAIT_COMPACT','WAIT_COMPACT','TAIL_DELTA','BACKOFF'))
         return {'source':'operator-witnessed-native','expected':expected,'events':events}
+
+    def test_execution_output_measures_serialized_result(self):
+        data=self.execution_fixture()
+        data['events'][4]={'kind':'output','serialized_result':'abc','bytes':1,
+                           'framing_bytes':0,'truncated':False}
+        self.assertEqual(canary.inspect_execution(data)['output'],'FAIL')
+        for raw in ('界'*1400, '{"content":'+' '*4100+'}'):
+            data['events'][4]={'kind':'output','serialized_result':raw,'bytes':1,
+                               'framing_bytes':0,'truncated':False}
+            self.assertEqual(canary.inspect_execution(data)['output'],'FAIL')
+        data['events'][4]={'kind':'output','serialized_result':'界','framing_bytes':2,'truncated':False}
+        self.assertEqual(canary.inspect_execution(data)['output'],'PASS')
+        data['events'][4].pop('framing_bytes')
+        self.assertEqual(canary.inspect_execution(data)['output'],'UNKNOWN')
+        data['events'][4]['serialized_result']='界'*1400
+        self.assertEqual(canary.inspect_execution(data)['output'],'FAIL')
+        data['events'][4]={'kind':'output','serialized_result':'x'*4094,'framing_bytes':2,'truncated':False}
+        self.assertEqual(canary.inspect_execution(data)['output'],'PASS')
+        data['events'][4]['framing_bytes']=3
+        self.assertEqual(canary.inspect_execution(data)['output'],'FAIL')
+        data['events'][4]={'kind':'output','serialized_result':{},'bytes':1,'framing_bytes':2,'truncated':False}
+        self.assertEqual(canary.inspect_execution(data)['output'],'UNKNOWN')
+
+    def test_execution_progress_excludes_commentary_and_poll_cursors(self):
+        data=self.execution_fixture()
+        for index,event in enumerate(data['events'][5:]):
+            event['commentary']=str(index)
+            event['poll_cursor']=str(index)
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'PASS')
+        for snapshot in ('new commentary', {'state':'working','poll_cursor':'new'},
+                         {'state':'working','result':'','commentary':'new'}):
+            bad=copy.deepcopy(data);bad['events'][8]['snapshot']=snapshot
+            self.assertEqual(canary.inspect_execution(bad)['backoff'],'UNKNOWN')
+        changed=copy.deepcopy(data)
+        changed['events'][7]['snapshot']['result']='validated-artifact-sha256'
+        changed['events'][7]['action']='WAIT_COMPACT'
+        changed['events']=changed['events'][:8]
+        for action in ('WAIT_COMPACT','TAIL_DELTA','BACKOFF'):
+            changed['events'].append({**copy.deepcopy(changed['events'][7]),'action':action})
+        self.assertEqual(canary.inspect_execution(changed)['backoff'],'PASS')
 
     def test_execution_inspection_separates_missing_and_failing_evidence(self):
         data=self.execution_fixture();result=canary.inspect_execution(data)
