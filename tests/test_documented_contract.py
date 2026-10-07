@@ -163,7 +163,10 @@ class DocumentedContractTests(unittest.TestCase):
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         for phrase in ('host-observed', 'explicitly releases unit for writes',
                        'ID/config/claims/old logs fail', 'Same-session turns reuse release',
-                       'real restart/resume or contradiction rechecks',
+                       'contradiction rechecks', 'Closed/unloaded/restarted: handoff',
+                       'explicit role/model/effort fresh spawn, host binding, RELEASE',
+                       'Reject native `resume_agent` for every model: cannot pin model/effort',
+                       'Live follow-up/task-evidence `resume()` differ',
                        'UNKNOWN/MISMATCH blocks writes',
                        'source/build config', 'destructive recovery'):
             self.assertIn(phrase, dispatch)

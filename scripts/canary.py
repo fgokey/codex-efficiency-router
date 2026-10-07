@@ -64,7 +64,10 @@ def inspect_execution(observations: object) -> dict:
     for event in events:
         if not isinstance(event, dict): raise ValueError('event must be an object')
         kind = event.get('kind')
-        if kind == 'resume':
+        if kind in ('resume', 'resume_agent'):
+            # Explicit native recovery cannot pin the child model/effort; later records
+            # do not erase the unsafe dispatch. Ordinary task follow-ups are separate.
+            binding_bad = True
             meta = context = None
         elif kind in ('session_meta', 'turn_context'):
             fields = ('session', 'owner', 'role') if kind == 'session_meta' else ('session', 'cwd', 'model', 'effort', 'sandbox', 'approval')

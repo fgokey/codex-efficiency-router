@@ -410,11 +410,16 @@ class CanaryV070(TempCase):
         ordinary=copy.deepcopy(data);ordinary['events'].append(copy.deepcopy(data['events'][1]))
         self.assertEqual(canary.inspect_execution(ordinary)['binding'],'PASS')
         resumed=copy.deepcopy(data);resumed['events'].append({'kind':'resume'})
-        self.assertEqual(canary.inspect_execution(resumed)['binding'],'UNKNOWN')
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'FAIL')
         resumed['events'].append(copy.deepcopy(data['events'][1]))
-        self.assertEqual(canary.inspect_execution(resumed)['binding'],'UNKNOWN')
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'FAIL')
         resumed['events'].append(copy.deepcopy(data['events'][0]))
-        self.assertEqual(canary.inspect_execution(resumed)['binding'],'PASS')
+        self.assertEqual(canary.inspect_execution(resumed)['binding'],'FAIL')
+        for kind in ('historical_warning', 'send_input', 'task_resume'):
+            ordinary=copy.deepcopy(data);ordinary['events'].append({'kind':kind,'text':'resume_agent'})
+            self.assertEqual(canary.inspect_execution(ordinary)['binding'],'PASS')
+        native=copy.deepcopy(data);native['events'].append({'kind':'resume_agent'})
+        self.assertEqual(canary.inspect_execution(native)['binding'],'FAIL')
 
     def test_execution_inspection_retains_binding_gaps_and_known_output_failures(self):
         data=self.execution_fixture()
@@ -427,14 +432,14 @@ class CanaryV070(TempCase):
                 mixed=copy.deepcopy(data);mixed['events'].insert(position,event)
                 self.assertEqual(canary.inspect_execution(mixed)['binding'],verdict)
                 mixed['events'].extend([{'kind':'resume'},*copy.deepcopy(data['events'][:2])])
-                self.assertEqual(canary.inspect_execution(mixed)['binding'],verdict)
+                self.assertEqual(canary.inspect_execution(mixed)['binding'],'FAIL')
         for position in (0,len(data['events'])):
             event={**data['events'][1],'model':'gpt-6-astra'};event.pop('effort')
             mixed=copy.deepcopy(data);mixed['events'].insert(position,event)
             self.assertEqual(canary.inspect_execution(mixed)['binding'],'FAIL')
         for pair in (data['events'][:2],list(reversed(data['events'][:2]))):
             rebinding=copy.deepcopy(data);rebinding['events'].extend([{'kind':'resume'},*copy.deepcopy(pair)])
-            self.assertEqual(canary.inspect_execution(rebinding)['binding'],'PASS')
+            self.assertEqual(canary.inspect_execution(rebinding)['binding'],'FAIL')
         for field,value in (('model','gpt-6-astra'),('effort','medium')):
             mixed=copy.deepcopy(data);mixed['expected'].pop(field)
             mixed['requested_spawn']={'agent_type':'cer_auto_sol61_engineer','reasoning_effort':'high','fork_turns':'none'}

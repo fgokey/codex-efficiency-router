@@ -89,6 +89,9 @@ def decide(event: object) -> dict:
     executor = isinstance(model, str) and model in EXECUTOR_FAMILIES
     # Snapshot aliases require an explicit audited addition, never prefix matching.
     data = event.get('tool_input')
+    if name == 'resume_agent':
+        return deny('CER native resume cannot bind model/effort. Hand off the owned unit; '
+                    'fresh spawn with explicit role/model/effort, verify host binding, then RELEASE.')
     if name == 'spawn_agent':
         try: validate_spawn(data)
         except (ValueError, TypeError) as exc:

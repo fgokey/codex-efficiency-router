@@ -158,6 +158,15 @@ class NativeGuardTests(unittest.TestCase):
         for tool in ('send_input','wait','close_agent','update_plan','read_file'):
             self.assertEqual(self.hook(tool),{})
 
+    def test_native_resume_is_denied_before_executor_or_claimed_model_allowance(self):
+        for model in ('gpt-6-astra', None, 'unknown', 'gpt-6.1-sol', 'gpt-6-sol',
+                      'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'):
+            for data in ({'id':'closed-child'},
+                         {'id':'closed-child','model':'gpt-6.1-sol','reasoning_effort':'high'}):
+                with self.subTest(model=model,data=data):
+                    self.assertTrue(self.denied(self.hook('resume_agent',model,data)))
+            self.assertEqual(self.hook('send_input',model,{'id':'live-child','message':'continue'}),{})
+
     def test_spawn_requires_explicit_role_effort_and_no_history_for_every_model(self):
         valid={'agent_type':'cer_auto_sol61_engineer','reasoning_effort':'high',
                'fork_turns':'none','message':'read-only source review'}
