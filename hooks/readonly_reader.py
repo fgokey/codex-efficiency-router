@@ -34,6 +34,13 @@ LEGACY_OPS = frozenset(('read', 'list', 'search', 'diff', 'status'))
 PAGE_BYTES = 4096
 EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
+  batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N
+    Independent requests; full preflight, one complete JSON results envelope or nonzero exit.
+    Total JSON+CRLF+explicit outer framing <=max-bytes; member caps are not aggregate caps.
+    Preserve each continuation separately. Legacy encoded batches retain text/restrictions.
+    Example: batch --root ABS --requests '[{"op":"page","path":"a.txt","max_bytes":1024},{"op":"page","path":"b.txt","max_bytes":1024}]' --max-bytes 3072 --framing-bytes 256
+    Declare actual host framing; the example's 256 is not a host measurement.
+    On overflow narrow members/caps; reuse retained results. Do not repeat the unchanged batch.
   read|search|list|diff|status --root ABS --path PATH [--cursor TOKEN] [--max-bytes N]
     Pages retain selected-request semantics; read/search keep line numbers. search needs --query.
     Git capture <=128 KiB; PARTIAL means narrow scope. Encoded small legacy results stay text;
@@ -80,19 +87,31 @@ def validate(request: object) -> dict:
         raise ValueError('reader input exceeds 16 KiB')
     op = request.get('op')
     if op == 'batch':
-        if set(request) != {'op', 'requests'}:
-            raise ValueError('batch only accepts op and requests')
+        structured = 'framing_bytes' in request or 'max_bytes' in request
+        fields = {'op', 'requests', 'max_bytes', 'framing_bytes'} if structured else {'op', 'requests'}
+        if set(request) != fields:
+            raise ValueError('batch requires op/requests; JSON batch also needs max_bytes/framing_bytes')
+        if structured:
+            cap, framing = request['max_bytes'], request['framing_bytes']
+            if (type(cap) is not int or not 256 <= cap <= PAGE_BYTES
+                    or type(framing) is not int or framing < 0 or cap - framing < 256):
+                raise ValueError('batch needs max_bytes 256..4096 and known framing leaving >=256 bytes')
         items = request['requests']
         if not isinstance(items, list) or not 1 <= len(items) <= BATCH_LIMIT:
             raise ValueError('batch requires 1..16 operations')
+        seen = set()
         for item in items:
             if not isinstance(item, dict) or item.get('op') == 'batch':
                 raise ValueError('nested batches are not supported')
-            if item.get('op') in ('index', 'page', 'excerpt', 'locate', 'json'):
+            if not structured and item.get('op') in ('index', 'page', 'excerpt', 'locate', 'json'):
                 raise ValueError('index/page/excerpt/locate/json cannot be batched')
-            if 'cursor' in item or 'max_bytes' in item:
+            if not structured and ('cursor' in item or 'max_bytes' in item):
                 raise ValueError('batch members cannot request pages; split batch')
             validate(item)
+            if structured:
+                key = json.dumps(item, sort_keys=True, ensure_ascii=True, allow_nan=False)
+                if key in seen: raise ValueError('duplicate batch request; reuse its result')
+                seen.add(key)
         return request
     if not isinstance(op, str) or op not in OPS:
         raise ValueError('reader needs read/list/search/diff/status/index/page/excerpt/locate/json or batch')
@@ -182,7 +201,7 @@ def preflight(root: Path, request: dict) -> list[tuple[dict, Path]]:
     if not root.is_dir():
         raise ValueError('workspace must be a directory')
     items = request['requests'] if request['op'] == 'batch' else [request]
-    total = 0
+    total = json_total = 0
     checked = []
     for item in items:
         path = resolve(root, item.get('path', '.'))
@@ -195,7 +214,8 @@ def preflight(root: Path, request: dict) -> list[tuple[dict, Path]]:
         elif item['op'] == 'json':
             if not path.is_file() or not stat.S_ISREG(path.stat().st_mode):
                 raise ValueError('json requires one regular file')
-            if path.stat().st_size > JSON_SCAN_LIMIT:
+            json_total += path.stat().st_size
+            if json_total > JSON_SCAN_LIMIT:
                 raise ValueError('json source exceeds 256 MiB scan budget')
         elif item['op'] == 'locate' and not (path.is_file() or path.is_dir()):
             raise ValueError('locate requires one file or directory')
@@ -790,10 +810,22 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
     results = []
     size = 0
     remaining = [READ_LIMIT]
+    structured = request['op'] == 'batch' and 'framing_bytes' in request
     for index, (item, path) in enumerate(checked):
         result = one(root, item, path, remaining)
         if request['op'] != 'batch':
             return legacy_page(root, item, result, json_output) if item['op'] in LEGACY_OPS else result
+        if structured:
+            if item['op'] in LEGACY_OPS:
+                if not result[2]: raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
+                result = legacy_page(root, item, result, True)
+            value = json.loads(result)
+            if value.get('complete') is False or value.get('status') == 'PARTIAL':
+                raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
+            results.append(value)
+            envelope({'op':'batch','results':results,'status':'COMPLETE'},
+                     request['max_bytes'] - request['framing_bytes'])
+            continue
         text, _, complete = result
         if not complete: raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
         if request['op'] == 'batch':
@@ -803,18 +835,34 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
             # No partial batch output is emitted. All operations are read-only.
             raise ValueError('aggregate output exceeds 4 KiB including frames/CRLF; split batch')
         results.append(text)
-    return '\n'.join(results)
+    return (envelope({'op':'batch','results':results,'status':'COMPLETE'},
+                     request['max_bytes'] - request['framing_bytes']) if structured else '\n'.join(results))
 
 
 def cli_request(args: list[str]) -> tuple[Path, dict]:
-    if not args or args[0] not in OPS or len(args[1:]) % 2:
+    if not args or args[0] not in OPS | {'batch'} or len(args[1:]) % 2:
         raise ValueError('usage: read|search|list|diff|status|excerpt|locate|index|page|json --root ROOT --path RELATIVE [options]; use --help')
     values = {}
     for key, value in zip(args[1::2], args[2::2]):
         if key not in ('--root', '--path', '--cursor', '--max-bytes',
-                       '--start', '--lines', '--query', '--glob', '--pointer', '--mode', '--staged') or key in values:
+                       '--start', '--lines', '--query', '--glob', '--pointer', '--mode', '--staged',
+                       '--requests', '--framing-bytes') or key in values:
             raise ValueError('unknown or duplicate reader CLI option')
         values[key] = value
+    if args[0] == 'batch':
+        if set(values) != {'--root','--requests','--max-bytes','--framing-bytes'}:
+            raise ValueError('JSON batch needs root/requests/max-bytes/framing-bytes')
+        if len(values['--requests'].encode('utf-8')) > INPUT_LIMIT:
+            raise ValueError('reader input exceeds 16 KiB')
+        root = Path(values['--root'])
+        if not root.is_absolute(): raise ValueError('root must be an absolute directory')
+        request = {'op':'batch','requests':json.loads(values['--requests'], object_pairs_hook=unique,
+                                                     parse_constant=reject_constant),
+                   'max_bytes':int(values['--max-bytes']), 'framing_bytes':int(values['--framing-bytes'])}
+        validate(request)
+        return root, request
+    if '--requests' in values or '--framing-bytes' in values:
+        raise ValueError('requests/framing-bytes are batch-only')
     if '--root' not in values or '--path' not in values:
         raise ValueError('root and path are required')
     root = Path(values['--root'])
@@ -843,19 +891,21 @@ def main() -> int:
     json_output = False
     try:
         if sys.argv[1:] == ['--help'] or (len(sys.argv) == 3 and sys.argv[2] == '--help'
-                                         and sys.argv[1] in OPS):
+                                         and sys.argv[1] in OPS | {'batch'}):
             sys.stdout.buffer.write(HELP.encode('utf-8'))
             return 0
-        if len(sys.argv) > 1 and sys.argv[1] in OPS:
+        if len(sys.argv) > 1 and sys.argv[1] in OPS | {'batch'}:
             root, request = cli_request(sys.argv[1:])
             json_output = True
-            cap = request.get('max_bytes', PAGE_BYTES)
+            cap = request.get('max_bytes', PAGE_BYTES) - request.get('framing_bytes', 0)
         else:
             if len(sys.argv) != 3 or len(sys.argv[2]) > (INPUT_LIMIT + 2) // 3 * 4:
                 raise ValueError('expected workspace and bounded encoded request')
             raw = base64.b64decode(sys.argv[2], altchars=b'-_', validate=True)
             request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
             root = Path(sys.argv[1])
+            validate(request)
+            cap = request.get('max_bytes', PAGE_BYTES) - request.get('framing_bytes', 0)
         sys.stdout.buffer.write(run(root, request, json_output=json_output).encode('utf-8') + b'\n')
         return 0
     except (ValueError, OSError, TypeError, UnicodeError, RecursionError, subprocess.SubprocessError) as exc:

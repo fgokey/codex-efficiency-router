@@ -31,6 +31,6 @@ Read [quality.md](references/quality.md) for large evidence, semantic/lifecycle 
 
 ## Context and reporting
 
-Verified Python `-I -B <Skill>/scripts/readonly_reader.py`, one page, default `--max-bytes 3072`; output+framing <=4KiB, unknown framing is a gap. Batch independent read-only checks once; act on substantive events, save short state, back off.
+Verified Python `-I -B <Skill>/scripts/readonly_reader.py`, one page, default `--max-bytes 3072`; output+framing <=4KiB, unknown framing is a gap. Independent checks: Reader `batch` (`--help`); act on substantive events, save short state, back off.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.

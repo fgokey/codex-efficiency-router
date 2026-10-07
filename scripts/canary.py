@@ -21,7 +21,7 @@ from uuid import uuid4
 
 from manage import reject_links, read_bytes
 from write_guard import inspect_status, loads, encode
-from quality_reference import progress_action
+from quality_reference import bounded_output, progress_action, serialize_output
 
 OWNER = 'cer-native-canary'
 SEED = b'CER read-only canary fixture\n'
@@ -95,12 +95,44 @@ def inspect_execution(observations: object) -> dict:
             cursor = event.get('next_cursor'); read_done = cursor is None
         elif kind == 'output':
             size, framing = event.get('bytes'), event.get('framing_bytes')
+            # captures is the complete list serialized by ONE outer emit, not one
+            # event per member. Native status fields are explicit; text is never
+            # scanned recursively for old warning strings.
+            if 'captures' in event:
+                captures = event['captures']
+                if not isinstance(captures, list) or not captures:
+                    output_missing = True
+                else:
+                    for capture in captures:
+                        if not isinstance(capture, dict):
+                            output_missing = True; continue
+                        code, truncated = capture.get('exit_code'), capture.get('truncated')
+                        output_missing |= (type(code) is not int or type(truncated) is not bool
+                                           or not isinstance(capture.get('stderr'), str)
+                                           or 'result' not in capture)
+                        output_bad |= (type(code) is int and code != 0) or truncated is True
+                    try:
+                        if type(framing) is int and framing >= 0:
+                            try:
+                                raw = bounded_output(captures, framing_bytes=framing)
+                            except ValueError:
+                                raw = serialize_output(captures)
+                                output_bad = True
+                        else:
+                            raw = serialize_output(captures)
+                        actual = len(raw.encode('utf-8')) + 2  # Reserve CRLF.
+                        output_bad |= type(size) is int and size >= 0 and size != len(raw.encode('utf-8'))
+                        output_bad |= 'serialized_result' in event and event['serialized_result'] != raw
+                        size = actual
+                    except (ValueError, TypeError, UnicodeError):
+                        output_missing = True
             if 'serialized_result' in event:
                 raw = event['serialized_result']
                 if isinstance(raw, str):
                     actual = len(raw.encode('utf-8'))
-                    output_bad |= type(size) is int and size >= 0 and size != actual
-                    size = actual
+                    if 'captures' not in event:
+                        output_bad |= type(size) is int and size >= 0 and size != actual
+                        size = actual
                 else:
                     output_missing = True
             size_known = type(size) is int and size >= 0

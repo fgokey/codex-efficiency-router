@@ -292,6 +292,37 @@ class BatchReaderV070(TempCase):
 
 
 class CanaryV070(TempCase):
+    def test_execution_output_counts_one_complete_capture_collection(self):
+        from quality_reference import bounded_output
+        data=self.execution_fixture()
+        captures=[{'result':{'content':[{'text':'界\\"\n'*50}]},'stderr':'warning\n',
+                   'exit_code':0,'truncated':False},
+                  {'result':{'nested':{'values':['Warning: truncated output','ok']}},
+                   'stderr':'','exit_code':0,'truncated':False}]
+        raw=bounded_output(captures,framing_bytes=200)
+        data['events'][4]={'kind':'output','captures':captures,'serialized_result':raw,
+                           'bytes':len(raw.encode()),'framing_bytes':200,'truncated':False}
+        self.assertEqual(canary.inspect_execution(data)['output'],'PASS')
+        for field,value in (('exit_code',1),('truncated',True)):
+            bad=copy.deepcopy(data); bad['events'][4]['captures'][1][field]=value
+            bad['events'][4].pop('serialized_result'); bad['events'][4].pop('bytes')
+            self.assertEqual(canary.inspect_execution(bad)['output'],'FAIL')
+        for field in ('exit_code','truncated','stderr'):
+            bad=copy.deepcopy(data); bad['events'][4]['captures'][1].pop(field)
+            bad['events'][4].pop('serialized_result'); bad['events'][4].pop('bytes')
+            self.assertEqual(canary.inspect_execution(bad)['output'],'UNKNOWN')
+        bad=copy.deepcopy(data); bad['events'][4]['captures'][1]['stderr']='界'*1400
+        bad['events'][4].pop('serialized_result'); bad['events'][4].pop('bytes')
+        self.assertEqual(canary.inspect_execution(bad)['output'],'FAIL')
+        bad=copy.deepcopy(data); bad['events'][4]['serialized_result']='{}'
+        self.assertEqual(canary.inspect_execution(bad)['output'],'FAIL')
+        data['events'][4].pop('framing_bytes')
+        self.assertEqual(canary.inspect_execution(data)['output'],'UNKNOWN')
+        with self.assertRaises(ValueError): bounded_output(captures*10,framing_bytes=200)
+        for framing in (None,True,-1):
+            with self.assertRaises(ValueError): bounded_output(captures,framing_bytes=framing)
+        with self.assertRaises(ValueError): bounded_output({'x':float('nan')},framing_bytes=0)
+
     def execution_fixture(self):
         body='version: 0.8.5\npublic Skill body\n';sha=hashlib.sha256(body.encode()).hexdigest()
         expected={'session':'s1','owner':'root','role':'cer_auto_sol61_engineer','cwd':str(self.root),

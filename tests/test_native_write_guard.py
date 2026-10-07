@@ -2,6 +2,7 @@
 Not a claim that an untested Codex version loads/trusts/enforces the hook.
 """
 import json
+import base64
 import os
 from pathlib import Path
 import runpy
@@ -33,6 +34,85 @@ class NativeGuardTests(unittest.TestCase):
                          capture_output=True,text=True,encoding='utf-8',timeout=10)
         self.assertEqual(p.returncode,0,p.stderr)
         return json.loads(p.stdout) if p.stdout.strip() else {}
+
+    def test_structured_batch_cli_counts_complete_json_and_framing(self):
+        self.file.write_text('界\\"\r\n'*30,encoding='utf-8',newline='')
+        (self.root/'other.json').write_text('{"nested":{"x":"界"}}',encoding='utf-8')
+        reader=ROOT/'hooks/readonly_reader.py'
+        requests=[{'op':'excerpt','path':'sentinel.txt','start':1,'lines':2,'max_bytes':1024},
+                  {'op':'json','path':'other.json','pointer':'/nested','max_bytes':1024}]
+        args=[sys.executable,'-I','-B',str(reader),'batch','--root',str(self.root),
+              '--requests',json.dumps(requests),'--max-bytes','3072','--framing-bytes','400']
+        p=subprocess.run(args,capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertLessEqual(len(p.stdout)+1+400,3072)
+        result=json.loads(p.stdout)
+        self.assertEqual(result['results'][0]['data'],'界\\"\r\n'*2)
+        self.assertEqual(json.loads(result['results'][1]['data']),{'x':'界'})
+        self.assertEqual(result['status'],'COMPLETE')
+        structured={'op':'batch','requests':requests,'max_bytes':3072,'framing_bytes':400}
+        encoded=base64.urlsafe_b64encode(json.dumps(structured).encode()).decode()
+        p=subprocess.run([sys.executable,'-I','-B',str(reader),str(self.root),encoded],capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(json.loads(p.stdout),result)
+        # Legacy encoded batch is still text and retains its old restrictions.
+        old=base64.urlsafe_b64encode(json.dumps({'op':'batch','requests':[{'op':'read','path':'sentinel.txt','lines':1}]}).encode()).decode()
+        p=subprocess.run([sys.executable,'-I','-B',str(reader),str(self.root),old],capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertTrue(p.stdout.startswith(b'[1:read]\n'))
+        p=subprocess.run([sys.executable,'-I','-B',str(reader),'batch','--help'],capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr); self.assertIn(b'--requests JSON_ARRAY',p.stdout)
+        self.assertLessEqual(len(p.stdout)+1,4096)
+
+    def test_structured_batch_retains_independent_page_continuations(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        contents={'sentinel.txt':'A界\\"\n'*1000,'second.txt':'B界\\"\n'*1000}
+        for name,body in contents.items(): (self.root/name).write_text(body,encoding='utf-8',newline='')
+        requests=[{'op':'page','path':name,'max_bytes':1024} for name in contents]
+        request={'op':'batch','requests':requests,'max_bytes':3072,'framing_bytes':400}
+        first=json.loads(reader['run'](self.root,request))['results']
+        for item,page in zip(requests,first):
+            self.assertIsInstance(page['next_cursor'],str)
+            item['cursor']=page['next_cursor']
+        second=json.loads(reader['run'](self.root,request))['results']
+        for name,before,after in zip(contents,first,second):
+            offset=len(before['data'])
+            self.assertEqual(after['data'],contents[name][offset:offset+len(after['data'])])
+            self.assertNotEqual(after['next_cursor'],before['next_cursor'])
+        self.file.write_text('changed',encoding='utf-8')
+        with self.assertRaisesRegex(ValueError,'changed|stale'): reader['run'](self.root,request)
+
+    def test_structured_batch_preflights_and_never_emits_partial_members(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','max_bytes':1024}],
+                 'max_bytes':3072,'framing_bytes':400}
+        for bad in ({'op':'page','path':'../outside'}, {'op':'excerpt','path':'sentinel.txt','start':1,'lines':201}):
+            with mock.patch.dict(reader['run'].__globals__,one=mock.Mock(side_effect=AssertionError('read before preflight'))):
+                with self.assertRaises(ValueError): reader['run'](self.root,{**request,'requests':[*request['requests'],bad]})
+        for changes in ({'framing_bytes':None},{'framing_bytes':True},{'framing_bytes':3000},
+                        {'requests':request['requests']*2},{'requests':[request]}):
+            with self.assertRaises(ValueError): reader['run'](self.root,{**request,**changes})
+        args=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),'batch','--root',str(self.root),
+              '--requests',json.dumps(request['requests']),'--max-bytes','1024','--framing-bytes','800']
+        p=subprocess.run(args,capture_output=True,timeout=10)
+        self.assertNotEqual(p.returncode,0); self.assertEqual(p.stdout,b'')
+        self.file.write_text('界\\"\n'*1000,encoding='utf-8')
+        (self.root/'second.txt').write_text('界\\"\n'*1000,encoding='utf-8')
+        requests=[{'op':'page','path':name,'max_bytes':1024} for name in ('sentinel.txt','second.txt')]
+        args=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),'batch','--root',str(self.root),
+              '--requests',json.dumps(requests),'--max-bytes','2048','--framing-bytes','256']
+        p=subprocess.run(args,capture_output=True,timeout=10)
+        self.assertNotEqual(p.returncode,0); self.assertEqual(p.stdout,b'')
+        self.assertIn(b'envelope',p.stderr)
+        self.assertLessEqual(len(p.stderr)+1+256,2048)
+        args[-5]=json.dumps([requests[0],{'op':'page','path':'../outside'}])
+        p=subprocess.run(args,capture_output=True,timeout=10)
+        self.assertNotEqual(p.returncode,0); self.assertEqual(p.stdout,b'')
+        self.assertLessEqual(len(p.stderr)+1+256,2048)
+        with mock.patch.dict(reader['run'].__globals__,one=lambda *unused: ('git exit=1\nerror',{},False)):
+            with self.assertRaises(ValueError): reader['run'](self.root,{**request,'requests':[{'op':'status','path':'.'}]})
+        with mock.patch.dict(reader['run'].__globals__,one=lambda *unused: json.dumps({'op':'locate','complete':False,'status':'PARTIAL'})):
+            with self.assertRaises(ValueError): reader['run'](self.root,request)
 
     @staticmethod
     def denied(output):
@@ -109,6 +189,23 @@ class NativeGuardTests(unittest.TestCase):
         argv=['pwsh','-NoProfile','-NonInteractive','-Command',cmd] if os.name=='nt' else ['/bin/sh','-c',cmd]
         p=subprocess.run(argv,cwd=self.root,capture_output=True,text=True,timeout=15)
         self.assertEqual(p.returncode,0,p.stderr);self.assertIn('before',p.stdout)
+        self.assertEqual({p.name:p.read_bytes() for p in self.root.iterdir()},before)
+
+    def test_guarded_structured_batch_rewrite_runs_actual_reader(self):
+        before={p.name:p.read_bytes() for p in self.root.iterdir()}
+        request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','max_bytes':1024},
+                                         {'op':'excerpt','path':'sentinel.txt','start':1,'lines':1,'max_bytes':1024}],
+                 'max_bytes':3072,'framing_bytes':256}
+        output=self.hook('Bash',data={'command':'cer-read '+json.dumps(request)})
+        specific=output['hookSpecificOutput']
+        self.assertEqual(specific['permissionDecision'],'allow')
+        command=specific['updatedInput']['command']
+        argv=['pwsh','-NoProfile','-NonInteractive','-Command',command] if os.name=='nt' else ['/bin/sh','-c',command]
+        p=subprocess.run(argv,cwd=self.root,capture_output=True,timeout=15)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertLessEqual(len(p.stdout)+1+256,3072)
+        result=json.loads(p.stdout)
+        self.assertEqual([i['data'] for i in result['results']],['before','before'])
         self.assertEqual({p.name:p.read_bytes() for p in self.root.iterdir()},before)
 
     def test_virtual_protocol_does_not_fall_through_to_shell(self):

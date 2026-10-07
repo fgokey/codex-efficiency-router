@@ -38,6 +38,22 @@ def flag(value: bool) -> None:
         raise ValueError('gate flags must be boolean')
 
 
+def serialize_output(value: object) -> str:
+    """Exact compact JSON for one outer emit, including all selected nested results."""
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+
+
+def bounded_output(value: object, *, framing_bytes: int, max_bytes: int = 4096) -> str:
+    """Prepare one output or fail; caller must account for its actual host framing."""
+    if (type(framing_bytes) is not int or framing_bytes < 0
+            or type(max_bytes) is not int or not 256 <= max_bytes <= 4096):
+        raise ValueError('known nonnegative framing and max_bytes 256..4096 required')
+    output = serialize_output(value)
+    if len(output.encode('utf-8')) + 2 + framing_bytes > max_bytes:
+        raise ValueError('complete serialized output plus CRLF/framing exceeds max_bytes')
+    return output
+
+
 def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
                 members_bounded: bool, truncated: bool = False,
                 continuation_known: bool = False) -> ReadAction:

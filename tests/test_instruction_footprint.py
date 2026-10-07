@@ -98,16 +98,17 @@ class InstructionFootprintTests(unittest.TestCase):
         text = contract_text()
         for phrase in ('first load SKILL alone in bounded pages',
                        'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
-                       'handoff both', 'All ops: `--root ABS --path PATH`',
+                       'handoff both', 'Single ops: `--root ABS --path PATH`',
                        'current located lines: `excerpt --start N --lines N` (count 1..200)',
                        'unknown: `locate --query Q`', 'Files/rules: `page`',
-                       'same root/path `--cursor TOKEN` to null', 'Page <=4096B',
+                       'same root/path `--cursor TOKEN` to null', 'output+framing <=4KiB',
                        'Check exit before JSON', 'fix limits/page/locate on error',
                        'no full-file slicing/merging pages/files',
-                       'total output below outer incl framing',
-                       'capture result, select fields, retain cursor, serialize/count',
-                       'then emit one page',
-                       'Inner/item/line caps fail', 'Resume gaps', 'disclose omissions'):
+                       'JSON+CRLF+framing <=4KiB',
+                       'capture/select/serialize/count before emit',
+                       'one results JSON', 'keep each cursor', 'no early member output',
+                       'batch --requests JSON_ARRAY --max-bytes N --framing-bytes N',
+                       'Resume gaps', 'disclose omissions'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']

@@ -1,8 +1,8 @@
 # Evidence and recovery
 
-first load SKILL alone in bounded pages. Reader handoff both. All ops: `--root ABS --path PATH`. Files/rules: `page`, same root/path `--cursor TOKEN` to null; unknown: `locate --query Q`; current located lines: `excerpt --start N --lines N` (count 1..200). Check exit before JSON; fix limits/page/locate on error. Page <=4096B; default `--max-bytes 3072`; framing extra. no full-file slicing/merging pages/files.
+first load SKILL alone in bounded pages. Reader handoff both. Single ops: `--root ABS --path PATH`. Files/rules: `page`, same root/path `--cursor TOKEN` to null; unknown: `locate --query Q`; current located lines: `excerpt --start N --lines N` (count 1..200). Check exit before JSON; fix limits/page/locate on error. no full-file slicing/merging pages/files.
 
-capture result, select fields, retain cursor, serialize/count total output below outer incl framing <=4KiB, then emit one page. Inner/item/line caps fail. Resume gaps; shrink batches; disclose omissions. Commentary, completed queries/waits and prompt rewrites do not reset backoff. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Report requested/observed; reconcile unknown effects before replay. Never invent identity/savings/enforcement/cleanup.
+Checks: Reader `batch --requests JSON_ARRAY --max-bytes N --framing-bytes N`. Check exit, then one results JSON; keep each cursor. JSON+CRLF+framing <=4KiB or narrow; no early member output. Resume gaps; disclose omissions. Other tools: capture/select/serialize/count before emit. Commentary, queries/waits and prompt rewrites do not reset backoff. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Report requested/observed; reconcile unknown effects before replay. Never invent identity/savings/enforcement/cleanup.
 
 Check semantic invariants, platform/macros, consumers, validation. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild across affected states; else PARTIAL/BLOCKED.
 
