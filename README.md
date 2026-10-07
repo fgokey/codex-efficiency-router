@@ -252,6 +252,8 @@ Ordinary work uses Sol/medium; focused low-risk code uses Luna/high, while deter
 
 ## Install and update
 
+The installed `scripts/` directory contains only `readonly_reader.py`: one invocation per tool call, or one bounded Reader `batch` for independent checks. Keep page calls separate from other pages, `Get-Content` and queries. Dispatch preflight is the reference checklist, not an installed CLI; verify script paths before use. Source doctor preflight is only for Router development. [Exact paths and scope](docs/INSTALL.md).
+
 Review source first. Installation only manages owned files; it does not edit global config, authentication, permissions, AGENTS.md or unrelated Skills/agents. Keep the clone for lifecycle commands. Choose one installation scope.
 
 ### Windows / PowerShell

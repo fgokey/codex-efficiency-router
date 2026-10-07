@@ -224,6 +224,8 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 ## 安装与更新
 
+安装包的 `scripts/` 目录只含 `readonly_reader.py`：每次工具调用单独运行一次 Reader；独立检查用一次有总输出预算的 Reader `batch`。不要拼接多个 page，也不要混入 `Get-Content` 或查询输出。dispatch preflight 指参考文件中的检查清单，不是安装命令；脚本路径先验证存在再使用。源码 doctor preflight 只用于 Router 开发。[具体入口与范围](docs/INSTALL.md)。
+
 先审查源码。安装器只操作清单拥有的文件，不改全局 `config.toml`、`AGENTS.md`、认证、权限或其他 Skill。用户级/项目级二选一，保留克隆用于更新卸载。
 
 ### Windows / PowerShell

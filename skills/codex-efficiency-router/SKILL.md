@@ -1,6 +1,6 @@
 ---
 name: codex-efficiency-router
-description: Complex repo routing and bounded evidence; skip Q&A, status and clear low-risk single-owner tasks. Load SKILL alone in bounded pages.
+description: Complex repo routing/bounded evidence; skip Q&A, status and clear low-risk single-owner tasks. Read SKILL alone, one page per tool call.
 ---
 
 # Codex Efficiency Router
@@ -9,7 +9,7 @@ description: Complex repo routing and bounded evidence; skip Q&A, status and cle
 
 Installation: fixed; automatic low: disabled.
 
-first load SKILL alone in bounded pages. Verified Python `-I -B <Skill>/scripts/readonly_reader.py`: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Check exit before JSON; no full-file slicing/merging pages/files. Output+framing <=4KiB; unknown framing: gap; handoff both.
+One Reader invocation/tool call; no joined pages/queries or mixed Get-Content. Verified Python `-I -B <Skill>/scripts/readonly_reader.py`: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Check exit before JSON; no full-file slicing/merging pages/files. Output+framing <=4KiB; unknown framing: gap; handoff both.
 
 Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/hidden config edits.
 
@@ -29,10 +29,8 @@ Owned scope; requirements win; acceptance: dispatch.
 
 ## Recovery
 
-Read [quality.md](references/quality.md) for large evidence, semantic/lifecycle changes, failure or disputed validation. Retain attempts; do not weaken assertions.
+Read [quality.md](references/quality.md) for large evidence, semantic/lifecycle changes, failure or disputed validation.
 
 ## Context and reporting
-
-`batch --help`: checks; substantive events, short state, back off.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.

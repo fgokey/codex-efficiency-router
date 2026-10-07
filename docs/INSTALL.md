@@ -6,6 +6,8 @@ Copyable commands for Windows and macOS/Linux are in [README](../README.md#insta
 
 The complete Skill directory, including four progressive references and UI metadata, plus five canonical roles and, in default auto, five generated native aliases. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
 
+The installed `scripts/` directory contains only `readonly_reader.py`. Run each Reader invocation alone in its tool call; use one Reader `batch` for independent checks under one total output budget. Do not concatenate page calls or mix `Get-Content`/queries into their output. Dispatch preflight is the checklist in `references/dispatch.md`, not an installed command. Verify any script's real path before use. `ROOT/scripts/doctor.py --source-tree ROOT --preflight` is only for Router development, with `ROOT` the Router source repository; it is not an installed helper or a prerequisite for unrelated repository work.
+
 Select either user scope or one explicit existing project root. Keep the repository clone to update/uninstall. `$CODEX_HOME` changes user agent and backup locations, not `~/.agents/skills`. Use the same scope, project and environment for subsequent operations. A project-root flag without project scope is rejected.
 
 ## Safe updates

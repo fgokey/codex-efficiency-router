@@ -124,7 +124,7 @@ class DocumentedContractTests(unittest.TestCase):
     def test_native_change_summary_is_preflighted_before_delegation(self):
         core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        self.assertIn('Run dispatch preflight', core)
+        self.assertIn('Dispatch preflight: checklist below, not a CLI', core)
         for phrase in ('all roots', 'exact paths/status',
                        'owned/prior dirt', 'Parent checks all diffs/status',
                        'review/open-review', 'unstaged review',

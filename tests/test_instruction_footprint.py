@@ -98,9 +98,9 @@ class InstructionFootprintTests(unittest.TestCase):
         text = contract_text()
         core = SKILL.read_text(encoding='utf-8')
         description = next(line for line in core.splitlines() if line.startswith('description:'))
-        self.assertIn('Load SKILL alone in bounded pages', description)
+        self.assertIn('Read SKILL alone, one page per tool call', description)
         self.assertLess(core.index('Check exit before JSON'), core.index('Read [effort.md]'))
-        for phrase in ('first load SKILL alone in bounded pages',
+        for phrase in ('Read SKILL alone, one page per tool call',
                        'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
                        'handoff both', '`page --root ABS --path PATH`',
                        'current located lines: `excerpt --start N --lines N` (count 1..200)',
@@ -122,6 +122,25 @@ class InstructionFootprintTests(unittest.TestCase):
                        'other totals <outer incl framing')
             for phrase in phrases:
                 self.assertIn(phrase, role, name)
+
+    def test_reader_call_and_dispatch_checklist_boundaries_are_explicit(self):
+        core = SKILL.read_text(encoding='utf-8')
+        description = next(line for line in core.splitlines() if line.startswith('description:'))
+        self.assertIn('Read SKILL alone, one page per tool call', description)
+        self.assertIn('One Reader invocation/tool call', core)
+        self.assertIn('no joined pages/queries or mixed Get-Content', core)
+
+    def test_dispatch_preflight_is_checklist_and_scripts_are_verified(self):
+        dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
+        self.assertIn('Dispatch preflight: checklist below, not a CLI', dispatch)
+        self.assertIn('Verify script paths before use', dispatch)
+        self.assertNotIn('Run dispatch preflight.', dispatch)
+        self.assertIn('Checks: one Reader `batch', contract_text())
+        self.assertIn('Router ROOT dev only:', contract_text())
+        self.assertIn('ROOT/scripts/doctor.py --source-tree ROOT --preflight', contract_text())
+        from manage import source_files
+        scripts = {key for key in source_files(ROOT) if key.startswith('skill/scripts/')}
+        self.assertEqual(scripts, {'skill/scripts/readonly_reader.py'})
 
     def test_monitoring_uses_one_delta_then_backoff(self):
         text = contract_text()
