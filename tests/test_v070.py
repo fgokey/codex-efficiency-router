@@ -25,7 +25,8 @@ import canary
 import manage
 import release_package
 import write_guard as wg
-from compare_v2 import compare_three, call_cost
+from compare_v2 import compare_three, call_cost, normalize
+import compare_runs
 from release_identity import policy_hash, bundle_hash
 from task_handshake import handshake
 
@@ -597,6 +598,47 @@ class CanaryV070(TempCase):
 
 
 class AccountingV070(unittest.TestCase):
+    def test_schema_three_cli_exit_matches_quality(self):
+        for failing, expected in ((False, 0), (True, 1)):
+            rows = self.rows()
+            if failing:
+                rows[0]['outcome'] = 'fail'
+            with patch.object(sys, 'argv', ['compare_runs.py', 'in-memory-runs.json']), \
+                    patch.object(Path, 'read_text', return_value=json.dumps(rows)), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(compare_runs.main(), expected)
+
+    def test_per_model_partial_cost_and_usage_are_unknown(self):
+        row = self.rows()[0]
+        model = row['calls'][0]['model']
+        row['calls'][1]['model'] = model
+        row['calls'][1].pop('actual_cost')
+        result = normalize(row)['per_model'][model]
+        self.assertIsNone(result['costs'])
+        self.assertEqual(result['price_status'], 'UNKNOWN')
+        row['calls_complete'] = False
+        result = normalize(row)['per_model'][model]
+        self.assertEqual(result['usage_status'], 'UNKNOWN')
+        for key in ('input_tokens', 'cached_input_tokens', 'output_tokens'):
+            self.assertIsNone(result[key])
+
+    def test_per_model_prices_record_actual_estimate_and_currency_gaps(self):
+        row = self.rows()[0]
+        model = row['calls'][0]['model']
+        row['calls'][1]['model'] = model
+        result = normalize(row)['per_model'][model]
+        self.assertEqual(result['price_status'], 'actual')
+        self.assertAlmostEqual(result['costs']['USD'], .12)
+        row['calls'][1]['actual_cost']['currency'] = 'CNY'
+        self.assertIsNone(normalize(row)['per_model'][model]['costs'])
+        row['calls'][1].pop('actual_cost')
+        row['calls'][1]['rates'] = {'model': model, 'currency': 'USD', 'source': 'test-card',
+                                  'effective_at': '2026-09-09', 'input_per_million': 1,
+                                  'cached_input_per_million': 1, 'output_per_million': 1}
+        result = normalize(row)['per_model'][model]
+        self.assertEqual(result['price_status'], 'rate-card-estimate')
+        self.assertEqual(result['cost_basis'], {'actual': 1, 'rate-card-estimate': 1})
+
     def rows(self, trials=1):
         rows = []
         for trial in range(trials):

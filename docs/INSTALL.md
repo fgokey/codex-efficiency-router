@@ -14,6 +14,8 @@ Run `git pull --ff-only`, review changes, preview with `--dry-run`, then reinsta
 
 Unowned filename collisions always stop installation. Existing managed-file edits stop it unless `--force` is explicitly supplied; that switch backs up only owned content. It cannot overwrite unrelated files. Source validation occurs before any payload write. Do not edit configuration concurrently with installation.
 
+An ownership manifest must explicitly include `skill/SKILL.md`. Doctor requires the current profile's complete managed inventory. Historical manifests may omit later-added files that are absent on disk and still upgrade normally. Uninstall refuses an existing standard payload path missing from ownership, even with `--force`, and preserves the manifest and files; disk presence never grants ownership.
+
 ## Uninstall and recovery
 
 Uninstall reads the manifest, checks modifications, backs up affected bytes, removes only managed files and the manifest, and prunes only owned empty directories. Untracked files/directories and unrelated configuration survive. No manifest means no broad deletion; migrate legacy installations first. Backups survive uninstall.

@@ -61,6 +61,40 @@ class ProfileLifecycleTests(unittest.TestCase):
     def test_new_default_auto(self):
         self.install(); self.assert_installed(Profile('auto'))
 
+    def test_modern_manifest_missing_ownership_blocks_doctor_and_lifecycle(self):
+        self.install(mode='auto')
+        original = self.manifests()
+        for key in (None, 'skill/SKILL.md', 'skill/scripts/readonly_reader.py',
+                    'agents/cer-auto-sol61-engineer.toml'):
+            data = json.loads(json.dumps(original))
+            if key is None:
+                data['files'] = {}
+            else:
+                del data['files'][key]
+            (self.skill / MANIFEST).write_text(json.dumps(data), encoding='utf-8')
+            before = self.files()
+            result = subprocess.run([sys.executable, '-B', str(ROOT / 'scripts/doctor.py'),
+                                     '--scope', 'project', '--project-root', str(self.project), '--json'],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode, 1)
+            for operation in (lambda: self.install(),
+                              lambda: manage.uninstall('project', self.project)):
+                with self.assertRaisesRegex(ValueError, 'ownership|unowned'):
+                    operation()
+                self.assertEqual(self.files(), before)
+
+    def test_uninstall_preserves_unknown_standard_path_even_with_force(self):
+        self.install(mode='auto')
+        data = self.manifests()
+        del data['files']['skill/scripts/readonly_reader.py']
+        (self.skill / MANIFEST).write_text(json.dumps(data), encoding='utf-8')
+        (self.skill / 'scripts/readonly_reader.py').write_text('custom reader', encoding='utf-8')
+        before = self.files()
+        for force in (False, True):
+            with self.assertRaisesRegex(ValueError, 'unowned standard path preserved'):
+                manage.uninstall('project', self.project, force=force)
+            self.assertEqual(self.files(), before)
+
     def test_explicit_adaptive_renders_four_unpinned_roles(self):
         self.install(mode='adaptive'); self.assert_installed(Profile('adaptive'))
         source = manage.source_files(ROOT)

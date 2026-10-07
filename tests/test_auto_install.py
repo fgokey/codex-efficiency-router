@@ -62,6 +62,7 @@ class AutomaticInstallTests(unittest.TestCase):
 
     def test_071_inventory_adds_both_sol61_roles_with_backup_and_restore(self):
         self.prior_sol_inventory()
+        self.assertEqual(self.manifest()['profile_schema'], 2)
         before=self.state();old_backup=self.backup()
         self.assertEqual(len(self.manifest()['files']),16)
         self.install(dry_run=True)

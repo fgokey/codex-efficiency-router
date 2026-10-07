@@ -81,7 +81,8 @@ def normalize(row):
     ids = set()
     per_model = defaultdict(lambda: {'calls': 0, 'input_tokens': 0, 'cached_input_tokens': 0,
                                     'output_tokens': 0, 'efforts': Counter(), 'attempts': [],
-                                    'statuses': Counter(), 'costs': defaultdict(float)})
+                                    'statuses': Counter(), 'costs': defaultdict(float),
+                                    'cost_basis': Counter()})
     costs = []
     token_complete = bool(calls) and row.get('calls_complete') is True
     for call in calls:
@@ -116,8 +117,22 @@ def normalize(row):
                 model_row[key] += call[key]
         amount, currency, basis = call_cost(call)
         costs.append((amount, currency, basis))
+        model_row['cost_basis'][basis] += 1
         if amount is not None:
             model_row['costs'][currency] += amount
+    for model_row in per_model.values():
+        complete = row.get('calls_complete') is True
+        model_row['calls_complete'] = complete
+        model_row['usage_status'] = ('measured' if complete and all(model_row[key] is not None
+                                    for key in ('input_tokens', 'cached_input_tokens', 'output_tokens')) else 'UNKNOWN')
+        if not complete:
+            for key in ('input_tokens', 'cached_input_tokens', 'output_tokens'):
+                model_row[key] = None
+        money_complete = complete and not model_row['cost_basis']['UNKNOWN'] and len(model_row['costs']) == 1
+        model_row['price_status'] = ('actual' if money_complete and not model_row['cost_basis']['rate-card-estimate']
+                                    else 'rate-card-estimate' if money_complete else 'UNKNOWN')
+        if not money_complete:
+            model_row['costs'] = None
     currency_set = {currency for amount, currency, _ in costs if amount is not None}
     money_complete = (bool(calls) and row.get('calls_complete') is True
                       and all(amount is not None for amount, _, _ in costs) and len(currency_set) == 1)

@@ -78,6 +78,8 @@ def load_manifest(skill: Path, agents: Path) -> dict[str, str]:
         if key == f"skill/{MANIFEST}" or not isinstance(value, str) or len(value) != 64:
             raise ValueError("invalid manifest entry")
         int(value, 16)
+    if 'skill/SKILL.md' not in data['files']:
+        raise ValueError('incomplete ownership manifest: skill/SKILL.md')
     return data["files"]
 
 
@@ -85,6 +87,15 @@ def installed_profile(skill: Path, agents: Path) -> Profile:
     load_manifest(skill, agents)
     raw = read_bytes(skill / MANIFEST)
     return from_manifest(json.loads(raw)) if raw is not None else Profile()
+
+
+def required_ownership(profile: Profile) -> set[str]:
+    required = {'skill/' + name for name in ('SKILL.md', 'agents/openai.yaml', 'cer.ps1',
+                'scripts/readonly_reader.py', 'references/dispatch.md', 'references/effort.md',
+                'references/quality.md', 'references/routing.md')}
+    required.update('agents/' + name for name in
+                    (MANAGED_AGENT_FILES if profile.mode == 'auto' else AGENT_FILES))
+    return required
 
 
 def source_files(root: Path) -> dict[str, bytes]:
@@ -266,6 +277,9 @@ def uninstall(scope: str, project_root: Path | None, dry_run: bool = False, forc
             print("no managed installation found; nothing removed")
             return
         owned = load_manifest(skill, agents)
+        for key in required_ownership(installed_profile(skill, agents)) - owned.keys():
+            if target(key, skill, agents).exists():
+                raise ValueError(f'incomplete ownership manifest; unowned standard path preserved: {key}')
         for key, expected in owned.items():
             raw = read_bytes(target(key, skill, agents))
             if raw is not None and digest(raw) != expected and not force:

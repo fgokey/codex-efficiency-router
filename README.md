@@ -331,6 +331,8 @@ For project scope use `--scope project --project-root ...`. Only manifest-owned 
 
 Restore preserves the original selection without migrating it to auto. Reload Codex after uninstall; keep private customization backups out of public reports. [Full lifecycle and recovery](docs/INSTALL.md).
 
+Doctor rejects incomplete current ownership inventories. Uninstall preserves the manifest and stops when a standard payload file exists without declared ownership, even with `--force`. Historical manifests missing later-added files can still upgrade when those paths are absent.
+
 ## Validation and limits
 
 ```sh

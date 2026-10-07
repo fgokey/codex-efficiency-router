@@ -75,7 +75,7 @@ def compare(rows: list[dict]) -> dict:
             "router_passes": sum(p["router"]["outcome"] == "pass" for p in pairs.values()),
             "router_acceptance": "pass" if all(p["router"]["outcome"] == "pass" for p in pairs.values()) else "incomplete",
             "efficiency_claim_eligible": False,
-            "monetary_cost": {"status": "UNKNOWN", "reason": "Legacy format has no per-call monetary provenance; use schema 2 for cost claims."},
+            "monetary_cost": {"status": "UNKNOWN", "reason": "Legacy format has no per-call monetary provenance; use schema 3 for cost claims."},
             "quality_status": "regression" if regressions else "unknown" if unknowns else "no_observed_regression",
             "measurements": measurements,
             "limitation": "Descriptive paired sample only; not proof of non-inferiority or future quality."}
@@ -88,7 +88,7 @@ def main() -> int:
     try:
         result = compare(json.loads(args.runs.read_text(encoding="utf-8")))
         print(json.dumps(result, indent=2, allow_nan=False))
-        if result.get("schema") == 2:
+        if result.get("schema") in (2, 3):
             return 0 if result["quality_status"] == "pass" else 1
         return 0 if result["quality_status"] == "no_observed_regression" and result["router_acceptance"] == "pass" else 1
     except (OSError, ValueError, TypeError) as exc:
