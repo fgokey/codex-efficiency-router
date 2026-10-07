@@ -1,6 +1,6 @@
 ---
 name: codex-efficiency-router
-description: Complex repo routing and bounded evidence; skip Q&A, status and clear low-risk single-owner tasks.
+description: Complex repo routing and bounded evidence; skip Q&A, status and clear low-risk single-owner tasks. Load SKILL alone in bounded pages.
 ---
 
 # Codex Efficiency Router
@@ -8,6 +8,8 @@ description: Complex repo routing and bounded evidence; skip Q&A, status and cle
 <!-- CER version: 0.8.5 -->
 
 Installation: fixed; automatic low: disabled.
+
+first load SKILL alone in bounded pages. Verified Python `-I -B <Skill>/scripts/readonly_reader.py`: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Check exit before JSON; no full-file slicing/merging pages/files. Output+framing <=4KiB; unknown framing: gap; handoff both.
 
 Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/hidden config edits.
 
@@ -31,6 +33,6 @@ Read [quality.md](references/quality.md) for large evidence, semantic/lifecycle 
 
 ## Context and reporting
 
-Verified Python `-I -B <Skill>/scripts/readonly_reader.py`, one page, default `--max-bytes 3072`; output+framing <=4KiB, unknown framing is a gap. Independent checks: Reader `batch` (`--help`); act on substantive events, save short state, back off.
+`batch --help`: checks; substantive events, short state, back off.
 
 Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.

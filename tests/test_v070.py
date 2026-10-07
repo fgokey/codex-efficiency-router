@@ -335,7 +335,36 @@ class CanaryV070(TempCase):
                 {'kind':'output','bytes':4094,'framing_bytes':2,'truncated':False}]
         events.extend({'kind':'progress','snapshot':{'state':'working','result':''},'active':True,'action':action,'offset':'saved-offset'}
                       for action in ('WAIT_COMPACT','WAIT_COMPACT','TAIL_DELTA','BACKOFF'))
+        events[-1]['backoff']={'scope':'in-turn','mechanism':'wait','requested_seconds':30,'elapsed_seconds':30}
         return {'source':'operator-witnessed-native','expected':expected,'events':events}
+
+    def test_execution_backoff_requires_effect_evidence(self):
+        data=self.execution_fixture()
+        event=data['events'][8]
+        event.pop('backoff')
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'UNKNOWN')
+        for evidence in ({'mechanism':'noop'},
+                         {'mechanism':'wait','requested_seconds':30,'elapsed_seconds':0},
+                         {'mechanism':'wait','requested_seconds':0},
+                         {'mechanism':'schedule','previous_interval_seconds':900,'interval_seconds':900},
+                         {'mechanism':'schedule','previous_interval_seconds':900,'interval_seconds':900,'status':'ACTIVE'},
+                         {'mechanism':'pause','status':'ACTIVE'}):
+            event['backoff']={'scope':'in-turn' if evidence['mechanism']=='wait' else 'heartbeat',**evidence}
+            self.assertEqual(canary.inspect_execution(data)['backoff'],'FAIL')
+        for evidence in ({'mechanism':'wait','requested_seconds':30,'elapsed_seconds':30},
+                         {'mechanism':'schedule','previous_interval_seconds':900,'interval_seconds':1800,'status':'ACTIVE'},
+                         {'mechanism':'pause','status':'PAUSED'}):
+            event['backoff']={'scope':'in-turn' if evidence['mechanism']=='wait' else 'heartbeat',**evidence}
+            self.assertEqual(canary.inspect_execution(data)['backoff'],'PASS')
+        event['backoff']={'scope':'heartbeat','mechanism':'wait','requested_seconds':30,'elapsed_seconds':30}
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'FAIL')
+        event['backoff']={'mechanism':'pause','status':'PAUSED'}
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'UNKNOWN')
+        for evidence in ({}, {'mechanism':'wait','requested_seconds':True,'elapsed_seconds':30},
+                         {'mechanism':'schedule','previous_interval_seconds':900,'interval_seconds':1800},
+                         {'mechanism':'pause','status':None}):
+            event['backoff']={'scope':'in-turn',**evidence}
+            self.assertEqual(canary.inspect_execution(data)['backoff'],'UNKNOWN')
 
     def test_execution_output_measures_serialized_result(self):
         data=self.execution_fixture()
@@ -375,6 +404,7 @@ class CanaryV070(TempCase):
         changed['events']=changed['events'][:8]
         for action in ('WAIT_COMPACT','TAIL_DELTA','BACKOFF'):
             changed['events'].append({**copy.deepcopy(changed['events'][7]),'action':action})
+        changed['events'][-1]['backoff']={'scope':'in-turn','mechanism':'wait','requested_seconds':30,'elapsed_seconds':30}
         self.assertEqual(canary.inspect_execution(changed)['backoff'],'PASS')
 
     def test_execution_inspection_separates_missing_and_failing_evidence(self):

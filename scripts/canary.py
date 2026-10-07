@@ -170,7 +170,36 @@ def inspect_execution(observations: object) -> dict:
                 delta_seen = True
             elif action == 'WAIT_COMPACT' and isinstance(event.get('offset'), str):
                 saved_offset = event['offset']
-            backoff_seen |= action == 'BACKOFF'
+            if action == 'BACKOFF':
+                evidence = event.get('backoff')
+                mechanism = evidence.get('mechanism') if isinstance(evidence, dict) else None
+                scope = evidence.get('scope') if isinstance(evidence, dict) else None
+                backoff_missing |= scope not in ('in-turn', 'heartbeat')
+                backoff_bad |= scope == 'heartbeat' and mechanism == 'wait'
+                if mechanism == 'wait':
+                    requested, elapsed = evidence.get('requested_seconds'), evidence.get('elapsed_seconds')
+                    request_known, elapsed_known = (type(value) in (int, float) and -float('inf') < value < float('inf')
+                                                    for value in (requested, elapsed))
+                    backoff_missing |= not (request_known and elapsed_known)
+                    backoff_bad |= ((request_known and requested <= 0) or (elapsed_known and elapsed < 0)
+                                    or (request_known and elapsed_known and elapsed < requested))
+                elif mechanism == 'schedule':
+                    before, after = evidence.get('previous_interval_seconds'), evidence.get('interval_seconds')
+                    before_known, after_known = (type(value) in (int, float) and -float('inf') < value < float('inf')
+                                                 for value in (before, after))
+                    status_known = isinstance(evidence.get('status'), str)
+                    backoff_missing |= not (before_known and after_known and status_known)
+                    backoff_bad |= ((before_known and before <= 0) or (after_known and after <= 0)
+                                    or (before_known and after_known and after <= before)
+                                    or (status_known and evidence['status'] != 'ACTIVE'))
+                elif mechanism == 'pause':
+                    known = isinstance(evidence.get('status'), str)
+                    backoff_missing |= not known
+                    backoff_bad |= known and evidence['status'] != 'PAUSED'
+                else:
+                    backoff_missing |= mechanism != 'noop'
+                    backoff_bad |= mechanism == 'noop'
+                backoff_seen = True
             previous = snapshot
     if read_bad:
         result['read_evidence'] = 'FAIL'

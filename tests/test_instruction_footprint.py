@@ -96,13 +96,17 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = contract_text()
+        core = SKILL.read_text(encoding='utf-8')
+        description = next(line for line in core.splitlines() if line.startswith('description:'))
+        self.assertIn('Load SKILL alone in bounded pages', description)
+        self.assertLess(core.index('Check exit before JSON'), core.index('Read [effort.md]'))
         for phrase in ('first load SKILL alone in bounded pages',
                        'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
-                       'handoff both', 'Single ops: `--root ABS --path PATH`',
+                       'handoff both', '`page --root ABS --path PATH`',
                        'current located lines: `excerpt --start N --lines N` (count 1..200)',
                        'unknown: `locate --query Q`', 'Files/rules: `page`',
-                       'same root/path `--cursor TOKEN` to null', 'output+framing <=4KiB',
-                       'Check exit before JSON', 'fix limits/page/locate on error',
+                       'same root/path `--cursor TOKEN` to null', 'Output+framing <=4KiB',
+                       'Check exit before JSON', 'Fix limits/page/locate errors',
                        'no full-file slicing/merging pages/files',
                        'JSON+CRLF+framing <=4KiB',
                        'capture/select/serialize/count before emit',
@@ -122,7 +126,10 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_monitoring_uses_one_delta_then_backoff(self):
         text = contract_text()
         for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
-                       'no repeat tails/polls/nudges until change'):
+                       'no repeat tails/polls/nudges until change',
+                       'Status/check: one-shot; explicit watch',
+                       'heartbeat: defer schedule or pause, never skipped wakeups',
+                       'compact state/cadence; stop on cancel'):
             self.assertIn(phrase, text)
 
     def test_child_instructions_remain_self_contained(self):
