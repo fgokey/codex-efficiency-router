@@ -67,7 +67,8 @@ class AutomaticBindingTests(unittest.TestCase):
             (SOL,C('sol','high')),
             (S(uncertainty=2,coupling=2,risk=1),C('sol','high')),
             (S(uncertainty=1,coupling=1,risk=2),C('sol','high')),
-            (S(risk=3,uncertainty=3),C('astra','high')),
+            (S(risk=3,uncertainty=3,very_complex=True,
+               sol61_unsuitable_reason='unresolved recovery invariants'),C('astra','high')),
         )
         for signals,expected in cases:
             with self.subTest(expected=expected):
@@ -132,7 +133,8 @@ class AutomaticBindingTests(unittest.TestCase):
         self.assertEqual(plan(SOL,host(host_can_set_effort=False),AUTO,explicit_effort='medium').action,'blocked')
 
     def test_astra_high_works_with_fixed_fallback(self):
-        d=plan(S(risk=3,uncertainty=3),host(current=C('sol','medium'),current_sufficient=False,
+        d=plan(S(risk=3,uncertainty=3,very_complex=True,
+                 sol61_unsuitable_reason='unresolved recovery invariants'),host(current=C('sol','medium'),current_sufficient=False,
                                            host_can_set_effort=False),AUTO)
         self.assertEqual((d.requested_role,d.requested),('astra_architect',C('astra','high')))
 

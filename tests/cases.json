@@ -39,7 +39,9 @@
       "coupling": 2,
       "verifiability": 1,
       "irreversibility": 2,
-      "commitment_boundary": true
+      "commitment_boundary": true,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "unresolved cross-client public API ownership tradeoff"
     },
     "expected": "astra"
   },
@@ -50,7 +52,9 @@
       "risk": 2,
       "coupling": 2,
       "verifiability": 1,
-      "evidence_conflict": true
+      "evidence_conflict": true,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "competing root causes need independent technical arbitration"
     },
     "expected": "astra"
   },
@@ -61,7 +65,9 @@
       "risk": 2,
       "coupling": 2,
       "verifiability": 2,
-      "irreversibility": 3
+      "irreversibility": 3,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "irreversible migration and recovery paths remain in conflict"
     },
     "expected": "astra"
   },
@@ -72,7 +78,9 @@
       "risk": 1,
       "coupling": 2,
       "verifiability": 1,
-      "novelty": 3
+      "novelty": 3,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "new cross-domain protocol has unresolved invariants"
     },
     "expected": "astra"
   },
@@ -154,7 +162,7 @@
       "prior_lane": "sol",
       "capability_failure": true
     },
-    "expected": "astra"
+    "expected": "sol"
   },
   {
     "name": "sol environment failure does not escalate",
@@ -188,7 +196,9 @@
       "risk": 3,
       "coupling": 3,
       "verifiability": 1,
-      "no_subagents": true
+      "no_subagents": true,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "cross-system recovery strategy remains unresolved"
     },
     "expected": "astra"
   },
@@ -290,7 +300,9 @@
       "risk": 3,
       "uncertainty": 3,
       "verifiability": 1,
-      "failed_attempts": 0
+      "failed_attempts": 0,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "irreversible state transition needs design arbitration"
     },
     "expected": "astra"
   },
@@ -373,7 +385,9 @@
       "prior_lane": "terra",
       "uncertainty": 2,
       "risk": 2,
-      "evidence_conflict": true
+      "evidence_conflict": true,
+      "very_complex": true,
+      "sol61_unsuitable_reason": "new owner evidence invalidates the settled migration design"
     },
     "expected": "astra"
   }

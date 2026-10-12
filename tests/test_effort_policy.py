@@ -16,7 +16,8 @@ ADAPTIVE = Profile('adaptive')
 MECHANICAL = S(mechanical=True, uncertainty=0, risk=1, coupling=0, verifiability=3)
 DATA_TRANSFORM = replace(MECHANICAL, workload='data_transform')
 SOL = S(uncertainty=2, risk=1, coupling=1)
-ASTRA = S(uncertainty=3, risk=3, coupling=2)
+ASTRA = S(uncertainty=3, risk=3, coupling=2, very_complex=True,
+          sol61_unsuitable_reason='Sol61 cannot resolve conflicting owner-lifetime guarantees across clients')
 
 
 def context(**overrides):
@@ -31,6 +32,38 @@ def context(**overrides):
 
 
 class EffortPolicyTests(unittest.TestCase):
+    def test_old_hard_judgment_floor_survives_without_automatic_astra(self):
+        for changes in ({'irreversibility':3},
+                        {'commitment_boundary':True,'irreversibility':2},
+                        {'novelty':3,'verifiability':1},
+                        {'capability_failure':True,'failed_attempts':1,'prior_lane':'sol'}):
+            with self.subTest(changes=changes):
+                s=S(uncertainty=2,risk=1,coupling=0,**changes)
+                self.assertEqual(recommend(s),C('sol','high'))
+                self.assertEqual(plan(s,context(),ADAPTIVE,explicit_effort='medium').action,'blocked')
+                self.assertEqual(plan(replace(s,force_astra=True),context(),ADAPTIVE,
+                                      explicit_effort='medium').action,'blocked')
+
+    def test_readonly_tasks_and_retained_astra_need_admission_for_new_unit(self):
+        for signals in (S(),S(very_complex=True),
+                        S(sol61_unsuitable_reason='conflicting owner lifetimes'),
+                        S(very_complex=True,sol61_unsuitable_reason=' \t')):
+            with self.subTest(signals=signals):
+                c=context(current=C('astra','high'),current_sufficient=True,
+                          keep_model=True,benefit_clear=True,same_config_reason='independent_review')
+                d=plan(signals,c,ADAPTIVE)
+                self.assertEqual(d.action,'local')
+                self.assertIsNone(d.requested)
+                self.assertEqual(plan(signals,replace(c,current_sufficient=False),ADAPTIVE).action,'blocked')
+                d=plan(signals,context(diagnosis_only=True,failure_kind='unexplained'),ADAPTIVE)
+                self.assertNotEqual(d.requested.lane if d.requested else None,'astra')
+
+    def test_retained_astra_can_dispatch_admitted_new_readonly_unit_without_trial(self):
+        c=context(current=C('astra','high'),current_sufficient=True,keep_model=True,
+                  benefit_clear=True,same_config_reason='independent_review')
+        d=plan(replace(ASTRA,failed_attempts=0),c,ADAPTIVE)
+        self.assertEqual((d.action,d.requested),('delegate',C('astra','high')))
+
     def test_sol61_high_preference_defaults_high_when_difficulty_is_unknown(self):
         self.assertEqual(recommend(S()), C('sol', 'high'))
 

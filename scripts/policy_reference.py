@@ -33,7 +33,9 @@ class TaskSignals:
     cheap_check_available: bool = False
     failed_attempts: int = 0
     prior_lane: Lane = "local"
-    force_astra: bool = False
+    force_astra: bool = False  # Only an explicit user Astra request.
+    very_complex: bool = False  # Parent judgment for this task unit.
+    sol61_unsuitable_reason: str = ""
     no_subagents: bool = False
 
     def validate(self) -> None:
@@ -52,8 +54,20 @@ class TaskSignals:
             elif field.name == "prior_lane":
                 if value not in LANES:
                     raise ValueError("unknown prior_lane")
+            elif field.name == "sol61_unsuitable_reason":
+                if type(value) is not str:
+                    raise ValueError("sol61_unsuitable_reason must be a string")
             elif type(value) is not bool:
                 raise ValueError(f"{field.name} must be boolean")
+
+
+def astra_admitted(s: TaskSignals) -> bool:
+    """A parent judgment or explicit user pin still needs intact task prerequisites."""
+    s.validate()
+    return (s.spec_complete and s.authority_ready and s.environment_ready
+            and s.observability_ready
+            and (s.force_astra or (not s.cheap_check_available and s.very_complex
+                                   and s.reasoning_bound and bool(s.sol61_unsuitable_reason.strip()))))
 
 
 def choose_lane(s: TaskSignals) -> Lane:
@@ -62,22 +76,13 @@ def choose_lane(s: TaskSignals) -> Lane:
     if not (s.spec_complete and s.authority_ready and s.environment_ready and s.observability_ready):
         return "local"  # Repair a prerequisite; not permission to implement blindly.
     if s.force_astra:
-        return "astra"
+        return "astra"  # An explicit user pin still respects task prerequisites.
     if s.cheap_check_available:
         return "local"  # The described check must be safe, bounded and discriminating.
-
-    if s.reasoning_bound:
-        if s.capability_failure and s.failed_attempts >= 1 and s.prior_lane == "sol" and s.uncertainty >= 1:
-            return "astra"
-        consequential = s.risk >= 2 or s.irreversibility >= 2 or s.coupling >= 2
-        if s.uncertainty >= 2 and (
-            (s.commitment_boundary and consequential)
-            or (s.evidence_conflict and (s.risk >= 2 or s.coupling >= 2))
-            or s.irreversibility == 3
-            or (s.novelty == 3 and (s.coupling >= 2 or s.verifiability <= 1))
-            or (s.risk == 3 and s.verifiability <= 2)
-        ):
-            return "astra"
+    if astra_admitted(s):
+        return "astra"
+    if s.very_complex or s.sol61_unsuitable_reason.strip():
+        return "sol"  # Incomplete parent judgment cannot downshift engineering work.
     if s.uncertainty >= 2 or s.coupling >= 2:
         return "sol"
     if s.risk >= 2 and (s.uncertainty >= 1 or s.verifiability <= 2):

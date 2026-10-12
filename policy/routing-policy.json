@@ -75,6 +75,8 @@
     "workload_evidence_distinguishes_luna_high_code_from_medium_data_transform"
   ],
   "astra_preconditions": [
+    "parent_judges_this_unit_very_complex",
+    "parent_records_concrete_sol61_unsuitable_reason",
     "reasoning_can_materially_reduce_current_uncertainty",
     "decision_is_consequential_or_exceptionally_difficult",
     "cheap_deterministic_falsification_is_insufficient"
@@ -102,8 +104,11 @@
     "technology_keyword",
     "single_tool_failure",
     "missing_tests_or_observability",
-    "missing_requirements_or_permissions"
+    "missing_requirements_or_permissions",
+    "risk_complexity_readonly_or_review_label",
+    "qualified_sol_failure_without_parent_admission"
   ],
+  "astra_admission_scope": "every new diagnosis/review/delegated unit, including retained Astra; root model and local reasoning stay unchanged; no prior failed trial or per-unit user approval required; explicit user Astra pin respects prerequisites and precedes cheap checks",
   "astra_write_exception": {
     "operation": "one bounded local repair unit; multiple code/test patches within retained attempt ceiling",
     "actor": "root Astra only; leaves and read-only roles excluded",

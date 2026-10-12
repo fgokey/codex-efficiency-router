@@ -21,11 +21,11 @@ Direct local completion is preferred only when the current agent is sufficient. 
 | Frozen security/migration implementation with strong evidence | Not automatically Astra |
 | Many failed network calls | Not a capability escalation |
 
-Astra is not a mandatory final reviewer. A higher-risk topic is not by itself an unresolved high-risk decision. Likewise, do not require a weak-model failure before sending an obviously difficult decision to appropriate capability.
+Astra admission requires the parent's very-complex judgment and concrete reason Sol61 is unsuitable, including ordinary diagnosis/review and existing Astra children receiving new units. No failed Sol trial or per-unit user approval is required. Risk labels and failure counts alone do not qualify; the root Astra model and local read-only reasoning stay unchanged.
 
 ## Failure transitions
 
-A targeted implementation fix stays in its lane. Repeated unexplained failure stops patching and calls for classification, not an automatic Astra call. Escalation requires a new unresolved question or qualified capability failure with adequate specification, authority, environment and observations. New evidence can reopen a frozen decision.
+A targeted implementation fix stays in its lane. Repeated unexplained failure stops patching and calls for classification. New Astra dispatch still requires parent admission with adequate specification, authority, environment and observations. New evidence can reopen a frozen decision.
 
 ## Overrides
 

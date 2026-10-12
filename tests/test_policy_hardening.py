@@ -70,7 +70,8 @@ class PolicyHardeningTests(unittest.TestCase):
                                  benefit_clear=True).action, "local")
 
     def test_capability_upgrade_needs_no_recovery_flag(self):
-        self.assertEqual(dispatch(S(risk=3, uncertainty=3), current_lane="sol", current_sufficient=False,
+        self.assertEqual(dispatch(S(risk=3, uncertainty=3, very_complex=True,
+                                   sol61_unsuitable_reason='unresolved cross-system ownership'), current_lane="sol", current_sufficient=False,
                                  host_supports_routing=True, available_lanes=("astra",)).action, "delegate")
 
     def test_no_escalation_does_not_force_cost_driven_restart(self):

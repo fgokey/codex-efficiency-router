@@ -1,7 +1,7 @@
 # Astra admission
 
-Counts/prerequisite gaps never qualify. Use cheap falsification first; hard judgment AND no cheap falsification required.
+New/reused Astra units, including diagnosis/review: parent very-complex judgment AND concrete Sol61-unsuitable reason; intact prerequisites/reasoning-bound/no cheap check. No prior failure/user reapproval; labels/counts fail. User Astra pin overrides cheap checks after prerequisites.
 
-Consequential API/ownership, trust/data invariants, competing causes, migration/recovery, novel algorithm/protocol or qualified Sol failure; settled contracts/checks stay with executors.
+Root model/local reasoning stay; settled work: executors.
 
 Return evidence/fixes; leaves read-only; plans grant no rollout authority. Contrary evidence reopens decisions; offline routing proves no quality/savings.

@@ -1,6 +1,7 @@
 """Offline authority gate and diagnostic admission; NOT live ownership telemetry."""
 from __future__ import annotations
 from dataclasses import dataclass
+from policy_reference import TaskSignals, astra_admitted
 
 OPERATIONS = ('reasoning', 'read', 'coordinate', 'local_patch', 'mutation', 'unknown')
 ASTRA_WRITE_REASONS = ('none', 'qualified_executor_failure', 'critical_context_loss')
@@ -168,7 +169,8 @@ def before_action(operation: str, model: str | None, scope: WriteScope = WriteSc
     return WriteDecision('delegate', 'assign the bounded write unit to an exact eligible executor, not Astra')
 
 
-def diagnostic_action(*, model: str | None, complex_judgment: bool = False,
+def diagnostic_action(*, model: str | None, signals: TaskSignals | None = None,
+                      complex_judgment: bool = False,
                       unresolved: bool = True, prerequisites_ready: bool = True,
                       cheap_check_available: bool = False, failure_kind: str = 'none',
                       qualified_attempts: int = 0, no_escalation: bool = False) -> str:
@@ -184,8 +186,10 @@ def diagnostic_action(*, model: str | None, complex_judgment: bool = False,
         return 'repair_prerequisite'
     if cheap_check_available:
         return 'executor_experiment'
-    if complex_judgment or (qualified_attempts >= 2 and failure_kind in ('capability', 'unexplained')):
-        if is_astra(model):
-            return 'astra_local_readonly_diagnosis'
+    admitted = astra_admitted(signals) if signals is not None else False
+    if is_astra(model) and (complex_judgment or admitted or
+                           (qualified_attempts >= 2 and failure_kind in ('capability', 'unexplained'))):
+        return 'astra_local_readonly_diagnosis'
+    if admitted:
         return 'blocked' if no_escalation else 'delegate_astra_readonly'
     return 'continue_scoped_diagnosis'

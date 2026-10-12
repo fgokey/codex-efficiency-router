@@ -1,6 +1,6 @@
 # Effort and binding
 
-Keep requirement/unit IDs; fix prerequisites. same-model needs contextual value AND net benefit. Default one leaf; Two writers max; no agent per file or permission bypass.
+Keep requirement/unit IDs; fix prerequisites. same-model needs contextual value AND net benefit. One leaf default; Two writers max; no agent per file/permission bypass.
 
 | Role | Model/default | Work |
 | --- | --- | --- |
@@ -10,9 +10,9 @@ Keep requirement/unit IDs; fix prerequisites. same-model needs contextual value 
 | `sol_engineer` | `gpt-6-sol` / medium | Pin/fallback |
 | `astra_architect` | `gpt-6-astra` / high | Read-only reasoning |
 
-High: reasoning-bound coupling/lifetime, material ambiguity/conflict.
+High: reasoning-bound coupling/lifetime/ambiguity/conflict.
 
-Select model AND effort: `cer_auto_<role>`+explicit effort; avoidable base role is MISMATCH. higher efforts need evidence/support. Astra needs routing/parent acceptance. Fallback: observed unavailability/exact role/catalog pair/intact locks/floors/history. No remap.
+Select model AND effort: `cer_auto_<role>`+explicit effort; avoidable base role is MISMATCH. higher efforts need evidence/support. Astra: routing admission. Fallback: observed unavailability/exact role/catalog pair/intact locks/floors/history. No remap.
 
 Default engineering: `agent_type="cer_auto_sol61_engineer",reasoning_effort="high",fork_turns="none"`; parent may explicitly select medium for confirmed simple work. Owned task_name/message. Exact pins prevail. No default/inherit/hot-load; verify host binding before RELEASE. Preflight: params only; Agent unverified. `gpt-5.6-sol/luna`: explicit/fallback. Capacity: reassess/no blacklist; recheck stale unavailability. Capability failure: adequate; others fix prerequisites. Keep attempts; no probes/replay/ladder. High cannot replace capability.
 

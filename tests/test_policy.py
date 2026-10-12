@@ -23,7 +23,7 @@ class RoutingPolicyTests(unittest.TestCase):
         for key, value in (("uncertainty", 4), ("risk", True), ("novelty", 1.5),
                            ("mechanical", "false"), ("failed_attempts", -1),
                            ("failed_attempts", True), ("prior_lane", "unknown"),
-                           ("workload", "guess")):
+                           ("workload", "guess"), ("sol61_unsuitable_reason", True)):
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
                 choose_lane(TaskSignals(**{key: value}))
 
@@ -39,7 +39,8 @@ class RoutingPolicyTests(unittest.TestCase):
             self.assertEqual(choose_lane(s), "local")
 
     def test_no_subagents_does_not_certify_quality(self):
-        s = TaskSignals(risk=3, uncertainty=3, no_subagents=True)
+        s = TaskSignals(risk=3, uncertainty=3, no_subagents=True, very_complex=True,
+                        sol61_unsuitable_reason="unresolved recovery invariants")
         d = choose_dispatch(s, current_lane="terra", current_sufficient=False)
         self.assertEqual((d.recommended_lane, d.action), ("astra", "blocked"))
 
@@ -48,13 +49,15 @@ class RoutingPolicyTests(unittest.TestCase):
         self.assertEqual(choose_dispatch(s, current_lane="sol", current_sufficient=True).action, "local")
 
     def test_no_escalation_retains_quality_floor(self):
-        s = TaskSignals(risk=3, uncertainty=3)
+        s = TaskSignals(risk=3, uncertainty=3, very_complex=True,
+                        sol61_unsuitable_reason="irreversible protocol choice unresolved")
         d = choose_dispatch(s, current_lane="sol", current_sufficient=False, no_escalation=True,
                             host_supports_routing=True, available_lanes=("astra",))
         self.assertEqual(d.action, "blocked")
 
     def test_missing_host_or_model_blocks_unsafe_fallback(self):
-        s = TaskSignals(risk=3, uncertainty=3)
+        s = TaskSignals(risk=3, uncertainty=3, very_complex=True,
+                        sol61_unsuitable_reason="irreversible protocol choice unresolved")
         for host, available in ((False, ("astra",)), (True, ("terra",))):
             d = choose_dispatch(s, current_lane="terra", current_sufficient=False,
                                 host_supports_routing=host, available_lanes=available)
@@ -74,9 +77,28 @@ class RoutingPolicyTests(unittest.TestCase):
         self.assertEqual(choose_lane(s), "sol")
 
     def test_capability_upgrade_does_not_require_cost_savings(self):
-        d = choose_dispatch(TaskSignals(risk=3, uncertainty=3), current_lane="terra", current_sufficient=False,
+        s = TaskSignals(risk=3, uncertainty=3, very_complex=True,
+                        sol61_unsuitable_reason="unresolved cross-client ownership strategy")
+        d = choose_dispatch(s, current_lane="terra", current_sufficient=False,
                             host_supports_routing=True, available_lanes=("astra",))
         self.assertEqual(d.action, "delegate")
+
+    def test_labels_and_failures_alone_do_not_admit_astra(self):
+        for changes in ({"risk": 3, "coupling": 3, "irreversibility": 3},
+                        {"novelty": 3, "uncertainty": 3, "evidence_conflict": True},
+                        {"capability_failure": True, "failed_attempts": 2, "prior_lane": "sol"},
+                        {"very_complex": True},
+                        {"sol61_unsuitable_reason": "unresolved ownership tradeoff"},
+                        {"very_complex": True, "sol61_unsuitable_reason": "  "}):
+            with self.subTest(changes=changes):
+                self.assertEqual(choose_lane(TaskSignals(**changes)), "sol")
+
+    def test_parent_admission_needs_no_failed_sol_trial_but_respects_cheap_check(self):
+        s = TaskSignals(very_complex=True, sol61_unsuitable_reason="conflicting owner lifetimes across clients")
+        self.assertEqual(choose_lane(s), "astra")
+        self.assertEqual(choose_lane(replace(s, cheap_check_available=True)), "local")
+        self.assertEqual(choose_lane(replace(s, reasoning_bound=False)), "sol")
+        self.assertEqual(choose_lane(replace(s, force_astra=True, cheap_check_available=True)), "astra")
 
     def test_forced_route_is_not_claimed_when_unavailable(self):
         d = choose_dispatch(TaskSignals(force_astra=True), current_lane="sol", current_sufficient=True)

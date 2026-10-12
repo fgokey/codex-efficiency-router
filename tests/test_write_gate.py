@@ -239,15 +239,19 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual(plan(S(),host(no_effort_escalation=True,write_scope=ws)).action,'blocked')
 
     def test_complex_write_splits_out_readonly_diagnosis(self):
-        d=plan(S(risk=3,uncertainty=3),host())
+        d=plan(S(risk=3,uncertainty=3,very_complex=True,
+                 sol61_unsuitable_reason='unresolved ownership invariants'),host())
         self.assertEqual(d.action,'blocked'); self.assertIn('diagnosis',d.reason)
 
     def test_complex_task_does_not_need_failed_worker_first(self):
-        self.assertEqual(diagnostic_action(model='gpt-5.6-sol',complex_judgment=True),'delegate_astra_readonly')
+        s=S(very_complex=True,sol61_unsuitable_reason='unresolved ownership invariants')
+        self.assertEqual(diagnostic_action(model='gpt-6.1-sol',signals=s),'delegate_astra_readonly')
 
     def test_repeated_unexplained_failures_get_astra_diagnosis(self):
+        s=S(very_complex=True,sol61_unsuitable_reason='conflicting lifecycle causes')
         for kind in ('unexplained','capability'):
-            self.assertEqual(diagnostic_action(model='gpt-5.6-sol',qualified_attempts=2,failure_kind=kind),'delegate_astra_readonly')
+            self.assertEqual(diagnostic_action(model='gpt-6.1-sol',signals=s,qualified_attempts=2,failure_kind=kind),'delegate_astra_readonly')
+            self.assertEqual(diagnostic_action(model='gpt-6.1-sol',qualified_attempts=2,failure_kind=kind),'continue_scoped_diagnosis')
 
     def test_failure_count_alone_is_not_astra_trigger(self):
         self.assertEqual(diagnostic_action(model='gpt-5.6-sol',qualified_attempts=20),'continue_scoped_diagnosis')
@@ -264,7 +268,8 @@ class WriteGateTests(unittest.TestCase):
 
     def test_exhausted_workers_can_request_astra_without_repair_extension(self):
         c=host(current=C('sol','medium'),current_sufficient=False,operation='reasoning',diagnosis_only=True,failure_kind='unexplained')
-        d=plan(S(failed_attempts=2,prior_lane='terra'),c)
+        d=plan(S(failed_attempts=2,prior_lane='terra',very_complex=True,
+                 sol61_unsuitable_reason='conflicting lifecycle causes'),c)
         self.assertEqual(d.action,'delegate');self.assertIsNotNone(d.requested)
         self.assertEqual(d.requested.lane,'astra')
 
@@ -272,8 +277,17 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual(diagnostic_action(model='gpt-6-astra',complex_judgment=True,cheap_check_available=True),'executor_experiment')
 
     def test_no_escalation_respected_but_existing_astra_can_reason(self):
-        self.assertEqual(diagnostic_action(model='gpt-5.6-sol',complex_judgment=True,no_escalation=True),'blocked')
+        s=S(very_complex=True,sol61_unsuitable_reason='unresolved ownership invariants')
+        self.assertEqual(diagnostic_action(model='gpt-6.1-sol',signals=s,no_escalation=True),'blocked')
         self.assertEqual(diagnostic_action(model='gpt-6-astra',complex_judgment=True,no_escalation=True),'astra_local_readonly_diagnosis')
+
+    def test_readonly_diagnosis_requires_complete_parent_admission(self):
+        for signals in (None,S(),S(very_complex=True),
+                        S(sol61_unsuitable_reason='unresolved ownership'),
+                        S(very_complex=True,sol61_unsuitable_reason=' \t')):
+            with self.subTest(signals=signals):
+                self.assertEqual(diagnostic_action(model='gpt-6.1-sol',signals=signals,
+                                                  complex_judgment=True),'continue_scoped_diagnosis')
 
     def test_strict_input_validation(self):
         for ctx in (scope(authorized='yes'),scope(writer_limit=0)):

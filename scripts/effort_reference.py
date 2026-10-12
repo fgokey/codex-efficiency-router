@@ -9,7 +9,7 @@ from dataclasses import dataclass, field, replace
 from typing import Literal, Mapping
 
 from package import EXPECTED
-from policy_reference import LANES, SAME_LANE_REASONS, TaskSignals, choose_lane
+from policy_reference import LANES, SAME_LANE_REASONS, TaskSignals, astra_admitted, choose_lane
 from profiles import Profile
 from write_policy import OPERATIONS, WriteScope, before_action, diagnostic_action
 
@@ -215,7 +215,11 @@ def low_eligible(s: TaskSignals) -> bool:
 def needs_deeper_reasoning(s: TaskSignals, deep_reasoning: bool) -> bool:
     return s.reasoning_bound and (deep_reasoning or
         (s.uncertainty >= 2 and s.coupling >= 2) or
-        (s.uncertainty >= 1 and s.risk >= 2) or s.evidence_conflict)
+        (s.uncertainty >= 1 and s.risk >= 2) or s.evidence_conflict or
+        (s.capability_failure and s.failed_attempts >= 1 and s.prior_lane == 'sol' and s.uncertainty >= 1) or
+        (s.uncertainty >= 2 and (s.irreversibility == 3 or
+            (s.commitment_boundary and s.irreversibility >= 2) or
+            (s.novelty == 3 and (s.coupling >= 2 or s.verifiability <= 1)))))
 
 
 def ordinary_terra_eligible(s: TaskSignals, rec: Configuration) -> bool:
@@ -285,7 +289,7 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     must_delegate = write_intent and gate.action != "local_write"
     diagnostic = diagnostic_action(
         model=context.current.model if context.current else None,
-        complex_judgment=rec is not None and rec.lane == "astra",
+        signals=s,
         prerequisites_ready=s.spec_complete and s.authority_ready and s.environment_ready and s.observability_ready,
         cheap_check_available=s.cheap_check_available, failure_kind=context.failure_kind,
         qualified_attempts=s.failed_attempts, no_escalation=context.no_escalation)
@@ -361,12 +365,16 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     if candidate_model is None and context.keep_model and current is not None:
         candidate_model = current.model
     requested_lane = MODEL_LANES[candidate_model] if candidate_model is not None else rec.lane
+    if requested_lane == "astra" and not astra_admitted(s):
+        if context.keep_model and current is not None and current.lane == "astra":
+            return result("local" if context.current_sufficient else "blocked",
+                          "current Astra may continue locally; new Astra unit lacks parent admission")
+        return result("blocked", "new Astra unit needs parent very-complex judgment and a concrete Sol61-unsuitable reason")
     if requested_lane != rec.lane:
         higher_or_equal = LANES.index(requested_lane) >= LANES.index(rec.lane)
         ordinary_terra_override = (requested_lane == "terra" and minimum == 'medium'
                                    and ordinary_terra_eligible(s, Configuration('sol', 'medium')))
-        retained_astra = explicit_model is None and context.keep_model and current is not None and current.lane == "astra"
-        if (requested_lane == "astra" and not retained_astra) or not (higher_or_equal or ordinary_terra_override):
+        if not (higher_or_equal or ordinary_terra_override):
             return result("blocked", "explicit model does not satisfy the identified capability floor")
     retained_effort = (current.effort if context.keep_model and current is not None
                        and LANES.index(current.lane) > LANES.index(rec.lane)

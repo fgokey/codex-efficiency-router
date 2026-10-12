@@ -7,10 +7,12 @@ Do not route by technology names or the user's past projects. Astra is for conse
 All must hold for automatic Astra selection:
 
 - The blocker is reasoning, rather than missing specification, authorization, environment or evidence.
-- The decision has material consequences or is exceptionally difficult/novel.
+- The parent judges this task unit very complex and records a concrete reason GPT-6.1 Sol is unsuitable. Risk, novelty, review labels and failures alone do not qualify.
 - A safe inexpensive discriminating check cannot settle it first.
 
 Explicit Astra requests may override the cost preference, not authority or absent prerequisites. These are heuristics with conservative defaults, not a calibrated probabilistic guarantee.
+
+Apply admission to every new Astra diagnosis, review or delegated unit, including new work assigned to an existing Astra child. The parent can admit it without a failed Sol trial or per-unit user approval. A root Astra keeps its model and may reason locally under the existing read-only rules.
 
 ## General scenarios and counterexamples
 
