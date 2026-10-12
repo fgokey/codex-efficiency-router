@@ -7,7 +7,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from effort_reference import (Configuration as C, Context, EffortEvidence, RoleBinding, PRESETS,
-                              plan, recommend, check_observation)
+                              plan, recommend, check_observation, check_existing_assignment)
 from policy_reference import TaskSignals as S
 from profiles import Profile
 from package import EXPECTED
@@ -32,6 +32,26 @@ def context(**overrides):
 
 
 class EffortPolicyTests(unittest.TestCase):
+    def test_existing_assignment_preserves_checked_model_and_effort_pins(self):
+        s=S()
+        selection=plan(s,context(),ADAPTIVE,explicit_model='gpt-6-sol',explicit_effort='medium')
+        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='legacy-pinned',
+            unit_id='unit-b',purpose='new_unit',selection=selection),'VERIFIED')
+        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='legacy-pinned',
+            unit_id='unit-b',purpose='new_unit'),'UNKNOWN')
+        pinned=S(force_astra=True)
+        selection=plan(pinned,context(),ADAPTIVE,explicit_effort='medium')
+        self.assertEqual(check_existing_assignment(pinned,selection.requested,recipient_id='pinned-astra',
+            unit_id='unit-b',purpose='new_unit',selection=selection),'VERIFIED')
+
+    def test_old_simple_selection_cannot_certify_new_hard_unit(self):
+        for old in (S(),S(uncertainty=0,risk=1,coupling=1,verifiability=3)):
+            with self.subTest(old=old):
+                selection=plan(old,context(),ADAPTIVE,explicit_model='gpt-6-sol',explicit_effort='medium')
+                harder=S(uncertainty=2,risk=3,coupling=2)
+                self.assertEqual(check_existing_assignment(harder,selection.requested,recipient_id='legacy-pinned',
+                    unit_id='new-hard-unit',purpose='new_unit',selection=selection),'MISMATCH')
+
     def test_old_hard_judgment_floor_survives_without_automatic_astra(self):
         for changes in ({'irreversibility':3},
                         {'commitment_boundary':True,'irreversibility':2},

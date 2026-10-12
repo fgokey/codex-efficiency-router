@@ -19,6 +19,8 @@ Cheap: Q&A, status and bounded low-risk single-owner work: no routing, reference
 
 Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
 
+New engineering/readonly review (send_input/followup_task/send_message): default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason.
+
 ## Delegate
 
 Read [dispatch.md](references/dispatch.md) before delegation, binding or delivery review. Children start read-only; parent verifies/releases writes. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; read dispatch for exceptions.

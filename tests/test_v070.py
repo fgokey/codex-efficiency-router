@@ -293,6 +293,51 @@ class BatchReaderV070(TempCase):
 
 
 class CanaryV070(TempCase):
+    def assignment_event(self, tool='sendInput', **changes):
+        event={'kind':tool,'unit_id':'ordinary-review-2','purpose':'new_unit',
+               'recipient':{'id':'existing-child','model':'gpt-6-astra','effort':'high'},
+               'signals':{'uncertainty':1,'risk':1,'coupling':1}}
+        event.update(changes)
+        return event
+
+    def test_existing_astra_new_readonly_review_is_rejected_for_each_tool_alias(self):
+        for tool in ('sendInput','send_input','followup_task','send_message'):
+            with self.subTest(tool=tool):
+                data=self.execution_fixture();data['events'].append(self.assignment_event(tool))
+                result=canary.inspect_execution(data)
+                self.assertEqual(result.get('dispatch_admission'),'FAIL')
+                self.assertEqual(result['host_enforcement'],'UNKNOWN')
+
+    def test_existing_astra_same_unit_needs_matching_prior_admission_evidence(self):
+        data=self.execution_fixture()
+        admitted=self.assignment_event(signals={'very_complex':True,
+            'sol61_unsuitable_reason':'Sol61 cannot resolve conflicting cross-client lifetime guarantees'})
+        data['events'].extend((admitted,self.assignment_event(purpose='continue')))
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'PASS')
+        data['events'][-1]['unit_id']='another-review'
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
+        data=self.execution_fixture();data['events'].append(self.assignment_event(purpose='continue',same_unit=True))
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'UNKNOWN')
+
+    def test_existing_sol61_review_and_missing_receiver_evidence(self):
+        data=self.execution_fixture()
+        event=self.assignment_event(recipient={'id':'existing-sol61','model':'gpt-6.1-sol','effort':'high'})
+        data['events'].append(event)
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'PASS')
+        for field in ('recipient','signals','unit_id','purpose'):
+            with self.subTest(field=field):
+                missing=copy.deepcopy(data);del missing['events'][-1][field]
+                self.assertEqual(canary.inspect_execution(missing).get('dispatch_admission'),'UNKNOWN')
+
+    def test_raw_native_send_input_missing_normalized_evidence_is_not_ignored(self):
+        data=self.execution_fixture()
+        data['events'].append(self.assignment_event(recipient={'id':'sol61','model':'gpt-6.1-sol','effort':'high'}))
+        data['events'].append({'type':'collabAgentToolCall','tool':'sendInput','receiver':'existing-child'})
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'UNKNOWN')
+        raw=self.assignment_event();raw['type']='collabAgentToolCall';raw['tool']=raw.pop('kind')
+        data['events'][-1]=raw
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
+
     def test_execution_output_rejects_observed_32767_bytes_and_member_only_caps(self):
         from quality_reference import serialize_output
         oversized = {'kind': 'output', 'bytes': 32767, 'framing_bytes': 0, 'truncated': False}

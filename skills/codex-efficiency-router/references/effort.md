@@ -2,13 +2,13 @@
 
 Keep requirement/unit IDs; fix prerequisites. same-model needs contextual value AND net benefit. One leaf default; Two writers max; no agent per file/permission bypass.
 
-| Role | Model/default | Work |
-| --- | --- | --- |
-| `luna_worker` | `gpt-6-luna` / high | Low-risk/unknown mechanical; confirmed transforms medium |
-| `terra_executor` | `gpt-5.6-terra` / medium | Legacy explicit/fallback |
-| `sol61_engineer` | `gpt-6.1-sol` / high | Default |
-| `sol_engineer` | `gpt-6-sol` / medium | Pin/fallback |
-| `astra_architect` | `gpt-6-astra` / high | Read-only reasoning |
+|Role|Model/effort|Work|
+|---|---|---|
+|`luna_worker`|gpt-6-luna/high|Low-risk mechanical; confirmed transform medium|
+|`terra_executor`|gpt-5.6-terra/medium|Pin/fallback|
+|`sol61_engineer`|gpt-6.1-sol/high|Engineering/diagnosis/review default|
+|`sol_engineer`|gpt-6-sol/medium|Pin/fallback|
+|`astra_architect`|gpt-6-astra/high|Admitted hard reasoning|
 
 High: reasoning-bound coupling/lifetime/ambiguity/conflict.
 

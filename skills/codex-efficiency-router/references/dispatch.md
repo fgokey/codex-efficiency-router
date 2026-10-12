@@ -14,10 +14,10 @@ Handoff: outcome/revision/dirt/rule paths/rationale/invariants/scope/checks/bind
 
 Current evidence/checks/gaps; unit PASS never parent PASS. Parent reviews fixes/checks, closes blockers, accepts integration. One executor per unit.
 
-Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release when bound; contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
+Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release: same admitted unit continue/status/stop. New readonly/review: default Sol61/high; Astra reuse needs core admission. contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
 
 Unit: source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: reconcile separate bounds.
 
 Policy denial stops equivalent replay/repackaging until supported permission change; `approval=never`: no manual boundary.
 
-Strict Guard denies Astra/unknown shell/patch/tools; active bars exceptions, UNKNOWN may deny. Astra never uses write_stdin. Executors own long commands/continuation; Astra: bounded saved evidence/permitted read-only shell/diff/source/logs. Read-only leaves/cer-read only read. Hosted UNPROTECTED; specialized UNKNOWN.
+Strict Guard denies Astra/unknown shell/patch/tools; active bars exceptions, UNKNOWN may deny. Astra never uses write_stdin. Executors own long commands/continuation; Astra: bounded saved evidence/permitted reads. Read-only leaves/cer-read only read. Hosted UNPROTECTED; specialized UNKNOWN.

@@ -22,6 +22,8 @@ from uuid import uuid4
 from manage import reject_links, read_bytes
 from write_guard import inspect_status, loads, encode
 from quality_reference import bounded_output, progress_action, serialize_output
+from effort_reference import Configuration, MODEL_LANES, check_existing_assignment
+from policy_reference import TaskSignals
 
 OWNER = 'cer-native-canary'
 SEED = b'CER read-only canary fixture\n'
@@ -38,7 +40,7 @@ FILES = ('plan.json', 'observations.json', 'read.txt', 'astra-patch.txt', 'astra
 
 def inspect_execution(observations: object) -> dict:
     """Check minimal operator-witnessed excerpts; does not authenticate the host."""
-    result = dict.fromkeys(('read_evidence', 'binding', 'output', 'backoff'), 'UNKNOWN')
+    result = dict.fromkeys(('read_evidence', 'binding', 'output', 'backoff', 'dispatch_admission'), 'UNKNOWN')
     result.update(host_enforcement='UNKNOWN', task_coverage='UNKNOWN', evidence_basis='caller-supplied', source='operator-witnessed-native',
                   limitation='Supplied excerpts are witnesses, not proof of Hook registration or enforcement.')
     if not isinstance(observations, dict) or observations.get('source') != result['source']:
@@ -53,6 +55,8 @@ def inspect_execution(observations: object) -> dict:
     previous = saved_offset = None; unchanged = 0; delta_seen = backoff_seen = backoff_bad = backoff_missing = False
     binding_keys = ('session', 'owner', 'role', 'cwd', 'model', 'effort', 'sandbox', 'approval')
     binding_bad = False
+    assignments = {}
+    dispatch_seen = dispatch_bad = dispatch_missing = False
     binding_missing = not all(isinstance(expected.get(k), str) and expected[k] for k in binding_keys)
     requested_model = requested_effort = None
     if 'requested_spawn' in observations:
@@ -64,7 +68,29 @@ def inspect_execution(observations: object) -> dict:
     for event in events:
         if not isinstance(event, dict): raise ValueError('event must be an object')
         kind = event.get('kind')
-        if kind in ('resume', 'resume_agent'):
+        if event.get('type') == 'collabAgentToolCall' and event.get('tool') in ('sendInput', 'send_input', 'followup_task', 'send_message'):
+            kind = event['tool']  # Raw native calls still count when normalized evidence is absent.
+        if kind in ('sendInput', 'send_input', 'followup_task', 'send_message'):
+            dispatch_seen = True
+            receiver = event.get('recipient')
+            signals = event.get('signals')
+            try:
+                if not isinstance(receiver, dict):
+                    raise ValueError('missing recipient evidence')
+                model, effort = receiver.get('model'), receiver.get('effort')
+                recipient = Configuration(MODEL_LANES[model], effort, model)
+                task = TaskSignals(**signals) if isinstance(signals, dict) else None
+                verdict = check_existing_assignment(task, recipient, recipient_id=receiver.get('id'),
+                    unit_id=event.get('unit_id'), purpose=event.get('purpose'),
+                    prior_assignment=assignments.get(receiver.get('id')))
+            except (ValueError, TypeError, KeyError):
+                verdict = 'UNKNOWN'
+            dispatch_bad |= verdict == 'MISMATCH'
+            dispatch_missing |= verdict == 'UNKNOWN'
+            if verdict == 'VERIFIED' and event.get('purpose') == 'new_unit':
+                assignments[receiver['id']] = {'recipient_id': receiver['id'], 'unit_id': event['unit_id'],
+                                             'model': model, 'effort': effort}
+        elif kind in ('resume', 'resume_agent'):
             # Explicit native recovery cannot pin the child model/effort; later records
             # do not erase the unsafe dispatch. Ordinary task follow-ups are separate.
             binding_bad = True
@@ -211,6 +237,8 @@ def inspect_execution(observations: object) -> dict:
     elif output_seen and not output_missing: result['output'] = 'PASS'
     if backoff_bad: result['backoff'] = 'FAIL'
     elif backoff_seen and not backoff_missing: result['backoff'] = 'PASS'
+    if dispatch_bad: result['dispatch_admission'] = 'FAIL'
+    elif dispatch_seen and not dispatch_missing: result['dispatch_admission'] = 'PASS'
     return result
 
 

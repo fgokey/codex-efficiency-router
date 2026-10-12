@@ -222,6 +222,11 @@ def needs_deeper_reasoning(s: TaskSignals, deep_reasoning: bool) -> bool:
             (s.novelty == 3 and (s.coupling >= 2 or s.verifiability <= 1)))))
 
 
+def minimum_effort(s: TaskSignals, rec: Configuration | None, deep_reasoning: bool = False) -> str:
+    return "high" if (needs_deeper_reasoning(s, deep_reasoning) or
+        (rec is not None and rec.lane == "astra" and choose_lane(replace(s, force_astra=False)) == "astra")) else "low" if low_eligible(s) else "medium"
+
+
 def ordinary_terra_eligible(s: TaskSignals, rec: Configuration) -> bool:
     return (rec.lane == "sol" and rec.effort == "medium" and s.workload == "general"
             and not s.mechanical and s.uncertainty <= 1 and s.risk <= 1 and s.coupling <= 1
@@ -317,8 +322,7 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
             return result("blocked", "automatic xhigh/max/ultra needs task-specific evidence that high is insufficient")
         if automatic_effort == "ultra" and not evidence.ultra_ready():
             return result("blocked", "automatic ultra needs one authorized coordinator and independent disjoint beneficial units")
-    minimum = "high" if (needs_deeper_reasoning(s, deep_reasoning) or
-        (rec is not None and rec.lane == "astra" and choose_lane(replace(s, force_astra=False)) == "astra")) else "low" if low_eligible(s) else "medium"
+    minimum = minimum_effort(s, rec, deep_reasoning)
     if write_intent and gate.exception == "bounded_astra_patch":
         if diagnostic == "repair_prerequisite":
             return result("prerequisite", "classified prerequisite failures do not qualify for root repairs")
@@ -500,6 +504,48 @@ def dispatch_arguments(decision: Decision) -> dict[str, str]:
     if decision.binding_kind == "adaptive":
         args["reasoning_effort"] = decision.requested.effort
     return args
+
+
+def check_existing_assignment(signals: TaskSignals | None, recipient: Configuration | None, *,
+                              recipient_id: str | None, unit_id: str | None, purpose: str | None,
+                              prior_assignment: Mapping[str, str] | None = None,
+                              selection: Decision | None = None) -> str:
+    """Offline evidence check; no messaging, host authentication or binding change.
+
+    Continuation needs a matching prior admitted unit, not a caller's same-unit flag.
+    The consumer retains that record from earlier verified assignment evidence.
+    """
+    if (recipient is None or not isinstance(recipient_id, str) or not recipient_id
+            or not isinstance(unit_id, str) or not unit_id
+            or purpose not in ('new_unit', 'continue', 'status', 'stop')):
+        return 'UNKNOWN'
+    if not isinstance(recipient, Configuration):
+        raise ValueError('observed recipient Configuration required')
+    if purpose != 'new_unit':
+        if prior_assignment is None:
+            return 'UNKNOWN'
+        expected = {'recipient_id': recipient_id, 'unit_id': unit_id,
+                    'model': recipient.model, 'effort': recipient.effort}
+        if any(not prior_assignment.get(key) for key in expected):
+            return 'UNKNOWN'
+        return 'VERIFIED' if all(prior_assignment[key] == value for key, value in expected.items()) else 'MISMATCH'
+    if signals is None:
+        return 'UNKNOWN'
+    signals.validate()
+    if recipient.lane == 'astra' and not astra_admitted(signals):
+        return 'MISMATCH'
+    requested = recommend(signals)
+    if selection is not None:
+        dispatch_arguments(selection)  # Retain checked exact pins/fallbacks and effort selection.
+        if (selection.recommended != requested
+                or EFFORTS.index(recipient.effort) < EFFORTS.index(minimum_effort(signals, requested))):
+            return 'MISMATCH'
+        return check_observation(selection.requested, recipient.model, recipient.effort)
+    if requested is None:
+        return 'UNKNOWN'
+    if recipient.model != requested.model or EFFORTS.index(recipient.effort) < EFFORTS.index(requested.effort):
+        return 'UNKNOWN'  # A non-default pin/fallback needs its checked selection evidence.
+    return 'VERIFIED'
 
 
 def check_observation(requested: Configuration, model: str | None,
