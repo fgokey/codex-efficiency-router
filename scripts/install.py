@@ -30,7 +30,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--force", action="store_true", help="back up and replace locally edited OWNED files")
     parser.add_argument("--adopt-v01", action="store_true", help="adopt only exact known legacy file contents")
     parser.add_argument("--set-subagent-defaults", action="store_true",
-                        help="set only agents child defaults to gpt-6.1-sol/medium; preserve parent model")
+                        help="set only agents child defaults to gpt-6.1-sol/high; preserve parent model")
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
     parser.add_argument("--mode", choices=("auto", "fixed", "adaptive"), default=None,
                         help="advanced override; ordinary install/update uses auto (explicit v0.5+ overrides are preserved)")

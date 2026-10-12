@@ -24,7 +24,7 @@ First load SKILL alone in bounded pages. Use `page` for known files/rules, and `
 
 ## v0.8.0: GPT-6.1 Sol binding
 
-New ordinary Sol work defaults to `gpt-6.1-sol`/medium. The separate `gpt-6-sol` role remains available for exact pins and evidence-backed fallback; neither an unavailable new alias nor an unknown catalog silently selects the older model. Standard API input/output prices are equal for these two models, while cached input is [$0.10 per million for 6.1](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and [$0.20 for 6](https://developers.openai.com/api/docs/models/gpt-6-sol); actual task cost is unmeasured. The live host catalog may offer Ultra beyond the API page's listed effort settings, subject to the existing Ultra authorization gate.
+New ordinary Sol work defaults to `gpt-6.1-sol` with explicit high effort when difficulty is unknown; confirmed simple work may use medium. The separate `gpt-6-sol` role remains available for exact pins and evidence-backed fallback; neither an unavailable new alias nor an unknown catalog silently selects the older model. Standard API input/output prices are equal for these two models, while cached input is [$0.10 per million for 6.1](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and [$0.20 for 6](https://developers.openai.com/api/docs/models/gpt-6-sol); actual task cost is unmeasured. The live host catalog may offer Ultra beyond the API page's listed effort settings, subject to the existing Ultra authorization gate.
 
 ## v0.7.1: locate and excerpt
 
@@ -46,7 +46,7 @@ Choose a sufficient model and reasoning effort per bounded task. Ordinary instal
 
 ## v0.7.0-rc.15: GPT-6 routing and evidence-backed high effort
 
-Current routing defaults to GPT-6 Sol/medium for ordinary work and GPT-6 Luna/high for focused low-risk code. Exact pins stay exact; legacy GPT-5.6 bindings remain explicit or evidenced fallbacks. XHigh/Max need reviewed task evidence, while Ultra also requires one authorized Sol/Astra coordinator and disjoint leaf work.
+Current routing prefers GPT-6.1 Sol/high when engineering difficulty is unknown, with medium for confirmed simple work, and GPT-6 Luna/high for focused low-risk code. Exact pins stay exact; legacy GPT-5.6 bindings remain explicit or evidenced fallbacks. XHigh/Max need reviewed task evidence, while Ultra also requires one authorized Sol/Astra coordinator and disjoint leaf work.
 
 
 ## Windows Python preflight and acceptance boundaries
@@ -242,21 +242,21 @@ Only one binding is selected per child. No model calls just to probe capability,
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol61_engineer` | `gpt-6.1-sol` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
 Auto generates five `cer_auto_<role>` unpinned aliases alongside the five fixed bindings: **ten small TOML files, four responsibilities**, not ten running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
 
-Ordinary work uses Sol/medium; focused low-risk code uses Luna/high, while deterministic conversion may use Luna/medium. Automatic low stays opt-in. Parent-selected XHigh/Max requires reviewed bottleneck, High-limit and value evidence. Ultra also requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work with shared bounds; explicit Ultra does not grant that authority. No mandatory ladder or silent substitute. Legacy GPT-5.6 Sol/Luna/Terra remain exact explicit/fallback options.
+Engineering work uses GPT-6.1 Sol/high when difficulty is unknown, and medium for confirmed simple work; the parent selects effort explicitly before dispatch. Focused low-risk code uses Luna/high, while deterministic conversion may use Luna/medium. Automatic low stays opt-in. Parent-selected XHigh/Max requires reviewed bottleneck, High-limit and value evidence. Ultra also requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work with shared bounds; explicit Ultra does not grant that authority. No mandatory ladder or silent substitute. Legacy GPT-5.6 Sol/Luna/Terra remain exact explicit/fallback options.
 
 ## Install and update
 
 The installed `scripts/` directory contains only `readonly_reader.py`: one invocation per tool call, or one bounded Reader `batch` for independent checks. Keep page calls separate from other pages, `Get-Content` and queries. Dispatch preflight is the reference checklist, not an installed CLI; verify script paths before use. Source doctor preflight is only for Router development. [Exact paths and scope](docs/INSTALL.md).
 
-Review source first. Ordinary installation only manages owned files. Optional `--set-subagent-defaults` adds missing `agents.default_subagent_model = "gpt-6.1-sol"` and `agents.default_subagent_reasoning_effort = "medium"` to that scope's `config.toml`; parent model/effort, authentication, permissions, AGENTS.md and unrelated configuration remain unchanged. Different existing values stop installation, even with `--force`; equal existing values remain user-owned. Keep the clone for lifecycle commands. Choose one installation scope.
+Review source first. Ordinary installation only manages owned files. Optional `--set-subagent-defaults` adds missing `agents.default_subagent_model = "gpt-6.1-sol"` and `agents.default_subagent_reasoning_effort = "high"` to that scope's `config.toml`; parent model/effort, authentication, permissions, AGENTS.md and unrelated configuration remain unchanged. Updating an unchanged tool-owned medium default migrates it to high. Different user-owned values stop installation, even with `--force`; equal existing values remain user-owned. Keep the clone for lifecycle commands. Choose one installation scope.
 
-Preview with `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run`, then remove `--dry-run` to apply. Updates retain these defaults; doctor checks their current values. Uninstall removes only inserted settings and preserves unrelated customization. Restore refuses any subsequent config change, including with `--force`. These settings express the intended child defaults; host loading and session behavior require live verification. They do not guarantee a running session adopts them. Engineering policy requires fresh `cer_auto_sol61_engineer`/`medium`/`fork_turns=none` dispatch and matching host evidence before RELEASE; bare `default` is prohibited for engineering by policy. Guard registration remains optional, so this is not a host-enforced tool prohibition. A full-history fork inherits its parent.
+Preview with `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run`, then remove `--dry-run` to apply. Updates retain these defaults; doctor checks their current values. Uninstall removes only inserted settings and preserves unrelated customization, including unowned medium values from older installs. Restore refuses any subsequent config change, including with `--force`. These settings express the intended child defaults; host loading and session behavior require live verification. They do not guarantee a running session adopts them. Engineering policy requires fresh `cer_auto_sol61_engineer` with explicit high for unknown difficulty or medium for confirmed simple work, `fork_turns=none`, and matching host evidence before RELEASE; bare `default` is prohibited for engineering by policy. Guard registration remains optional, so this is not a host-enforced tool prohibition. A full-history fork inherits its parent.
 
 ### Windows / PowerShell
 

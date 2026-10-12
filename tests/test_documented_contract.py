@@ -23,9 +23,9 @@ def contract_text():
 class DocumentedContractTests(unittest.TestCase):
     def test_engineering_default_dispatch_pins_complete_routing_parameters(self):
         effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
-        self.assertIn('agent_type="cer_auto_sol61_engineer",reasoning_effort="medium",fork_turns="none"', effort)
-        for phrase in ('Default engineering:', 'owned task_name/message', 'Exact pins prevail',
-                       'No bare default/inherit/config hot-load reliance',
+        self.assertIn('agent_type="cer_auto_sol61_engineer",reasoning_effort="high",fork_turns="none"', effort)
+        for phrase in ('Default engineering:', 'parent may explicitly select medium for confirmed simple work',
+                       'Owned task_name/message', 'Exact pins prevail', 'No default/inherit/hot-load',
                        'verify host binding before RELEASE'):
             self.assertIn(phrase, effort)
 

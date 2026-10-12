@@ -7,8 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/astra_write_guard.py\" --expected-bundle 17fd5e7c4b979ae035be08c7512beedbda689ad3e7b65cc881230d56ba51ed16",
-            "commandWindows": "python -I -B \"$env:PLUGIN_ROOT/hooks/astra_write_guard.py\" --expected-bundle 17fd5e7c4b979ae035be08c7512beedbda689ad3e7b65cc881230d56ba51ed16",
+            "command": "python3 -I -B \"${PLUGIN_ROOT}/hooks/astra_write_guard.py\" --expected-bundle 04e37224bf8cb6d62a1ec2abab4bcc92aa1fea7a6652f9484b22f1bdd50a4198",
+            "commandWindows": "python -I -B \"$env:PLUGIN_ROOT/hooks/astra_write_guard.py\" --expected-bundle 04e37224bf8cb6d62a1ec2abab4bcc92aa1fea7a6652f9484b22f1bdd50a4198",
             "timeout": 5,
             "statusMessage": "CER 0.8.5 strict Astra write boundary"
           }

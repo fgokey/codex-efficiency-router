@@ -32,18 +32,35 @@ LEGACY = {
 
 CONFIG_KEY = "config/config.toml"
 SUBAGENT_DEFAULTS = {"default_subagent_model": "gpt-6.1-sol",
-                    "default_subagent_reasoning_effort": "medium"}
+                    "default_subagent_reasoning_effort": "high"}
 DEFAULTS_MARKER = "# codex-efficiency-router: child defaults"
 
 
-def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=False):
+def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=False,
+                      migrate=False, _legacy=False):
     """Own only inserted scalars; preserve existing equal values and unrelated bytes."""
     text = (raw or b"").decode("utf-8")
     parsed = tomllib.loads(text)
     values = parsed.get("agents", {})
     if not isinstance(values, dict):
         raise ValueError("agents must be a TOML table")
-    for key, expected in SUBAGENT_DEFAULTS.items():
+    defaults = dict(SUBAGENT_DEFAULTS)
+    if _legacy:
+        defaults['default_subagent_reasoning_effort'] = 'medium'
+    if (migrate and not _legacy and isinstance(owned, dict)
+            and defaults['default_subagent_reasoning_effort'] == 'high'
+            and isinstance(owned.get('fields'), list)
+            and ('default_subagent_reasoning_effort' in owned['fields'] or remove)
+            and values.get('default_subagent_reasoning_effort') == 'medium'):
+        subagent_defaults(raw, owned, _legacy=True)  # Validate old ownership before changing any byte.
+        if remove:
+            return subagent_defaults(raw, owned, remove=True, _legacy=True)
+        old_block = owned['block']
+        new_block = old_block.replace('default_subagent_reasoning_effort = "medium"',
+                                      'default_subagent_reasoning_effort = "high"', 1)
+        migrated = text.replace(old_block, new_block, 1).encode('utf-8')
+        return subagent_defaults(migrated, {**owned, 'block': new_block})
+    for key, expected in defaults.items():
         if key in values and values[key] != expected:
             raise ValueError(f"conflicting agents.{key}; existing customization preserved")
     if owned is not None:
@@ -54,13 +71,13 @@ def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=Fa
                 or any(not isinstance(owned[key], str) for key in ("block", "header", "prefix"))
                 or type(owned["created"]) is not bool):
             raise ValueError("invalid child-default ownership")
-        if any(values.get(key) != value for key, value in SUBAGENT_DEFAULTS.items()):
+        if any(values.get(key) != value for key, value in defaults.items()):
             raise ValueError("managed child defaults missing or modified")
         block = owned["block"]
         forms = []
         for newline in ("\n", "\r\n"):
             canonical = DEFAULTS_MARKER + newline + "".join(
-                f'{key} = "{SUBAGENT_DEFAULTS[key]}"{newline}' for key in owned["fields"])
+                f'{key} = "{defaults[key]}"{newline}' for key in owned["fields"])
             canonical += "# end codex-efficiency-router: child defaults" + newline
             forms.extend((canonical, newline + canonical))
         if ((owned["fields"] and block not in forms)
@@ -99,7 +116,7 @@ def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=Fa
         raise ValueError("unowned child-default marker; config preserved")
     newline = "\r\n" if "\r\n" in text else "\n"
     block = DEFAULTS_MARKER + newline + "".join(
-        f'{key} = "{SUBAGENT_DEFAULTS[key]}"{newline}' for key in missing)
+        f'{key} = "{defaults[key]}"{newline}' for key in missing)
     block += "# end codex-efficiency-router: child defaults" + newline
     record["block"] = block
     match = re.search(r"(?m)^[ \t]*\[agents\][ \t]*(?:#[^\r\n]*)?\r?$", text)
@@ -118,16 +135,17 @@ def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=Fa
         record["header"] = "[agents]" + newline
         text += record["prefix"] + record["header"] + block
     result = text.encode("utf-8")
-    if any(tomllib.loads(text)["agents"].get(k) != v for k, v in SUBAGENT_DEFAULTS.items()):
+    if any(tomllib.loads(text)["agents"].get(k) != v for k, v in defaults.items()):
         raise ValueError("child-default insertion failed validation")
     return result, record
 
 
-def installed_defaults(skill: Path, agents: Path) -> dict | None:
+def installed_defaults(skill: Path, agents: Path, *, allow_legacy=False, remove=False) -> dict | None:
     raw = read_bytes(skill / MANIFEST)
     record = json.loads(raw).get("subagent_defaults") if raw is not None else None
     if record is not None:
-        subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), record)
+        subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), record,
+                          migrate=allow_legacy, remove=remove)
     return record
 
 
@@ -352,9 +370,9 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
                 raise ValueError(f"managed file was changed or removed: {path}; review before --force")
         changes = {key: None for key in owned if key not in payload}
         changes.update(payload)
-        defaults = installed_defaults(skill, agents)
+        defaults = installed_defaults(skill, agents, allow_legacy=True)
         if set_subagent_defaults or defaults is not None:
-            config, defaults = subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), defaults)
+            config, defaults = subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), defaults, migrate=True)
             changes[CONFIG_KEY] = config
         from release_identity import source_identity, sha, canonical as canonical_json
         identity = source_identity(root)
@@ -396,10 +414,10 @@ def uninstall(scope: str, project_root: Path | None, dry_run: bool = False, forc
             if raw is not None and digest(raw) != expected and not force:
                 raise ValueError(f"locally edited file preserved: {key}; review before --force")
         changes = {key: None for key in owned}
-        defaults = installed_defaults(skill, agents)
+        defaults = installed_defaults(skill, agents, allow_legacy=True, remove=True)
         if defaults is not None:
             changes[CONFIG_KEY], _ = subagent_defaults(
-                read_bytes(target(CONFIG_KEY, skill, agents)), defaults, remove=True)
+                read_bytes(target(CONFIG_KEY, skill, agents)), defaults, remove=True, migrate=True)
         changes[f"skill/{MANIFEST}"] = None
         apply(changes, skill, agents, backup_root, dry_run)
         if not dry_run and skill.exists():

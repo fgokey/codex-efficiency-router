@@ -12,7 +12,7 @@
     },
     "sol": {
       "model": "gpt-6.1-sol",
-      "effort": "medium"
+      "effort": "high"
     },
     "astra": {
       "model": "gpt-6-astra",
@@ -186,7 +186,7 @@
       "fixed",
       "adaptive"
     ],
-    "adaptive_default": "sol_medium_luna_high",
+    "adaptive_default": "sol61_high_luna_high",
     "astra_default": "high",
     "automatic_efforts": [
       "medium",

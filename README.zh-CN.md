@@ -24,7 +24,7 @@ canonical `spawn_agent` 预检查在执行者/协调白名单放行前拒绝未�
 
 ## v0.8.0：GPT-6.1 Sol 绑定
 
-普通 Sol 新任务默认选 `gpt-6.1-sol`/medium；独立的 `gpt-6-sol` 角色保留精确钉选及有证据的回退。新别名缺失或宿主目录未知时，不会悄悄转到旧模型。两代标准 API 输入/输出单价相同，但缓存输入分别为 [6.1 的每百万 $0.10](https://developers.openai.com/api/docs/models/gpt-6.1-sol) 和 [6 的 $0.20](https://developers.openai.com/api/docs/models/gpt-6-sol)；不据此推断实际任务总费用。宿主目录可能额外支持 Ultra，仍受原有授权门槛约束。
+普通 Sol 新任务默认选 `gpt-6.1-sol`；难度未知时显式选 high，已确认简单的工作可选 medium。独立的 `gpt-6-sol` 角色保留精确钉选及有证据的回退。新别名缺失或宿主目录未知时，不会悄悄转到旧模型。两代标准 API 输入/输出单价相同，但缓存输入分别为 [6.1 的每百万 $0.10](https://developers.openai.com/api/docs/models/gpt-6.1-sol) 和 [6 的 $0.20](https://developers.openai.com/api/docs/models/gpt-6-sol)；不据此推断实际任务总费用。宿主目录可能额外支持 Ultra，仍受原有授权门槛约束。
 
 ## v0.7.1：定位与范围读取
 
@@ -46,7 +46,7 @@ canonical `spawn_agent` 预检查在执行者/协调白名单放行前拒绝未�
 
 ## v0.7.0-rc.15：GPT-6 路由与有证据的高档位
 
-现行路由默认以 GPT-6 Sol/medium 处理普通工作，以 GPT-6 Luna/high 处理聚焦低风险代码。精确钉选保持不变；旧 GPT-5.6 绑定只作显式选择或有证据的回退。XHigh/Max 需要父代理审查任务证据；Ultra 还要求一个获授权的 Sol/Astra 协调者和互相独立的叶子任务。
+现行路由在工程难度未知时优先选 GPT-6.1 Sol/high，已确认简单的工作可选 medium；聚焦低风险代码选 GPT-6 Luna/high。精确钉选保持不变；旧 GPT-5.6 绑定只作显式选择或有证据的回退。XHigh/Max 需要父代理审查任务证据；Ultra 还要求一个获授权的 Sol/Astra 协调者和互相独立的叶子任务。
 
 
 ## Windows 解释器预检与验收边界
@@ -214,7 +214,7 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol61_engineer` | `gpt-6.1-sol` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
@@ -226,9 +226,9 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 安装包的 `scripts/` 目录只含 `readonly_reader.py`：每次工具调用单独运行一次 Reader；独立检查用一次有总输出预算的 Reader `batch`。不要拼接多个 page，也不要混入 `Get-Content` 或查询输出。dispatch preflight 指参考文件中的检查清单，不是安装命令；脚本路径先验证存在再使用。源码 doctor preflight 只用于 Router 开发。[具体入口与范围](docs/INSTALL.md)。
 
-先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "medium"`；父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
+先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "high"`；更新时把工具拥有且未改动的旧 medium 迁移到 high。父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同的用户自有值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
 
-先运行 `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run` 预览，再去掉 `--dry-run` 应用。更新保留设置，doctor 核验当前值；卸载只移除工具插入的配置并保留用户其他改动。restore 遇到后续任何 config 改动均拒绝覆盖，即使带 `--force`。这两项只表达子默认配置意图，宿主加载与会话是否采用必须实测，不能保证当前存量会话生效。工程规则要求明确 `cer_auto_sol61_engineer`/`medium`/`fork_turns=none`，宿主绑定匹配才 RELEASE；规则禁止工程派发使用裸 `default`，这不是宿主已强制禁用该工具。全历史 fork 仍继承父模型。
+先运行 `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run` 预览，再去掉 `--dry-run` 应用。更新保留设置，doctor 核验当前值；卸载只移除工具插入的配置并保留用户其他改动，包括旧安装中用户自有的 medium。restore 遇到后续任何 config 改动均拒绝覆盖，即使带 `--force`。这两项只表达子默认配置意图，宿主加载与会话是否采用必须实测，不能保证当前存量会话生效。工程规则要求明确 `cer_auto_sol61_engineer`，难度未知时显式选 high、确认简单时可选 medium，并传 `fork_turns=none`；宿主绑定匹配才 RELEASE。规则禁止工程派发使用裸 `default`，这不是宿主已强制禁用该工具。全历史 fork 仍继承父模型。
 
 ### Windows / PowerShell
 

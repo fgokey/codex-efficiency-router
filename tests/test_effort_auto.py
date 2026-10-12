@@ -29,7 +29,7 @@ def host(**kwargs):
 
 class AutomaticBindingTests(unittest.TestCase):
     def test_sol61_default_and_exact_old_sol_pin(self):
-        self.assertEqual(PRESETS['sol'], ('sol61_engineer', 'gpt-6.1-sol', 'medium'))
+        self.assertEqual(PRESETS['sol'], ('sol61_engineer', 'gpt-6.1-sol', 'high'))
         self.assertEqual(C('sol', 'medium').model, 'gpt-6.1-sol')
         self.assertEqual(C('sol', 'medium', 'gpt-6-sol').role, 'sol_engineer')
         c=host(current=C('luna','high'),current_sufficient=False)
@@ -63,8 +63,8 @@ class AutomaticBindingTests(unittest.TestCase):
         cases=(
             (MECHANICAL,C('luna','high')),
             (DATA_TRANSFORM,C('luna','medium')),
-            (S(),C('sol','medium')),
-            (SOL,C('sol','medium')),
+            (S(),C('sol','high')),
+            (SOL,C('sol','high')),
             (S(uncertainty=2,coupling=2,risk=1),C('sol','high')),
             (S(uncertainty=1,coupling=1,risk=2),C('sol','high')),
             (S(risk=3,uncertainty=3),C('astra','high')),
@@ -88,12 +88,12 @@ class AutomaticBindingTests(unittest.TestCase):
     def test_native_effort_chooses_alias_and_explicit_pair(self):
         d = plan(S(), host(), AUTO)
         self.assertEqual((d.action, d.requested_role, d.binding_kind, d.requested),
-                         ('delegate', 'cer_auto_sol61_engineer', 'adaptive', C('sol','medium')))
+                         ('delegate', 'cer_auto_sol61_engineer', 'adaptive', C('sol','high')))
 
     def test_no_effort_field_uses_exact_fixed_binding(self):
         d = plan(S(), host(host_can_set_effort=False), AUTO)
         self.assertEqual((d.action,d.requested_role,d.binding_kind,d.requested),
-                         ('delegate','sol61_engineer','fixed',C('sol','medium')))
+                         ('delegate','sol61_engineer','fixed',C('sol','high')))
 
     def test_missing_alias_is_not_a_reason_to_reinstall(self):
         c=host(); roles=dict(c.roles); del roles['cer_auto_sol61_engineer']
@@ -117,17 +117,19 @@ class AutomaticBindingTests(unittest.TestCase):
 
     def test_missing_high_never_falls_back_to_medium(self):
         c=host(current_sufficient=False,host_can_set_effort=False)
+        c=replace(c,roles={**c.roles,'sol61_engineer':RoleBinding('gpt-6.1-sol','medium')})
         d=plan(SOL,c,AUTO,deep_reasoning=True)
         self.assertEqual(d.action,'blocked');self.assertEqual(d.recommended,C('sol','high'))
         self.assertIsNone(d.requested)
 
     def test_sufficient_parent_can_work_without_claiming_requested_high(self):
         c=host(current=C('astra','high'),host_can_set_effort=False)
+        c=replace(c,roles={**c.roles,'sol61_engineer':RoleBinding('gpt-6.1-sol','medium')})
         d=plan(SOL,c,AUTO,deep_reasoning=True)
         self.assertEqual(d.action,'local');self.assertIsNone(d.requested_role)
 
     def test_explicit_unavailable_setting_is_disclosed(self):
-        self.assertEqual(plan(SOL,host(host_can_set_effort=False),AUTO,explicit_effort='high').action,'blocked')
+        self.assertEqual(plan(SOL,host(host_can_set_effort=False),AUTO,explicit_effort='medium').action,'blocked')
 
     def test_astra_high_works_with_fixed_fallback(self):
         d=plan(S(risk=3,uncertainty=3),host(current=C('sol','medium'),current_sufficient=False,

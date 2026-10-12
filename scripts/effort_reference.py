@@ -235,6 +235,10 @@ def recommend(s: TaskSignals, *, deep_reasoning: bool = False,
         return None
     effort = "high" if (lane == "astra" or needs_deeper_reasoning(s, deep_reasoning)
                         or (lane == "luna" and s.workload != "data_transform")) else "medium"
+    if lane == "sol" and not (ordinary_terra_eligible(s, Configuration('sol', 'medium'))
+                             and s.uncertainty == 0 and s.novelty == 0
+                             and s.verifiability >= 2 and s.failed_attempts == 0):
+        effort = "high"
     if allow_low and lane == "luna" and low_eligible(s) and not deep_reasoning:
         effort = "low"
     return Configuration(lane, effort)
@@ -359,13 +363,17 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     requested_lane = MODEL_LANES[candidate_model] if candidate_model is not None else rec.lane
     if requested_lane != rec.lane:
         higher_or_equal = LANES.index(requested_lane) >= LANES.index(rec.lane)
-        ordinary_terra_override = requested_lane == "terra" and ordinary_terra_eligible(s, rec)
+        ordinary_terra_override = (requested_lane == "terra" and minimum == 'medium'
+                                   and ordinary_terra_eligible(s, Configuration('sol', 'medium')))
         retained_astra = explicit_model is None and context.keep_model and current is not None and current.lane == "astra"
         if (requested_lane == "astra" and not retained_astra) or not (higher_or_equal or ordinary_terra_override):
             return result("blocked", "explicit model does not satisfy the identified capability floor")
     retained_effort = (current.effort if context.keep_model and current is not None
                        and LANES.index(current.lane) > LANES.index(rec.lane)
                        and context.current_sufficient else rec.effort)
+    if (candidate_model in ('gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra')
+            and not (context.keep_model and current is not None and context.current_sufficient)):
+        retained_effort = 'high' if minimum == 'high' else EXPECTED['sol-engineer.toml'][2]
     candidate = Configuration(requested_lane, automatic_effort or explicit_effort or retained_effort, candidate_model)
     if candidate.effort == "ultra" and candidate.lane not in ("sol", "astra"):
         return result("blocked", "ultra requires a Sol or Astra coordinator-capable role")

@@ -31,11 +31,39 @@ def context(**overrides):
 
 
 class EffortPolicyTests(unittest.TestCase):
+    def test_sol61_high_preference_defaults_high_when_difficulty_is_unknown(self):
+        self.assertEqual(recommend(S()), C('sol', 'high'))
+
+    def test_sol61_high_preference_only_confirmed_simple_work_uses_medium(self):
+        simple = S(uncertainty=0, risk=1, coupling=1, novelty=0, verifiability=3)
+        self.assertEqual(recommend(simple), C('sol', 'medium'))
+        for changes in ({'uncertainty': 1}, {'risk': 2}, {'coupling': 2},
+                        {'novelty': 1}, {'verifiability': 1}, {'failed_attempts': 1},
+                        {'evidence_conflict': True}):
+            with self.subTest(changes=changes):
+                self.assertEqual(recommend(replace(simple, **changes)), C('sol', 'high'))
+
+    def test_sol61_high_preference_preserves_explicit_legacy_model_and_effort(self):
+        for model in ('gpt-6-sol', 'gpt-5.6-sol'):
+            catalog = dict(context().catalog)
+            catalog[model] = frozenset(('medium', 'high'))
+            roles = dict(context().roles)
+            roles[EXPECTED['sol-engineer.toml'][0]] = RoleBinding(model, None)
+            result = plan(S(), context(roles=roles, catalog=catalog), ADAPTIVE, explicit_model=model)
+            self.assertEqual(result.requested, C('sol', 'medium', model))
+        result = plan(S(), context(current=C('astra', 'high'), current_sufficient=True,
+                                  benefit_clear=True), ADAPTIVE, explicit_effort='medium')
+        self.assertEqual(result.requested, C('sol', 'medium'))
+        current = C('sol', 'high', 'gpt-6-sol')
+        result = plan(S(), context(current=current, current_sufficient=True, keep_model=True), ADAPTIVE)
+        self.assertEqual(result.action, 'local')
+        self.assertIsNone(result.requested)
+
     def test_defaults_preserve_quality(self):
         for signals, expected in ((MECHANICAL, C('luna', 'high')),
                                   (DATA_TRANSFORM, C('luna', 'medium')),
-                                  (S(), C('sol', 'medium')),
-                                  (SOL, C('sol', 'medium')),
+                                  (S(), C('sol', 'high')),
+                                  (SOL, C('sol', 'high')),
                                   (ASTRA, C('astra', 'high'))):
             self.assertEqual(recommend(signals), expected)
 
@@ -47,7 +75,7 @@ class EffortPolicyTests(unittest.TestCase):
     def test_medium_to_high_is_not_identical_configuration_retry(self):
         c = context(benefit_clear=False, same_config_reason='none')
         self.assertEqual(plan(SOL, c, ADAPTIVE, deep_reasoning=True).action, 'delegate')
-        self.assertEqual(plan(SOL, c, ADAPTIVE).action, 'blocked')
+        self.assertEqual(plan(SOL, c, ADAPTIVE, explicit_effort='medium').action, 'blocked')
 
     def test_explicit_high_same_model_does_not_need_new_model(self):
         result = plan(SOL, context(keep_model=True), ADAPTIVE, explicit_effort='high')
@@ -133,11 +161,12 @@ class EffortPolicyTests(unittest.TestCase):
 
     def test_fixed_role_cannot_be_overridden(self):
         bindings = {r: RoleBinding(m, e) for r, m, e in PRESETS.values()}
+        bindings['sol61_engineer'] = RoleBinding('gpt-6.1-sol', 'medium')
         c = context(roles=bindings)
         result = plan(SOL, c, Profile(), deep_reasoning=True)
         self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
         result = plan(S(), replace(c, current=C('luna','high'), current_sufficient=True,
-                                   benefit_clear=True), Profile())
+                                   benefit_clear=True), Profile(), explicit_effort='medium')
         self.assertEqual(result.requested, C('sol', 'medium'))
 
     def test_pinned_adaptive_role_is_a_configuration_error_even_when_value_matches(self):
@@ -333,8 +362,9 @@ class EffortPolicyTests(unittest.TestCase):
     def test_safe_justified_downshift_after_phase_change(self):
         c = context(current=C('sol', 'high'), current_sufficient=True, keep_model=True,
                     no_escalation=True, benefit_clear=True, change_event='phase')
-        self.assertEqual(plan(SOL, c, ADAPTIVE).requested, C('sol', 'medium'))
-        self.assertEqual(plan(SOL, replace(c, benefit_clear=False), ADAPTIVE).action, 'local')
+        simple = S(uncertainty=0, risk=1, coupling=1, novelty=0, verifiability=3)
+        self.assertEqual(plan(simple, c, ADAPTIVE).requested, C('sol', 'medium'))
+        self.assertEqual(plan(simple, replace(c, benefit_clear=False), ADAPTIVE).action, 'local')
 
     def test_unresolved_insufficiency_cannot_downgrade_effort_or_model(self):
         c = context(current=C('sol', 'high'), benefit_clear=True)
@@ -356,7 +386,7 @@ class EffortPolicyTests(unittest.TestCase):
         for sufficient, benefit, reason in product((False, True), (False, True), ('none', 'independent_review')):
             c = context(current_sufficient=sufficient, benefit_clear=benefit, same_config_reason=reason)
             expected = 'delegate' if benefit and reason != 'none' else 'local' if sufficient else 'blocked'
-            self.assertEqual(plan(SOL, c, ADAPTIVE).action, expected)
+            self.assertEqual(plan(SOL, c, ADAPTIVE, explicit_effort='medium').action, expected)
 
     def test_unknown_route_retains_sufficient_parent_without_claiming_request(self):
         c = context(current_sufficient=True, benefit_clear=True, roles={})

@@ -20,7 +20,7 @@ READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thr
 COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan'))
 EXECUTOR_FAMILIES = ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
 SPAWN_ROLES = {'luna_worker': ('gpt-6-luna', 'high'), 'terra_executor': ('gpt-5.6-terra', 'medium'),
-               'sol_engineer': ('gpt-6-sol', 'medium'), 'sol61_engineer': ('gpt-6.1-sol', 'medium'),
+               'sol_engineer': ('gpt-6-sol', 'medium'), 'sol61_engineer': ('gpt-6.1-sol', 'high'),
                'astra_architect': ('gpt-6-astra', 'high')}
 PREFIX = 'cer-read '
 REASON = ('CER strict Guard: Astra/unknown identity cannot write, build, format or run tests. '

@@ -184,7 +184,9 @@ class NativeGuardTests(unittest.TestCase):
                      {'agent_type':'default','model':'gpt-5.6-sol','reasoning_effort':'high','fork_turns':'none'},
                      {'agent_type':'custom_reader','model':'gpt-6-luna','reasoning_effort':'low','fork_turns':'none'}):
             self.assertEqual(self.hook('spawn_agent','gpt-6-astra',data),{})
-        for data in ({'agent_type':'sol61_engineer','fork_turns':'none','reasoning_effort':'high'},
+        self.assertEqual(self.hook('spawn_agent','gpt-6.1-sol',
+                                   {'agent_type':'sol61_engineer','fork_turns':'none','reasoning_effort':'high'}), {})
+        for data in ({'agent_type':'sol61_engineer','fork_turns':'none','reasoning_effort':'medium'},
                      {'agent_type':'default','model':'inherit','reasoning_effort':'high','fork_turns':'none'}):
             self.assertTrue(self.denied(self.hook('spawn_agent','gpt-6.1-sol',data)))
         self.assertEqual(self.hook('Agent','gpt-6-astra',{}),{})

@@ -59,6 +59,90 @@ class InstallerTests(unittest.TestCase):
             path.write_bytes(data)
         return path
 
+    def install_legacy_owned_medium(self):
+        with patch.dict(manage.SUBAGENT_DEFAULTS, {'default_subagent_reasoning_effort': 'medium'}):
+            self.install(set_subagent_defaults=True)
+
+    def test_sol61_high_migration_updates_only_owned_unchanged_medium(self):
+        before = b'model = "gpt-6-astra"\nmodel_reasoning_effort = "high"\n'
+        config = self.config(before)
+        self.install_legacy_owned_medium()
+        legacy = config.read_bytes()
+        self.install()
+        updated = config.read_bytes()
+        self.assertEqual(updated, legacy.replace(b'"medium"', b'"high"'))
+        manage.uninstall('project', self.project)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_sol61_high_migration_dry_run_and_restore_old_medium(self):
+        self.install_legacy_owned_medium()
+        config = self.config()
+        before = config.read_bytes()
+        manifest = (self.skill / MANIFEST).read_bytes()
+        self.install(dry_run=True)
+        self.assertEqual(config.read_bytes(), before)
+        self.assertEqual((self.skill / MANIFEST).read_bytes(), manifest)
+        self.install()
+        manage.restore(self.backup_list()[-1], 'project', self.project)
+        self.assertEqual(config.read_bytes(), before)
+        self.assertEqual((self.skill / MANIFEST).read_bytes(), manifest)
+        manage.uninstall('project', self.project)
+        self.assertFalse(config.exists())
+
+    def test_sol61_high_migration_rolls_back_config_on_failure(self):
+        self.install_legacy_owned_medium()
+        config = self.config()
+        before = config.read_bytes()
+        manifest = (self.skill / MANIFEST).read_bytes()
+        original = manage.replace
+        def fail_manifest(path, data):
+            if path.name == MANIFEST:
+                raise OSError('injected migration failure')
+            return original(path, data)
+        with patch.object(manage, 'replace', side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.install()
+        self.assertEqual(config.read_bytes(), before)
+        self.assertEqual((self.skill / MANIFEST).read_bytes(), manifest)
+
+    def test_sol61_high_migration_effort_only_ownership_preserves_crlf(self):
+        before = b'[agents]\r\ndefault_subagent_model = "gpt-6.1-sol"\r\nmax_threads = 4\r\n'
+        config = self.config(before)
+        self.install_legacy_owned_medium()
+        record = json.loads((self.skill / MANIFEST).read_text())['subagent_defaults']
+        self.assertEqual(record['fields'], ['default_subagent_reasoning_effort'])
+        legacy = config.read_bytes()
+        self.install()
+        self.assertEqual(config.read_bytes(), legacy.replace(b'"medium"', b'"high"'))
+        manage.uninstall('project', self.project)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_sol61_high_migration_preserves_unowned_equal_medium(self):
+        config = self.config(b'[agents]\ndefault_subagent_reasoning_effort = "medium"\n')
+        self.install_legacy_owned_medium()
+        before = config.read_bytes()
+        with self.assertRaises(ValueError):
+            self.install(force=True)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_sol61_high_migration_uninstall_preserves_unowned_medium(self):
+        original = b'[agents]\ndefault_subagent_reasoning_effort = "medium"\n'
+        config = self.config(original)
+        self.install_legacy_owned_medium()
+        record = json.loads((self.skill / MANIFEST).read_text())['subagent_defaults']
+        self.assertEqual(record['fields'], ['default_subagent_model'])
+        manage.uninstall('project', self.project)
+        self.assertEqual(config.read_bytes(), original)
+
+    def test_sol61_high_migration_preserves_customized_owned_medium(self):
+        self.install_legacy_owned_medium()
+        config = self.config()
+        config.write_bytes(config.read_bytes().replace(b'"medium"', b'"custom"'))
+        before = config.read_bytes()
+        with self.assertRaises(ValueError):
+            self.install(force=True)
+        self.assertEqual(config.read_bytes(), before)
+
     def test_child_defaults_are_explicit_and_reversible(self):
         before = b'# parent\r\nmodel = "gpt-6-astra"\r\nmodel_reasoning_effort = "high"'
         config = self.config(before)
@@ -93,7 +177,7 @@ class InstallerTests(unittest.TestCase):
             self.assertFalse((codex / "config.toml").exists())
 
     def test_equal_existing_child_defaults_are_not_owned(self):
-        before = b'[agents]\ndefault_subagent_model = "gpt-6.1-sol"\ndefault_subagent_reasoning_effort = "medium"\n'
+        before = b'[agents]\ndefault_subagent_model = "gpt-6.1-sol"\ndefault_subagent_reasoning_effort = "high"\n'
         config = self.config(before)
         self.install(set_subagent_defaults=True)
         record = json.loads((self.skill / MANIFEST).read_text())["subagent_defaults"]
@@ -146,12 +230,12 @@ class InstallerTests(unittest.TestCase):
     def test_managed_child_default_drift_blocks_update_and_uninstall(self):
         self.install(set_subagent_defaults=True)
         config = self.config()
-        config.write_bytes(config.read_bytes().replace(b'"medium"', b'"high"'))
+        config.write_bytes(config.read_bytes().replace(b'"high"', b'"medium"'))
         before = config.read_bytes()
-        for action in (lambda: self.install(force=True),
-                       lambda: manage.uninstall("project", self.project, force=True),
-                       lambda: manage.installed_defaults(self.skill, self.agents)):
-            with self.assertRaisesRegex(ValueError, "conflicting agents"):
+        for action, reason in ((lambda: self.install(force=True), "invalid child-default ownership text"),
+                               (lambda: manage.uninstall("project", self.project, force=True), "invalid child-default ownership text"),
+                               (lambda: manage.installed_defaults(self.skill, self.agents), "conflicting agents")):
+            with self.assertRaisesRegex(ValueError, reason):
                 action()
             self.assertEqual(config.read_bytes(), before)
 
@@ -162,7 +246,7 @@ class InstallerTests(unittest.TestCase):
         args = ['doctor', '--scope', 'project', '--project-root', str(self.project)]
         with patch.object(sys, 'argv', args):
             self.assertEqual(doctor.main(), 0)
-            config.write_bytes(config.read_bytes().replace(b'"medium"', b'"high"'))
+            config.write_bytes(config.read_bytes().replace(b'"high"', b'"medium"'))
             self.assertEqual(doctor.main(), 1)
 
     def test_child_default_rollback_includes_config(self):

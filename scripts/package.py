@@ -17,7 +17,7 @@ EXPECTED = {
     "luna-worker.toml": ("luna_worker", "gpt-6-luna", "high"),
     "terra-executor.toml": ("terra_executor", "gpt-5.6-terra", "medium"),
     "sol-engineer.toml": ("sol_engineer", "gpt-6-sol", "medium"),
-    "sol61-engineer.toml": ("sol61_engineer", "gpt-6.1-sol", "medium"),
+    "sol61-engineer.toml": ("sol61_engineer", "gpt-6.1-sol", "high"),
     "astra-architect.toml": ("astra_architect", "gpt-6-astra", "high"),
 }
 AGENT_FILES = list(EXPECTED)  # Canonical source definitions.
