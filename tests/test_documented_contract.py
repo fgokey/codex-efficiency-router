@@ -21,6 +21,14 @@ def contract_text():
 
 
 class DocumentedContractTests(unittest.TestCase):
+    def test_engineering_default_dispatch_pins_complete_routing_parameters(self):
+        effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
+        self.assertIn('agent_type="cer_auto_sol61_engineer",reasoning_effort="medium",fork_turns="none"', effort)
+        for phrase in ('Default engineering:', 'owned task_name/message', 'Exact pins prevail',
+                       'No bare default/inherit/config hot-load reliance',
+                       'verify host binding before RELEASE'):
+            self.assertIn(phrase, effort)
+
     def test_readme_cli_options_match_real_parsers(self):
         modules = {'install': install, 'uninstall': uninstall, 'doctor': doctor}
         for filename in ('README.md', 'README.zh-CN.md', 'docs/INSTALL.md', 'docs/ACCEPTANCE.md'):

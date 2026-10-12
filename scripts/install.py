@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install or restore this Skill and native role bindings; never edit config.toml."""
+"""Install or restore this Skill, roles and optional reversible child defaults."""
 from __future__ import annotations
 
 import argparse
@@ -16,9 +16,10 @@ def source_root() -> Path:
 
 def install(scope: str, project_root: Path | None, dry_run: bool, *,
             force: bool = False, adopt_v01: bool = False,
-            mode: str | None = None, allow_low: bool | None = None) -> int:
+            mode: str | None = None, allow_low: bool | None = None,
+            set_subagent_defaults: bool = False) -> int:
     return manage.install(source_root(), scope, project_root, dry_run, force, adopt_v01,
-                          mode=mode, allow_low=allow_low)
+                          mode=mode, allow_low=allow_low, set_subagent_defaults=set_subagent_defaults)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -28,6 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true", help="back up and replace locally edited OWNED files")
     parser.add_argument("--adopt-v01", action="store_true", help="adopt only exact known legacy file contents")
+    parser.add_argument("--set-subagent-defaults", action="store_true",
+                        help="set only agents child defaults to gpt-6.1-sol/medium; preserve parent model")
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
     parser.add_argument("--mode", choices=("auto", "fixed", "adaptive"), default=None,
                         help="advanced override; ordinary install/update uses auto (explicit v0.5+ overrides are preserved)")
@@ -44,11 +47,11 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.restore:
-            if args.adopt_v01 or args.mode is not None or args.allow_low is not None:
-                parser.error("--restore cannot be combined with --adopt-v01, --mode or low switches")
+            if args.adopt_v01 or args.mode is not None or args.allow_low is not None or args.set_subagent_defaults:
+                parser.error("--restore cannot be combined with install profile/default switches")
             return manage.restore(args.restore, args.scope, args.project_root, args.dry_run, args.force)
         return install(args.scope, args.project_root, args.dry_run, force=args.force, adopt_v01=args.adopt_v01,
-                       mode=args.mode, allow_low=args.allow_low)
+                       mode=args.mode, allow_low=args.allow_low, set_subagent_defaults=args.set_subagent_defaults)
     except (OSError, ValueError) as exc:
         print(f"install: FAILED: {exc}", file=sys.stderr)
         return 2

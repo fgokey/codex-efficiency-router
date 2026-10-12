@@ -1,4 +1,4 @@
-"""Manifest-owned, backed-up installation. No networking or Codex config edits.
+"""Manifest-owned, backed-up installation; explicit child defaults are reversible.
 
 Per-file replacement is atomic. Ordinary write failures roll back; a process/OS
 crash across different directories is not atomic. Retained backups support recovery.
@@ -9,8 +9,10 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import stat
 import tempfile
+import tomllib
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -27,6 +29,106 @@ LEGACY = {
     "agents/sol-engineer.toml": "8af1dd2b1760e90515e1e046252de621223a04d7",
     "agents/astra-architect.toml": "386c6f05628bdea3e460329f59b3c80f0361d6c2",
 }
+
+CONFIG_KEY = "config/config.toml"
+SUBAGENT_DEFAULTS = {"default_subagent_model": "gpt-6.1-sol",
+                    "default_subagent_reasoning_effort": "medium"}
+DEFAULTS_MARKER = "# codex-efficiency-router: child defaults"
+
+
+def subagent_defaults(raw: bytes | None, owned: dict | None = None, *, remove=False):
+    """Own only inserted scalars; preserve existing equal values and unrelated bytes."""
+    text = (raw or b"").decode("utf-8")
+    parsed = tomllib.loads(text)
+    values = parsed.get("agents", {})
+    if not isinstance(values, dict):
+        raise ValueError("agents must be a TOML table")
+    for key, expected in SUBAGENT_DEFAULTS.items():
+        if key in values and values[key] != expected:
+            raise ValueError(f"conflicting agents.{key}; existing customization preserved")
+    if owned is not None:
+        if (not isinstance(owned, dict) or set(owned) != {"fields", "block", "header", "prefix", "created"}
+                or not isinstance(owned["fields"], list)
+                or any(not isinstance(key, str) for key in owned["fields"])
+                or owned["fields"] != [key for key in SUBAGENT_DEFAULTS if key in owned["fields"]]
+                or any(not isinstance(owned[key], str) for key in ("block", "header", "prefix"))
+                or type(owned["created"]) is not bool):
+            raise ValueError("invalid child-default ownership")
+        if any(values.get(key) != value for key, value in SUBAGENT_DEFAULTS.items()):
+            raise ValueError("managed child defaults missing or modified")
+        block = owned["block"]
+        forms = []
+        for newline in ("\n", "\r\n"):
+            canonical = DEFAULTS_MARKER + newline + "".join(
+                f'{key} = "{SUBAGENT_DEFAULTS[key]}"{newline}' for key in owned["fields"])
+            canonical += "# end codex-efficiency-router: child defaults" + newline
+            forms.extend((canonical, newline + canonical))
+        if ((owned["fields"] and block not in forms)
+                or (not owned["fields"] and any((block, owned["header"], owned["prefix"], owned["created"])))
+                or owned["header"] not in ("", "[agents]\n", "[agents]\r\n")
+                or owned["prefix"] not in ("", "\n", "\r\n")
+                or (owned["prefix"] and not owned["header"])
+                or (owned["created"] and (not owned["header"] or owned["prefix"]))
+                or (owned["header"] and not block.startswith(DEFAULTS_MARKER + owned["header"][8:]))
+                or (owned["prefix"] and not owned["header"].endswith(owned["prefix"]))):
+            raise ValueError("invalid child-default ownership text")
+        if block and text.count(block) != 1:
+            raise ValueError("managed child-default block missing or modified")
+        if not remove or not block:
+            return raw, owned
+        text = text.replace(block, "", 1)
+        header = owned["header"]
+        if header and not tomllib.loads(text).get("agents"):
+            segment = owned["prefix"] + header
+            if text.count(segment) != 1:
+                raise ValueError("managed agents table changed; config preserved")
+            suffix = text[text.index(segment) + len(segment):]
+            text = text.replace(segment if not suffix else header, "", 1)
+        expected = dict(parsed)
+        expected["agents"] = {key: value for key, value in values.items() if key not in owned["fields"]}
+        if header and not expected["agents"]:
+            del expected["agents"]
+        if tomllib.loads(text) != expected:
+            raise ValueError("child-default removal changed unrelated config; config preserved")
+        return (None if owned["created"] and not text else text.encode("utf-8")), None
+    missing = [key for key in SUBAGENT_DEFAULTS if key not in values]
+    record = {"fields": missing, "block": "", "header": "", "prefix": "", "created": raw is None}
+    if not missing:
+        return raw, record
+    if DEFAULTS_MARKER in text:
+        raise ValueError("unowned child-default marker; config preserved")
+    newline = "\r\n" if "\r\n" in text else "\n"
+    block = DEFAULTS_MARKER + newline + "".join(
+        f'{key} = "{SUBAGENT_DEFAULTS[key]}"{newline}' for key in missing)
+    block += "# end codex-efficiency-router: child defaults" + newline
+    record["block"] = block
+    match = re.search(r"(?m)^[ \t]*\[agents\][ \t]*(?:#[^\r\n]*)?\r?$", text)
+    if match:
+        offset = match.end()
+        if text[offset:offset + 1] == "\n":
+            offset += 1
+        else:
+            block = newline + block
+            record["block"] = block
+        text = text[:offset] + block + text[offset:]
+    elif "agents" in parsed:
+        raise ValueError("child defaults require a plain [agents] table; config preserved")
+    else:
+        record["prefix"] = newline if text and not text.endswith("\n") else ""
+        record["header"] = "[agents]" + newline
+        text += record["prefix"] + record["header"] + block
+    result = text.encode("utf-8")
+    if any(tomllib.loads(text)["agents"].get(k) != v for k, v in SUBAGENT_DEFAULTS.items()):
+        raise ValueError("child-default insertion failed validation")
+    return result, record
+
+
+def installed_defaults(skill: Path, agents: Path) -> dict | None:
+    raw = read_bytes(skill / MANIFEST)
+    record = json.loads(raw).get("subagent_defaults") if raw is not None else None
+    if record is not None:
+        subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), record)
+    return record
 
 
 def digest(data: bytes | None) -> str | None:
@@ -48,7 +150,9 @@ def target(key: str, skill: Path, agents: Path) -> Path:
     if (p.is_absolute() or len(p.parts) < 2 or str(p) != key
             or any(v in ("", ".", "..") for v in p.parts) or "\\" in key or ":" in key):
         raise ValueError(f"unsafe managed path: {key!r}")
-    if p.parts[0] == "agents" and len(p.parts) == 2 and p.name in MANAGED_AGENT_FILES:
+    if key == CONFIG_KEY:
+        out = agents.parent / "config.toml"
+    elif p.parts[0] == "agents" and len(p.parts) == 2 and p.name in MANAGED_AGENT_FILES:
         out = agents / p.name
     elif p.parts[0] == "skill":
         out = skill.joinpath(*p.parts[1:])
@@ -75,7 +179,7 @@ def load_manifest(skill: Path, agents: Path) -> dict[str, str]:
     from_manifest(data)  # Validate persisted mode before any lifecycle operation.
     for key, value in data["files"].items():
         target(key, skill, agents)
-        if key == f"skill/{MANIFEST}" or not isinstance(value, str) or len(value) != 64:
+        if key in (f"skill/{MANIFEST}", CONFIG_KEY) or not isinstance(value, str) or len(value) != 64:
             raise ValueError("invalid manifest entry")
         int(value, 16)
     if 'skill/SKILL.md' not in data['files']:
@@ -222,7 +326,8 @@ def apply(changes: dict[str, bytes | None], skill: Path, agents: Path, backup_ro
 
 def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = False,
             force: bool = False, adopt_v01: bool = False, *,
-            mode: str | None = None, allow_low: bool | None = None) -> int:
+            mode: str | None = None, allow_low: bool | None = None,
+            set_subagent_defaults: bool = False) -> int:
     skill, agents, backup_root = resolve_targets(scope, project_root)
     canonical = source_files(root)
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
@@ -247,6 +352,10 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
                 raise ValueError(f"managed file was changed or removed: {path}; review before --force")
         changes = {key: None for key in owned if key not in payload}
         changes.update(payload)
+        defaults = installed_defaults(skill, agents)
+        if set_subagent_defaults or defaults is not None:
+            config, defaults = subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), defaults)
+            changes[CONFIG_KEY] = config
         from release_identity import source_identity, sha, canonical as canonical_json
         identity = source_identity(root)
         policy_parts = {key[len("skill/"):]: digest(value) for key, value in payload.items()
@@ -256,6 +365,8 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
                     "policy_sha256": sha(canonical_json(policy_parts)),
                     "mode": profile.mode, "allow_low": profile.allow_low, "profile_schema": 2,
                     "files": {key: digest(value) for key, value in sorted(payload.items())}}
+        if defaults is not None:
+            manifest["subagent_defaults"] = defaults
         changes[f"skill/{MANIFEST}"] = (json.dumps(manifest, indent=2, sort_keys=True) + "\n").encode()
         apply(changes, skill, agents, backup_root, dry_run)
     if dry_run:
@@ -285,6 +396,10 @@ def uninstall(scope: str, project_root: Path | None, dry_run: bool = False, forc
             if raw is not None and digest(raw) != expected and not force:
                 raise ValueError(f"locally edited file preserved: {key}; review before --force")
         changes = {key: None for key in owned}
+        defaults = installed_defaults(skill, agents)
+        if defaults is not None:
+            changes[CONFIG_KEY], _ = subagent_defaults(
+                read_bytes(target(CONFIG_KEY, skill, agents)), defaults, remove=True)
         changes[f"skill/{MANIFEST}"] = None
         apply(changes, skill, agents, backup_root, dry_run)
         if not dry_run and skill.exists():
@@ -335,7 +450,7 @@ def restore(backup: Path, scope: str, project_root: Path | None, dry_run: bool =
                 if value is not None:
                     int(value, 16)
             current = read_bytes(target(key, skill, agents))
-            if not force and digest(current) not in (record["after"], record["before"]):
+            if (key == CONFIG_KEY or not force) and digest(current) not in (record["after"], record["before"]):
                 raise ValueError(f"newer local change preserved: {key}")
             data = None
             if record["before"] is not None:

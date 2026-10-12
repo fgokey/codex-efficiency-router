@@ -5,6 +5,7 @@ import os
 import shutil
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -15,6 +16,7 @@ import manage
 import install as installer
 from package import MANIFEST, PROJECT, resolve_targets
 from doctor import validate_tree
+import doctor
 from profiles import Profile
 
 
@@ -49,6 +51,182 @@ class InstallerTests(unittest.TestCase):
         dst = Path(self.temp.name) / "source"
         shutil.copytree(ROOT, dst, ignore=shutil.ignore_patterns(".git", "__pycache__"))
         return dst
+
+    def config(self, data=None):
+        path = self.agents.parent / "config.toml"
+        if data is not None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        return path
+
+    def test_child_defaults_are_explicit_and_reversible(self):
+        before = b'# parent\r\nmodel = "gpt-6-astra"\r\nmodel_reasoning_effort = "high"'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True, dry_run=True)
+        self.assertEqual(config.read_bytes(), before)
+        self.assertFalse(self.skill.exists())
+        self.install(set_subagent_defaults=True)
+        installed = config.read_bytes()
+        self.assertTrue(installed.startswith(before))
+        self.assertEqual(tomllib.loads(installed.decode())["agents"], manage.SUBAGENT_DEFAULTS)
+        self.install()
+        self.assertEqual(config.read_bytes(), installed)
+        manage.uninstall("project", self.project, dry_run=True)
+        self.assertEqual(config.read_bytes(), installed)
+        manage.uninstall("project", self.project)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_child_defaults_created_config_is_removed(self):
+        self.install(set_subagent_defaults=True)
+        self.assertTrue(self.config().exists())
+        manage.uninstall("project", self.project)
+        self.assertFalse(self.config().exists())
+
+    def test_child_defaults_user_scope(self):
+        codex = Path(self.temp.name) / "user codex"
+        home = Path(self.temp.name) / "home"
+        home.mkdir()
+        with patch.object(Path, "home", return_value=home), patch.dict(os.environ, {"CODEX_HOME": str(codex)}):
+            installer.install("user", None, False, set_subagent_defaults=True)
+            self.assertEqual(tomllib.loads((codex / "config.toml").read_text())["agents"], manage.SUBAGENT_DEFAULTS)
+            manage.uninstall("user", None)
+            self.assertFalse((codex / "config.toml").exists())
+
+    def test_equal_existing_child_defaults_are_not_owned(self):
+        before = b'[agents]\ndefault_subagent_model = "gpt-6.1-sol"\ndefault_subagent_reasoning_effort = "medium"\n'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        record = json.loads((self.skill / MANIFEST).read_text())["subagent_defaults"]
+        self.assertEqual(record["fields"], [])
+        self.assertEqual(config.read_bytes(), before)
+        manage.uninstall("project", self.project)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_only_missing_child_default_is_owned(self):
+        before = b'[agents] # custom\r\ndefault_subagent_model = "gpt-6.1-sol"\r\nmax_threads = 4\r\n'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        record = json.loads((self.skill / MANIFEST).read_text())["subagent_defaults"]
+        self.assertEqual(record["fields"], ["default_subagent_reasoning_effort"])
+        manage.uninstall("project", self.project)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_conflicting_child_default_never_overwritten(self):
+        for key in manage.SUBAGENT_DEFAULTS:
+            for force in (False, True):
+                with self.subTest(key=key, force=force):
+                    before = f'[agents]\n{key} = "custom"\n'.encode()
+                    config = self.config(before)
+                    with self.assertRaisesRegex(ValueError, "conflicting agents"):
+                        self.install(set_subagent_defaults=True, force=force)
+                    self.assertEqual(config.read_bytes(), before)
+                    self.assertFalse(self.skill.exists())
+
+    def test_child_defaults_preserve_unrelated_customizations(self):
+        before = b'model = "gpt-6-astra"\nmodel_reasoning_effort = "high"\n'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        config.write_bytes(config.read_bytes() + b'max_threads = 6\n[hooks]\ncustom = "keep"\n')
+        self.install()
+        manage.uninstall("project", self.project)
+        result = config.read_bytes()
+        self.assertTrue(result.startswith(before))
+        self.assertEqual(tomllib.loads(result.decode())["agents"], {"max_threads": 6})
+        self.assertEqual(tomllib.loads(result.decode())["hooks"], {"custom": "keep"})
+
+    def test_uninstall_keeps_separator_before_new_user_table(self):
+        before = b'model = "gpt-6-astra"'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        config.write_bytes(config.read_bytes() + b'[hooks]\ncustom = "keep"\n')
+        manage.uninstall("project", self.project)
+        result = tomllib.loads(config.read_text())
+        self.assertEqual(result, {"model": "gpt-6-astra", "hooks": {"custom": "keep"}})
+
+    def test_managed_child_default_drift_blocks_update_and_uninstall(self):
+        self.install(set_subagent_defaults=True)
+        config = self.config()
+        config.write_bytes(config.read_bytes().replace(b'"medium"', b'"high"'))
+        before = config.read_bytes()
+        for action in (lambda: self.install(force=True),
+                       lambda: manage.uninstall("project", self.project, force=True),
+                       lambda: manage.installed_defaults(self.skill, self.agents)):
+            with self.assertRaisesRegex(ValueError, "conflicting agents"):
+                action()
+            self.assertEqual(config.read_bytes(), before)
+
+    def test_doctor_rejects_defaults_drift_but_allows_other_config_changes(self):
+        self.install(set_subagent_defaults=True)
+        config = self.config()
+        config.write_bytes(config.read_bytes() + b'max_threads = 6\n')
+        args = ['doctor', '--scope', 'project', '--project-root', str(self.project)]
+        with patch.object(sys, 'argv', args):
+            self.assertEqual(doctor.main(), 0)
+            config.write_bytes(config.read_bytes().replace(b'"medium"', b'"high"'))
+            self.assertEqual(doctor.main(), 1)
+
+    def test_child_default_rollback_includes_config(self):
+        before = b'model = "gpt-6-astra"\n'
+        config = self.config(before)
+        original = manage.replace
+        def fail_manifest(path, data):
+            if path.name == MANIFEST:
+                raise OSError("injected failure after config")
+            return original(path, data)
+        with patch.object(manage, "replace", side_effect=fail_manifest):
+            with self.assertRaises(OSError):
+                self.install(set_subagent_defaults=True)
+        self.assertEqual(config.read_bytes(), before)
+        self.assertEqual(self.snapshot(), {})
+
+    def test_child_default_restore_roundtrip(self):
+        before = b'model = "gpt-6-astra"\n'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        installed = config.read_bytes()
+        manage.uninstall("project", self.project)
+        backup = self.backup_list()[-1]
+        manage.restore(backup, "project", self.project)
+        self.assertEqual(config.read_bytes(), installed)
+        manage.installed_defaults(self.skill, self.agents)
+
+    def test_child_default_restore_never_overwrites_new_config(self):
+        self.install(set_subagent_defaults=True)
+        manage.uninstall("project", self.project)
+        backup = self.backup_list()[-1]
+        for newer in (b'model = "custom"\n[hooks]\ncustom = "keep"\n',
+                      b'[agents]\ndefault_subagent_model = "custom"\n'):
+            config = self.config(newer)
+            with self.assertRaisesRegex(ValueError, "newer local change preserved"):
+                manage.restore(backup, "project", self.project, force=True)
+            self.assertEqual(config.read_bytes(), newer)
+            self.assertFalse(self.skill.exists())
+
+    def test_child_defaults_reject_inline_table_without_rewrite(self):
+        before = b'agents = { max_threads = 4 }\n'
+        config = self.config(before)
+        with self.assertRaisesRegex(ValueError, "plain \\[agents\\]"):
+            self.install(set_subagent_defaults=True)
+        self.assertEqual(config.read_bytes(), before)
+
+    def test_corrupt_default_ownership_cannot_remove_parent_or_hooks(self):
+        before = b'model = "gpt-6-astra"\n[hooks]\ncustom = "keep"\n'
+        config = self.config(before)
+        self.install(set_subagent_defaults=True)
+        installed = config.read_bytes()
+        manifest = json.loads((self.skill / MANIFEST).read_text())
+        original = manifest["subagent_defaults"]
+        for changes in ({"block": 'model = "gpt-6-astra"\n'},
+                        {"header": '[hooks]\ncustom = "keep"\n'},
+                        {"prefix": 'model = "gpt-6-astra"\n'},
+                        {"fields": ["default_subagent_model", "default_subagent_model"]},
+                        {"fields": [{}]}):
+            with self.subTest(changes=changes):
+                manifest["subagent_defaults"] = {**original, **changes}
+                (self.skill / MANIFEST).write_text(json.dumps(manifest), encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "invalid child-default ownership"):
+                    manage.uninstall("project", self.project, force=True)
+                self.assertEqual(config.read_bytes(), installed)
 
     def test_user_install_copies_only_managed_files(self):
         home = Path(self.temp.name).resolve() / "home"

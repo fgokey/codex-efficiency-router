@@ -293,6 +293,20 @@ class BatchReaderV070(TempCase):
 
 
 class CanaryV070(TempCase):
+    def test_execution_output_rejects_observed_32767_bytes_and_member_only_caps(self):
+        from quality_reference import serialize_output
+        oversized = {'kind': 'output', 'bytes': 32767, 'framing_bytes': 0, 'truncated': False}
+        data = self.execution_fixture()
+        data['events'][4] = oversized
+        self.assertEqual(canary.inspect_execution(data)['output'], 'FAIL')
+        captures = [{'result': 'x' * 2200, 'stderr': '', 'exit_code': 0, 'truncated': False}] * 2
+        self.assertTrue(all(len(serialize_output(capture).encode()) + 256 < 4096 for capture in captures))
+        raw = serialize_output(captures)
+        self.assertGreater(len(raw.encode()) + 256, 4096)
+        data['events'][4] = {'kind': 'output', 'captures': captures, 'bytes': len(raw.encode()),
+                             'serialized_result': raw, 'framing_bytes': 256, 'truncated': False}
+        self.assertEqual(canary.inspect_execution(data)['output'], 'FAIL')
+
     def test_execution_output_counts_one_complete_capture_collection(self):
         from quality_reference import bounded_output
         data=self.execution_fixture()

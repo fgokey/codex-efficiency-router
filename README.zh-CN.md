@@ -226,7 +226,9 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 安装包的 `scripts/` 目录只含 `readonly_reader.py`：每次工具调用单独运行一次 Reader；独立检查用一次有总输出预算的 Reader `batch`。不要拼接多个 page，也不要混入 `Get-Content` 或查询输出。dispatch preflight 指参考文件中的检查清单，不是安装命令；脚本路径先验证存在再使用。源码 doctor preflight 只用于 Router 开发。[具体入口与范围](docs/INSTALL.md)。
 
-先审查源码。安装器只操作清单拥有的文件，不改全局 `config.toml`、`AGENTS.md`、认证、权限或其他 Skill。用户级/项目级二选一，保留克隆用于更新卸载。
+先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "medium"`；父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
+
+先运行 `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run` 预览，再去掉 `--dry-run` 应用。更新保留设置，doctor 核验当前值；卸载只移除工具插入的配置并保留用户其他改动。restore 遇到后续任何 config 改动均拒绝覆盖，即使带 `--force`。这两项只表达子默认配置意图，宿主加载与会话是否采用必须实测，不能保证当前存量会话生效。工程规则要求明确 `cer_auto_sol61_engineer`/`medium`/`fork_turns=none`，宿主绑定匹配才 RELEASE；规则禁止工程派发使用裸 `default`，这不是宿主已强制禁用该工具。全历史 fork 仍继承父模型。
 
 ### Windows / PowerShell
 

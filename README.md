@@ -254,7 +254,9 @@ Ordinary work uses Sol/medium; focused low-risk code uses Luna/high, while deter
 
 The installed `scripts/` directory contains only `readonly_reader.py`: one invocation per tool call, or one bounded Reader `batch` for independent checks. Keep page calls separate from other pages, `Get-Content` and queries. Dispatch preflight is the reference checklist, not an installed CLI; verify script paths before use. Source doctor preflight is only for Router development. [Exact paths and scope](docs/INSTALL.md).
 
-Review source first. Installation only manages owned files; it does not edit global config, authentication, permissions, AGENTS.md or unrelated Skills/agents. Keep the clone for lifecycle commands. Choose one installation scope.
+Review source first. Ordinary installation only manages owned files. Optional `--set-subagent-defaults` adds missing `agents.default_subagent_model = "gpt-6.1-sol"` and `agents.default_subagent_reasoning_effort = "medium"` to that scope's `config.toml`; parent model/effort, authentication, permissions, AGENTS.md and unrelated configuration remain unchanged. Different existing values stop installation, even with `--force`; equal existing values remain user-owned. Keep the clone for lifecycle commands. Choose one installation scope.
+
+Preview with `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run`, then remove `--dry-run` to apply. Updates retain these defaults; doctor checks their current values. Uninstall removes only inserted settings and preserves unrelated customization. Restore refuses any subsequent config change, including with `--force`. These settings express the intended child defaults; host loading and session behavior require live verification. They do not guarantee a running session adopts them. Engineering policy requires fresh `cer_auto_sol61_engineer`/`medium`/`fork_turns=none` dispatch and matching host evidence before RELEASE; bare `default` is prohibited for engineering by policy. Guard registration remains optional, so this is not a host-enforced tool prohibition. A full-history fork inherits its parent.
 
 ### Windows / PowerShell
 

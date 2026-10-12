@@ -1,6 +1,8 @@
 # Install, update, uninstall and restore
 
-Copyable commands for Windows and macOS/Linux are in [README](../README.md#install-and-update) and [中文 README](../README.zh-CN.md#安装与更新). Use Python 3.11+, no third-party Python packages. Installation never calls an LLM or edits `config.toml`.
+Copyable commands for Windows and macOS/Linux are in [README](../README.md#install-and-update) and [中文 README](../README.zh-CN.md#安装与更新). Use Python 3.11+, no third-party Python packages. Installation never calls an LLM. Ordinary installation preserves `config.toml`; explicit `--set-subagent-defaults` manages only missing child model/effort defaults, with conflict checks, backup and uninstall restoration. Parent settings remain unchanged.
+
+Desktop session verification on 2026-10-12: after writing the two defaults, a fresh `agent_type=default`, `fork_turns=none` child without model/effort still observed `gpt-6-astra/high` in native `turn_context`. A fresh `cer_auto_sol61_engineer`, explicit `medium`, `fork_turns=none` child observed `gpt-6.1-sol/medium`. Config persistence is not proof of host/session adoption; the cause of the bare-default result is unverified. Engineering dispatch uses the explicit role/effort template in [effort.md](../skills/codex-efficiency-router/references/effort.md), checks native binding, then RELEASE. These are policy requirements; Guard registration was ABSENT during this verification.
 
 ## What is installed
 

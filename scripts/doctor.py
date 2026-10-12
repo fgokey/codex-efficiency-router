@@ -303,11 +303,12 @@ def main() -> int:
             profile = installed_profile(skill_dir, agents)
         errors = validate_tree(skill, agents, profile)
         if not args.source_tree:
-            from manage import digest, load_manifest, read_bytes, target, required_ownership
+            from manage import digest, load_manifest, read_bytes, target, required_ownership, installed_defaults
             if not (skill.parent / MANIFEST).exists():
                 errors.append("missing ownership manifest; source-only copy or legacy installation")
             else:
                 owned = load_manifest(skill.parent, agents)
+                installed_defaults(skill.parent, agents)
                 missing = required_ownership(profile) - owned.keys()
                 if missing:
                     errors.append('incomplete ownership manifest: ' + ', '.join(sorted(missing)))

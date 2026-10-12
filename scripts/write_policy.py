@@ -59,7 +59,7 @@ class AstraWriteEvidence:
         if self.guard_status not in ('unknown', 'inactive', 'active'):
             raise ValueError('invalid strict Guard status')
         if self.failure_kind not in ('none', 'capability', 'unexplained', 'implementation',
-                                     'environment', 'specification', 'observability'):
+                                     'environment', 'specification', 'observability', 'capacity'):
             raise ValueError('invalid Astra write failure kind')
         for value in (self.qualified_attempts, self.prior_exception_units):
             if type(value) is not int or value < 0:
@@ -68,7 +68,7 @@ class AstraWriteEvidence:
     def qualifies(self) -> bool:
         failure_ready = (self.reason == 'qualified_executor_failure' and self.qualified_attempts >= 2
                          and self.failure_kind in ('capability', 'unexplained', 'implementation'))
-        context_ready = self.reason == 'critical_context_loss'
+        context_ready = self.reason == 'critical_context_loss' and self.failure_kind != 'capacity'
         return (self.root_actor and self.scope_bounded and self.target_in_workspace
                 and self.verification_defined and self.prior_exception_units == 0
                 and self.guard_status != 'active' and (failure_ready or context_ready))
@@ -176,11 +176,11 @@ def diagnostic_action(*, model: str | None, complex_judgment: bool = False,
     flags = (complex_judgment, unresolved, prerequisites_ready, cheap_check_available, no_escalation)
     if any(type(v) is not bool for v in flags) or type(qualified_attempts) is not int or qualified_attempts < 0:
         raise ValueError('invalid diagnostic evidence')
-    if failure_kind not in ('none', 'capability', 'unexplained', 'implementation', 'environment', 'specification', 'observability'):
+    if failure_kind not in ('none', 'capability', 'unexplained', 'implementation', 'environment', 'specification', 'observability', 'capacity'):
         raise ValueError('unknown failure kind')
     if not unresolved:
         return 'return_to_executor'
-    if not prerequisites_ready or failure_kind in ('environment', 'specification', 'observability'):
+    if not prerequisites_ready or failure_kind in ('environment', 'specification', 'observability', 'capacity'):
         return 'repair_prerequisite'
     if cheap_check_available:
         return 'executor_experiment'

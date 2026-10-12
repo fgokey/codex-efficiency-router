@@ -51,6 +51,17 @@ class WriteGateTests(unittest.TestCase):
         d=before_action('local_patch','gpt-6-astra',scope(local_owner=True,astra_write=evidence))
         self.assertEqual(d.action,'local_write')
 
+    def test_capacity_failures_never_qualify_astra_to_take_over_writes(self):
+        for reason in ('qualified_executor_failure', 'critical_context_loss'):
+            evidence = astra_write(reason=reason, failure_kind='capacity', qualified_attempts=2)
+            decision = before_action('local_patch', 'gpt-6-astra',
+                                     scope(local_owner=True, astra_write=evidence),
+                                     host_supports_routing=True)
+            self.assertFalse(evidence.qualifies())
+            self.assertNotEqual(decision.action, 'local_write')
+        self.assertEqual(diagnostic_action(model='gpt-6-astra', qualified_attempts=2,
+                                          failure_kind='capacity'), 'repair_prerequisite')
+
     def test_astra_exception_fails_closed_when_any_gate_is_missing(self):
         cases=(
             astra_write(root_actor=False), astra_write(scope_bounded=False),
