@@ -1,10 +1,12 @@
-# Native dispatch and guard
+# Dispatch/guard
 
-authority/ownership/capacity gaps BLOCK/defer; check slots/bound executor reuse; full: wait. Keep edits; no auto-revert. Read dispatch before writes/delegation. Dispatch preflight: checklist below, not a CLI. Verify script paths before use.
+authority/ownership/capacity gaps BLOCK/defer; check slots/bound executor reuse; full: wait. Keep edits; no auto-revert. Read dispatch before writes/delegation. Dispatch preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
 
-Root Astra review: host permission. one bounded local repair unit: two failed qualified executor attempts or material critical-context loss; capacity never qualifies; authority/current-workspace target/exclusive ownership/checks; no observed active strict Guard; shared attempts/absolute cap.
+Reader `assignment --help`: schema. Caller receipt isn't host proof. Exact controls reuse receipt; new text re-admits. Wait exempt. Spawn: explicit role/effort, HOLD identity then binding.
 
-Only parent-assigned Ultra Sol/Astra leaves may spawn disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority/exact repo/ref/destination/checks; grants none. Deduct context/copy/handoff/review costs.
+Root Astra review: host permission. one bounded local repair unit: two failed qualified executor attempts/material critical-context loss; capacity never qualifies; authority/current-workspace target/exclusive ownership/checks; no observed active strict Guard; shared attempts/absolute cap.
+
+Parent-assigned Ultra Sol/Astra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority/exact repo/ref/destination/checks; grants none. Deduct context/copy/handoff/review costs.
 
 Compare roots before writes; native parent file-change attribution needs support; model/review/open-review prove none. Missing/unknown stops.
 
@@ -14,7 +16,7 @@ Handoff: outcome/revision/dirt/rule paths/rationale/invariants/scope/checks/bind
 
 Current evidence/checks/gaps; unit PASS never parent PASS. Parent reviews fixes/checks, closes blockers, accepts integration. One executor per unit.
 
-Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release: same admitted unit continue/status/stop. New readonly/review: default Sol61/high; Astra reuse needs core admission. contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
+Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release: same admitted unit continue/status/stop; new work needs core admission. contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
 
 Unit: source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: reconcile separate bounds.
 

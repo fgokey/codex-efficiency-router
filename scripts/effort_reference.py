@@ -5,11 +5,11 @@ helpers do not read sessions, retry tasks, change budgets or call model APIs.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
 from typing import Literal, Mapping
 
 from package import EXPECTED
-from policy_reference import LANES, SAME_LANE_REASONS, TaskSignals, astra_admitted, choose_lane
+from policy_reference import LANES, SAME_LANE_REASONS, TaskSignals, astra_admitted, choose_lane, assignment_boundary
 from profiles import Profile
 from write_policy import OPERATIONS, WriteScope, before_action, diagnostic_action
 
@@ -508,6 +508,7 @@ def dispatch_arguments(decision: Decision) -> dict[str, str]:
 
 def check_existing_assignment(signals: TaskSignals | None, recipient: Configuration | None, *,
                               recipient_id: str | None, unit_id: str | None, purpose: str | None,
+                              scope: str | None = None, message: str | None = None,
                               prior_assignment: Mapping[str, str] | None = None,
                               selection: Decision | None = None) -> str:
     """Offline evidence check; no messaging, host authentication or binding change.
@@ -521,14 +522,11 @@ def check_existing_assignment(signals: TaskSignals | None, recipient: Configurat
         return 'UNKNOWN'
     if not isinstance(recipient, Configuration):
         raise ValueError('observed recipient Configuration required')
-    if purpose != 'new_unit':
-        if prior_assignment is None:
-            return 'UNKNOWN'
-        expected = {'recipient_id': recipient_id, 'unit_id': unit_id,
-                    'model': recipient.model, 'effort': recipient.effort}
-        if any(not prior_assignment.get(key) for key in expected):
-            return 'UNKNOWN'
-        return 'VERIFIED' if all(prior_assignment[key] == value for key, value in expected.items()) else 'MISMATCH'
+    boundary = assignment_boundary(recipient_id=recipient_id, model=recipient.model, effort=recipient.effort,
+        unit_id=unit_id, purpose=purpose, scope=scope, message=message,
+        signals=asdict(signals) if signals is not None else None, prior=prior_assignment)
+    if boundary['status'] != 'READY':
+        return boundary['status']
     if signals is None:
         return 'UNKNOWN'
     signals.validate()

@@ -23,7 +23,7 @@ from manage import reject_links, read_bytes
 from write_guard import inspect_status, loads, encode
 from quality_reference import bounded_output, progress_action, serialize_output
 from effort_reference import Configuration, MODEL_LANES, check_existing_assignment
-from policy_reference import TaskSignals
+from policy_reference import TaskSignals, assignment_boundary, assignment_policy_sha256
 
 OWNER = 'cer-native-canary'
 SEED = b'CER read-only canary fixture\n'
@@ -80,16 +80,23 @@ def inspect_execution(observations: object) -> dict:
                 model, effort = receiver.get('model'), receiver.get('effort')
                 recipient = Configuration(MODEL_LANES[model], effort, model)
                 task = TaskSignals(**signals) if isinstance(signals, dict) else None
+                boundary = assignment_boundary(recipient_id=receiver.get('id'), model=model, effort=effort,
+                    unit_id=event.get('unit_id'), purpose=event.get('purpose'), scope=event.get('scope'),
+                    message=event.get('message'), signals=signals, prior=assignments.get(receiver.get('id')))
                 verdict = check_existing_assignment(task, recipient, recipient_id=receiver.get('id'),
                     unit_id=event.get('unit_id'), purpose=event.get('purpose'),
+                    scope=event.get('scope'), message=event.get('message'),
                     prior_assignment=assignments.get(receiver.get('id')))
             except (ValueError, TypeError, KeyError):
                 verdict = 'UNKNOWN'
             dispatch_bad |= verdict == 'MISMATCH'
             dispatch_missing |= verdict == 'UNKNOWN'
-            if verdict == 'VERIFIED' and event.get('purpose') == 'new_unit':
+            if verdict == 'VERIFIED' and boundary['effective_purpose'] == 'new_unit':
                 assignments[receiver['id']] = {'recipient_id': receiver['id'], 'unit_id': event['unit_id'],
-                                             'model': model, 'effort': effort}
+                                             'model': model, 'effort': effort,
+                                             'scope_sha256': hashlib.sha256(event.get('scope', '').encode('utf-8')).hexdigest(),
+                                             'message_sha256': hashlib.sha256(event.get('message', '').encode('utf-8')).hexdigest(),
+                                             'policy_sha256': assignment_policy_sha256()}
         elif kind in ('resume', 'resume_agent'):
             # Explicit native recovery cannot pin the child model/effort; later records
             # do not erase the unsafe dispatch. Ordinary task follow-ups are separate.

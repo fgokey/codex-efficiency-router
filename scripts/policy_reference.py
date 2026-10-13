@@ -1,8 +1,14 @@
 """Offline reference rules, NOT a live Codex dispatcher or model-quality benchmark."""
 from __future__ import annotations
 
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
+from pathlib import Path
+import runpy
 from typing import Literal
+
+_assignment_reader = runpy.run_path(str(Path(__file__).resolve().parents[1] / 'hooks/readonly_reader.py'))
+assignment_boundary = _assignment_reader['assignment_boundary']
+assignment_policy_sha256 = _assignment_reader['assignment_policy_sha256']
 
 Lane = Literal["local", "luna", "terra", "sol", "astra"]
 LANES = ("local", "luna", "terra", "sol", "astra")
@@ -64,10 +70,7 @@ class TaskSignals:
 def astra_admitted(s: TaskSignals) -> bool:
     """A parent judgment or explicit user pin still needs intact task prerequisites."""
     s.validate()
-    return (s.spec_complete and s.authority_ready and s.environment_ready
-            and s.observability_ready
-            and (s.force_astra or (not s.cheap_check_available and s.very_complex
-                                   and s.reasoning_bound and bool(s.sol61_unsuitable_reason.strip()))))
+    return _assignment_reader['assignment_astra_admitted'](asdict(s))
 
 
 def choose_lane(s: TaskSignals) -> Lane:

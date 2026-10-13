@@ -224,7 +224,7 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 ## 安装与更新
 
-安装包的 `scripts/` 目录只含 `readonly_reader.py`：每次工具调用单独运行一次 Reader；独立检查用一次有总输出预算的 Reader `batch`。不要拼接多个 page，也不要混入 `Get-Content` 或查询输出。dispatch preflight 指参考文件中的检查清单，不是安装命令；脚本路径先验证存在再使用。源码 doctor preflight 只用于 Router 开发。[具体入口与范围](docs/INSTALL.md)。
+安装包的 `scripts/readonly_reader.py assignment` 通过有界 stdin 在给现有子任务发送工作前检查准入，只返回短前缀和正文哈希；实际消息必须合并同哈希正文。缺失/未知证据不给执行参数。纯同范围 continue/status/stop 可缓存当前凭据；廉价只读审查仍须派发检查。这是调用方必须消费的策略检查，不是宿主拦截或接收者身份认证；既有 live 角色不会因安装而热更新接收规则。Reader page 不拼接，也不混入 `Get-Content`/查询。[输入、入口和限制](docs/INSTALL.md)。
 
 先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "high"`；更新时把工具拥有且未改动的旧 medium 迁移到 high。父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同的用户自有值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
 

@@ -42,7 +42,7 @@ class EffortPolicyTests(unittest.TestCase):
         pinned=S(force_astra=True)
         selection=plan(pinned,context(),ADAPTIVE,explicit_effort='medium')
         self.assertEqual(check_existing_assignment(pinned,selection.requested,recipient_id='pinned-astra',
-            unit_id='unit-b',purpose='new_unit',selection=selection),'VERIFIED')
+            unit_id='unit-b',purpose='new_unit',selection=selection),'MISMATCH')
 
     def test_old_simple_selection_cannot_certify_new_hard_unit(self):
         for old in (S(),S(uncertainty=0,risk=1,coupling=1,verifiability=3)):

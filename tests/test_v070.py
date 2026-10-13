@@ -292,9 +292,134 @@ class BatchReaderV070(TempCase):
         self.assertEqual(json.loads(p.stdout)['hookSpecificOutput']['permissionDecision'], 'deny')
 
 
+class AssignmentPreflightV070(TempCase):
+    def setUp(self):
+        super().setUp()
+        self.reader = runpy.run_path(str(ROOT / 'hooks/readonly_reader.py'))
+
+    def request(self, **changes):
+        data = {'unit_id':'configuration-review', 'purpose':'new_unit',
+                'scope':'Independent Conan configuration review',
+                'message':'Independently review the Conan configuration',
+                'recipient':{'id':'existing-sol61', 'model':'gpt-6.1-sol', 'effort':'high',
+                             'evidence_ref':'session_meta + current turn_context'},
+                'signals':dict.fromkeys(('spec_complete','authority_ready','environment_ready','observability_ready'),True)}
+        data.update(changes)
+        return data
+
+    def cli(self, request):
+        proc = subprocess.run([sys.executable,'-I','-B',str(ROOT / 'hooks/readonly_reader.py'),'assignment'],
+            input=json.dumps(request),text=True,capture_output=True,encoding='utf-8')
+        self.assertIn(proc.returncode,(0,1),proc.stderr)
+        return proc.returncode,json.loads(proc.stdout)
+
+    def test_ordinary_review_cli_and_exact_body_consumption(self):
+        request=self.request();code,result=self.cli(request)
+        self.assertEqual(code,0)
+        self.assertEqual(result['dispatch_arguments'],{'id':'existing-sol61'})
+        self.assertNotIn(request['message'],result['prefix'])
+        self.assertEqual(self.reader['assignment_message'](result,request['message']),result['prefix']+request['message'])
+        with self.assertRaisesRegex(ValueError,'changed assignment body'):
+            self.reader['assignment_message'](result,'Different work')
+
+    def test_conan_review_to_old_astra_fails_even_with_self_reported_pin(self):
+        for pinned in (False,True):
+            request=self.request()
+            request['recipient'].update(id='old-Faraday',model='gpt-6-astra')
+            request['signals']['force_astra']=pinned
+            code,result=self.cli(request)
+            self.assertEqual((code,result['status']),(1,'MISMATCH'))
+            self.assertNotIn('dispatch_arguments',result)
+            self.assertNotIn('prefix',result)
+            data=CanaryV070.execution_fixture(self)
+            data['events'].append(dict(kind='sendInput',unit_id=request['unit_id'],purpose=request['purpose'],
+                scope=request['scope'],message=request['message'],recipient=request['recipient'],signals=request['signals']))
+            self.assertEqual(canary.inspect_execution(data)['dispatch_admission'],'FAIL')
+
+    def test_installed_payload_has_self_contained_help_and_preflight(self):
+        for key,content in manage.source_files(ROOT).items():
+            path=self.root/key;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(content)
+        script=self.root/'skill/scripts/readonly_reader.py'
+        help_result=subprocess.run([sys.executable,'-I','-B',str(script),'assignment','--help'],
+            text=True,capture_output=True,encoding='utf-8')
+        self.assertEqual(help_result.returncode,0,help_result.stderr)
+        self.assertLessEqual(len(help_result.stdout.encode('utf-8')),4096)
+        example=next(line for line in help_result.stdout.splitlines() if line.startswith('{'))
+        request=json.loads(example)
+        for model,expected in (('gpt-6.1-sol',0),('gpt-6-astra',1)):
+            request['recipient']['model']=model
+            proc=subprocess.run([sys.executable,'-I','-B',str(script),'assignment'],
+                input=json.dumps(request),text=True,capture_output=True,encoding='utf-8',cwd=self.root)
+            self.assertEqual(proc.returncode,expected,proc.stderr)
+            result=json.loads(proc.stdout)
+            self.assertEqual('dispatch_arguments' in result,expected==0)
+
+    def test_unknown_cli_never_emits_execution_parameters(self):
+        for field in ('scope','message','signals'):
+            request=self.request();del request[field]
+            code,result=self.cli(request)
+            self.assertEqual((code,result['status']),(1,'UNKNOWN'))
+            self.assertNotIn('dispatch_arguments',result)
+        for field in ('id','model','effort','evidence_ref'):
+            request=self.request();del request['recipient'][field]
+            code,result=self.cli(request)
+            self.assertEqual((code,result['status']),(1,'UNKNOWN'))
+            self.assertNotIn('dispatch_arguments',result)
+
+    def test_current_prerequisites_and_effort_floor(self):
+        for field in ('spec_complete','authority_ready','environment_ready','observability_ready'):
+            request=self.request();request['signals'][field]=False
+            self.assertEqual(self.cli(request)[0],1)
+        request=self.request(confirmed_simple=True);request['recipient']['effort']='medium'
+        self.assertEqual(self.cli(request)[0],0)
+        request['signals']['risk']=3
+        self.assertEqual(self.cli(request)[0],1)
+        request=self.request(effort_supported=True,effort_reason='Observed supported; conflicting lifetime proof')
+        request['recipient']['effort']='xhigh'
+        self.assertEqual(self.cli(request)[0],0)
+        del request['effort_reason']
+        self.assertEqual(self.cli(request)[0],1)
+
+    def test_astra_current_admission_control_and_new_work(self):
+        request=self.request(complexity_reason='Conflicting cross-client lifetime guarantees')
+        request['recipient'].update(id='old-Astra',model='gpt-6-astra')
+        request['signals'].update(very_complex=True,
+            sol61_unsuitable_reason='Sol61 cannot resolve the contradictory ownership evidence')
+        code,admitted=self.cli(request);self.assertEqual(code,0)
+        self.assertIn('Parent judgment: very complex;',admitted['prefix'])
+        self.assertIn('Sol61 unsuitable:',admitted['prefix'])
+        lowered=copy.deepcopy(request);lowered['recipient']['effort']='medium';lowered['confirmed_simple']=True
+        self.assertEqual(self.cli(lowered)[0],1)
+        control=copy.deepcopy(request);control.update(purpose='continue',message='continue',receipt=admitted['receipt'])
+        del control['signals'];del control['complexity_reason']
+        self.assertEqual(self.cli(control)[0],0)
+        control['message']='continue; independently review a new configuration'
+        self.assertEqual(self.cli(control)[0],1)
+        control.update(signals=request['signals'],complexity_reason=request['complexity_reason'])
+        self.assertEqual(self.cli(control)[0],0)
+        control.update(message='continue',scope='Another scope')
+        self.assertEqual(self.cli(control)[0],1)
+
+    def test_stale_or_malformed_receipt_cannot_continue(self):
+        request=self.request();_,admitted=self.cli(request)
+        for field,value in (('policy_sha256','0'*64),('message_sha256','not-a-sha')):
+            control=self.request(purpose='continue',message='continue',receipt=copy.deepcopy(admitted['receipt']))
+            control['receipt'][field]=value
+            code,result=self.cli(control)
+            self.assertEqual(code,1)
+            self.assertNotIn('dispatch_arguments',result)
+        for field,value in (('model','unknown-model'),('effort','unknown-effort')):
+            control=self.request(purpose='continue',message='continue',receipt=copy.deepcopy(admitted['receipt']))
+            control['recipient'][field]=value;control['receipt'][field]=value
+            code,result=self.cli(control)
+            self.assertEqual(code,1)
+            self.assertNotIn('dispatch_arguments',result)
+
+
 class CanaryV070(TempCase):
     def assignment_event(self, tool='sendInput', **changes):
         event={'kind':tool,'unit_id':'ordinary-review-2','purpose':'new_unit',
+               'scope':'Independent configuration review','message':'Independently review the Conan configuration',
                'recipient':{'id':'existing-child','model':'gpt-6-astra','effort':'high'},
                'signals':{'uncertainty':1,'risk':1,'coupling':1}}
         event.update(changes)
@@ -312,12 +437,43 @@ class CanaryV070(TempCase):
         data=self.execution_fixture()
         admitted=self.assignment_event(signals={'very_complex':True,
             'sol61_unsuitable_reason':'Sol61 cannot resolve conflicting cross-client lifetime guarantees'})
-        data['events'].extend((admitted,self.assignment_event(purpose='continue')))
+        data['events'].extend((admitted,self.assignment_event(purpose='continue',message='continue')))
         self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'PASS')
         data['events'][-1]['unit_id']='another-review'
         self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
-        data=self.execution_fixture();data['events'].append(self.assignment_event(purpose='continue',same_unit=True))
+        data=self.execution_fixture();data['events'].append(self.assignment_event(purpose='continue',message='continue',same_unit=True))
         self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'UNKNOWN')
+
+    def test_same_unit_id_continue_cannot_hide_new_review_work(self):
+        data=self.execution_fixture()
+        admitted=self.assignment_event(scope='Approved owner-lifetime arbitration',message='Arbitrate owner lifetimes',
+            signals={'very_complex':True,
+                     'sol61_unsuitable_reason':'Sol61 cannot resolve conflicting cross-client lifetime guarantees'})
+        concealed=self.assignment_event(purpose='continue',scope='New Conan configuration review',
+                                        message='Independently review the Conan configuration')
+        data['events'].extend((admitted,concealed))
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
+
+    def test_same_scope_continue_with_new_body_requires_current_admission(self):
+        data=self.execution_fixture()
+        admitted=self.assignment_event(signals={'very_complex':True,
+            'sol61_unsuitable_reason':'Sol61 cannot resolve conflicting cross-client lifetime guarantees'})
+        data['events'].extend((admitted,self.assignment_event(purpose='continue')))
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
+        data['events'][-1]['signals']=admitted['signals']
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'PASS')
+        data['events'][-1]['scope']='New admitted complex review'
+        data['events'].append(self.assignment_event(purpose='continue',message='continue',scope='New admitted complex review'))
+        self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'PASS')
+
+    def test_control_message_cannot_change_scope(self):
+        for purpose in ('continue','status','stop'):
+            with self.subTest(purpose=purpose):
+                data=self.execution_fixture()
+                admitted=self.assignment_event(signals={'very_complex':True,
+                    'sol61_unsuitable_reason':'Sol61 cannot resolve conflicting cross-client lifetime guarantees'})
+                data['events'].extend((admitted,self.assignment_event(purpose=purpose,message=purpose,scope='New review')))
+                self.assertEqual(canary.inspect_execution(data).get('dispatch_admission'),'FAIL')
 
     def test_existing_sol61_review_and_missing_receiver_evidence(self):
         data=self.execution_fixture()

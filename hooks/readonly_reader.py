@@ -886,10 +886,180 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
     return root, request
 
 
+ASSIGNMENT_HELP = '''CER existing-worker assignment preflight (caller evidence, not host authentication)
+  Verified Python -I -B <Skill>/scripts/readonly_reader.py assignment
+  UTF-8 JSON stdin <=16 KiB; output <=4 KiB. Exit 0: VERIFIED, with prefix/body_sha256/
+  receipt/dispatch_arguments. Exit 1: MISMATCH or UNKNOWN, no execution parameters.
+  Exit 2: invalid input. Check exit/status, then send prefix + the exact checked body;
+  verify body_sha256 before merging. Do not mirror the work prompt into tool output.
+Minimal engineering review input (replace recipient/evidence with observed values):
+{"unit_id":"review-1","purpose":"new_unit","scope":"Conan review","message":"Review Conan configuration","recipient":{"id":"observed-child","model":"gpt-6.1-sol","effort":"high","evidence_ref":"session_meta/current turn_context"},"signals":{"spec_complete":true,"authority_ready":true,"environment_ready":true,"observability_ready":true}}
+  Astra new work: signals.very_complex=true, complexity_reason, and
+  signals.sol61_unsuitable_reason; both readable reasons appear in the prefix.
+  force_astra alone is not a user authorization. Missing/unknown binding: no task send.
+  Medium: confirmed_simple=true + current simple uncertainty/risk/coupling <=1,
+  no conflict/failure/irreversibility, novelty <=1; admitted Astra floor remains high.
+  xhigh/max/ultra: effort_supported=true + effort_reason; no support is inferred.
+  Pure purpose/message continue/status/stop (or exact Chinese control word): same
+  unit/scope/recipient/current-policy receipt may cache admission; added work text
+  re-admits, even with unchanged IDs. Wait needs none. New spawn: explicit role/effort,
+  HOLD identity report; verify binding before this existing-worker entry releases work.
+'''
+
+
+def assignment_policy_sha256() -> str:
+    """Fingerprint this installed validator and its current rules, not host identity."""
+    here = Path(__file__).resolve()
+    skill = here.parents[1]
+    if not (skill / 'SKILL.md').is_file():
+        skill = skill / 'skills/codex-efficiency-router'
+    digest = hashlib.sha256(here.read_bytes())
+    for path in (skill / 'SKILL.md', *sorted((skill / 'references').glob('*.md'))):
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+def assignment_astra_admitted(signals: dict) -> bool:
+    prerequisites = ('spec_complete', 'authority_ready', 'environment_ready', 'observability_ready')
+    return (all(signals.get(key, True) is True for key in prerequisites)
+            and (signals.get('force_astra') is True or
+                 (signals.get('cheap_check_available', False) is False
+                  and signals.get('very_complex') is True
+                  and signals.get('reasoning_bound', True) is True
+                  and isinstance(signals.get('sol61_unsuitable_reason'), str)
+                  and bool(signals['sol61_unsuitable_reason'].strip()))))
+
+
+def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
+                        scope=None, message=None, signals=None, prior=None) -> dict:
+    """Caller evidence only. Work hidden in a control message needs fresh admission."""
+    result = {'status': 'UNKNOWN', 'effective_purpose': purpose}
+    if not all(isinstance(value, str) and value for value in (recipient_id, model, effort, unit_id)):
+        return result
+    controls = {'continue': ('continue', '继续'), 'status': ('status', '状态'), 'stop': ('stop', '停止')}
+    if purpose not in ('new_unit', *controls):
+        return result
+    if purpose in controls and message in controls[purpose]:
+        if not isinstance(scope, str) or not scope or not isinstance(prior, dict):
+            return result
+        expected = {'recipient_id': recipient_id, 'unit_id': unit_id, 'model': model, 'effort': effort,
+                    'scope_sha256': hashlib.sha256(scope.encode('utf-8')).hexdigest(),
+                    'policy_sha256': assignment_policy_sha256()}
+        if not all(isinstance(prior.get(key), str) and prior[key] for key in expected):
+            return result
+        fingerprint = prior.get('message_sha256')
+        if not isinstance(fingerprint, str) or re.fullmatch('[0-9a-f]{64}', fingerprint) is None:
+            return result
+        result['status'] = 'VERIFIED' if all(prior[key] == value for key, value in expected.items()) else 'MISMATCH'
+        return result
+    result['effective_purpose'] = 'new_unit'
+    if not isinstance(signals, dict):
+        return result
+    if model == 'gpt-6-astra' and not assignment_astra_admitted(dict(signals, force_astra=False)):
+        result['status'] = 'MISMATCH'
+        return result
+    result['status'] = 'READY'  # Configuration/effort still requires checking by the consumer.
+    return result
+
+
+def assignment_preflight(request: dict) -> dict:
+    """Installed pre-dispatch entry; never authenticates supplied recipient evidence."""
+    if not isinstance(request, dict):
+        raise ValueError('assignment object required')
+    receiver = request.get('recipient', {})
+    if not isinstance(receiver, dict):
+        receiver = {}
+    scope, message = request.get('scope'), request.get('message')
+    boundary = assignment_boundary(recipient_id=receiver.get('id'), model=receiver.get('model'),
+        effort=receiver.get('effort'), unit_id=request.get('unit_id'), purpose=request.get('purpose'),
+        scope=scope, message=message, signals=request.get('signals'), prior=request.get('receipt'))
+    result = {'status': boundary['status'], 'effective_purpose': boundary['effective_purpose'],
+              'evidence_basis': 'caller-supplied; not host authentication'}
+    if (not isinstance(scope, str) or not scope or not isinstance(message, str) or not message
+            or not isinstance(receiver.get('evidence_ref'), str) or not receiver['evidence_ref']):
+        result['status'] = 'UNKNOWN'
+        return result
+    if (receiver.get('model') not in ('gpt-6.1-sol', 'gpt-6-astra')
+            or receiver.get('effort') not in ('medium', 'high', 'xhigh', 'max', 'ultra')):
+        result['status'] = 'UNKNOWN'
+        return result
+    if boundary['status'] not in ('READY', 'VERIFIED'):
+        return result
+    signals = request.get('signals', {})
+    if boundary['status'] == 'READY':
+        model, effort = receiver['model'], receiver['effort']
+        prerequisites = ('spec_complete', 'authority_ready', 'environment_ready', 'observability_ready')
+        if not all(signals.get(key) is True for key in prerequisites):
+            result['status'] = 'UNKNOWN'
+            return result
+        if model not in ('gpt-6.1-sol', 'gpt-6-astra'):
+            result['status'] = 'UNKNOWN'
+            return result
+        simple = (request.get('confirmed_simple') is True
+                  and all(type(signals.get(key, 1)) is int and 0 <= signals.get(key, 1) <= 1
+                          for key in ('uncertainty', 'risk', 'coupling'))
+                  and all(signals.get(key, False) is False for key in ('evidence_conflict', 'capability_failure'))
+                  and signals.get('irreversibility', 0) == 0 and signals.get('novelty', 0) <= 1)
+        if effort == 'medium' and (not simple or model == 'gpt-6-astra'):
+            result['status'] = 'MISMATCH'
+            return result
+        if effort in ('xhigh', 'max', 'ultra') and not (
+                request.get('effort_supported') is True and isinstance(request.get('effort_reason'), str)
+                and request['effort_reason'].strip()):
+            result['status'] = 'UNKNOWN'
+            return result
+        if model == 'gpt-6-astra':
+            reason = request.get('complexity_reason')
+            # A self-reported pin is not evidence of an actual user instruction.
+            if not assignment_astra_admitted(dict(signals, force_astra=False)):
+                result['status'] = 'MISMATCH'
+                return result
+            if not isinstance(reason, str) or not reason.strip():
+                result['status'] = 'UNKNOWN'
+                return result
+    receipt = {'recipient_id': receiver['id'], 'unit_id': request['unit_id'],
+               'model': receiver['model'], 'effort': receiver['effort'], 'evidence_ref': receiver['evidence_ref'],
+               'scope_sha256': hashlib.sha256(scope.encode('utf-8')).hexdigest(),
+               'message_sha256': hashlib.sha256(message.encode('utf-8')).hexdigest(),
+               'policy_sha256': assignment_policy_sha256()}
+    if boundary['effective_purpose'] != 'new_unit':
+        receipt = request['receipt']  # Retain the admitted work fingerprint across pure controls.
+    prefix = 'CER assignment (caller evidence): ' + json.dumps(receipt, ensure_ascii=False, separators=(',', ':')) + '\n'
+    if boundary['effective_purpose'] == 'new_unit' and receiver['model'] == 'gpt-6-astra':
+        prefix += ('Parent judgment: very complex; ' + request['complexity_reason'].strip()
+                   + '\nSol61 unsuitable: ' + signals['sol61_unsuitable_reason'].strip() + '\n')
+    result.update(status='VERIFIED', receipt=receipt, prefix=prefix,
+                  body_sha256=hashlib.sha256(message.encode('utf-8')).hexdigest(),
+                  dispatch_arguments={'id': receiver['id']})
+    return result
+
+
+def assignment_message(result: dict, message: str) -> str:
+    """Merge only the exact checked body; callers must send this returned message."""
+    if (result.get('status') != 'VERIFIED' or not isinstance(message, str)
+            or result.get('body_sha256') != hashlib.sha256(message.encode('utf-8')).hexdigest()):
+        raise ValueError('unchecked or changed assignment body')
+    return result['prefix'] + message
+
+
 def main() -> int:
     cap = PAGE_BYTES
     json_output = False
     try:
+        if sys.argv[1:] == ['assignment', '--help']:
+            sys.stdout.buffer.write(ASSIGNMENT_HELP.encode('utf-8'))
+            return 0
+        if sys.argv[1:] == ['assignment']:
+            raw = sys.stdin.buffer.read(INPUT_LIMIT + 1)
+            if len(raw) > INPUT_LIMIT:
+                raise ValueError('assignment input exceeds limit')
+            request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
+            result = assignment_preflight(request)
+            output = json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
+            if len(output) > PAGE_BYTES:
+                raise ValueError('assignment result exceeds limit')
+            sys.stdout.buffer.write(output)
+            return 0 if result['status'] == 'VERIFIED' else 1
         if sys.argv[1:] == ['--help'] or (len(sys.argv) == 3 and sys.argv[2] == '--help'
                                          and sys.argv[1] in OPS | {'batch'}):
             sys.stdout.buffer.write(HELP.encode('utf-8'))

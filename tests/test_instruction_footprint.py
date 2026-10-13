@@ -78,10 +78,10 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_entry_is_cheap_but_does_not_grant_authority(self):
         text = SKILL.read_text()
         self.assertLessEqual(len(text.encode('utf-8')), 2048)
-        for phrase in ('Q&A, status', 'low-risk single-owner work', 'no routing, references or children',
+        for phrase in ('Cheap local Q&A/status/low-risk', 'no children/references', 'Delegation always routes',
                        'repo rules, current permissions/read-only roles',
                        'Unknown identity/effects grant no writes', 'exact pins', 'Low is opt-in',
-                       'If an executor is required, use routing', 'Root Astra defaults read-only',
+                       'Sends require Reader `assignment`', 'Root Astra defaults read-only',
                        'read dispatch for exceptions'):
             self.assertIn(phrase, text)
         chain = doctor.instruction_chain(SKILL)
@@ -130,9 +130,10 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('One Reader invocation/tool call', core)
         self.assertIn('no joined pages/queries or mixed Get-Content', core)
 
-    def test_dispatch_preflight_is_checklist_and_scripts_are_verified(self):
+    def test_dispatch_preflight_is_installed_reader_and_scripts_are_verified(self):
         dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
-        self.assertIn('Dispatch preflight: checklist below, not a CLI', dispatch)
+        self.assertIn('Dispatch preflight: Reader `assignment` before task-bearing sends', dispatch)
+        self.assertIn('assignment --help', dispatch)
         self.assertIn('Verify script paths before use', dispatch)
         self.assertNotIn('Run dispatch preflight.', dispatch)
         self.assertIn('Checks: one Reader `batch', contract_text())

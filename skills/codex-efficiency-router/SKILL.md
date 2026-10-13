@@ -1,6 +1,6 @@
 ---
 name: codex-efficiency-router
-description: Complex repo routing/bounded evidence; skip Q&A, status and clear low-risk single-owner tasks. Read SKILL alone, one page per tool call.
+description: All delegation/reuse/review. Read SKILL alone, one page per tool call.
 ---
 
 # Codex Efficiency Router
@@ -13,13 +13,13 @@ One Reader invocation/tool call; no joined pages/queries or mixed Get-Content. V
 
 Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/hidden config edits.
 
-Cheap: Q&A, status and bounded low-risk single-owner work: no routing, references or children. Honor repo rules, current permissions/read-only roles. Unknown identity/effects grant no writes. If an executor is required, use routing.
+Cheap local Q&A/status/low-risk: no children/references. Delegation always routes. Honor repo rules, current permissions/read-only roles. Unknown identity/effects grant no writes.
 
 ## Routing
 
 Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
 
-New engineering/readonly review (send_input/followup_task/send_message): default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason.
+New engineering/readonly review (send_input/followup_task/send_message): default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
 
 ## Delegate
 
@@ -27,7 +27,7 @@ Read [dispatch.md](references/dispatch.md) before delegation, binding or deliver
 
 ## Handoff
 
-Owned scope; requirements win; acceptance: dispatch.
+Owned scope; requirements win; dispatch acceptance.
 
 ## Recovery
 
