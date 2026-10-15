@@ -1,8 +1,10 @@
 # Dispatch/guard
 
-authority/ownership/capacity gaps BLOCK/defer; check slots/bound executor reuse; full: wait. Keep edits; no auto-revert. Read dispatch before writes/delegation. Dispatch preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
+authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Read dispatch before writes/delegation. Dispatch preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
 
-Reader `assignment --help`: schema. Caller receipt isn't host proof. Exact controls reuse receipt; new text re-admits. Wait exempt. Spawn: explicit role/effort, HOLD identity then binding.
+Reader `assignment --help`: schema. Receipt is not proof. Wait exempt. Spawn: explicit role/effort, HOLD then binding.
+
+When exposed, use `admitted_agent_task`: `spawn_hold`, bind, `assign` fresh envelope in `body`; no raw dispatch.
 
 Root Astra review: host permission. one bounded local repair unit: two failed qualified executor attempts/material critical-context loss; capacity never qualifies; authority/current-workspace target/exclusive ownership/checks; no observed active strict Guard; shared attempts/absolute cap.
 
