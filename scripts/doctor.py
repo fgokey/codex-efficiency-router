@@ -320,6 +320,7 @@ def main() -> int:
         from release_identity import source_identity
         identity = source_identity(root) if args.source_tree else None
         guard = None
+        dispatch_guard = None
         if args.source_tree and (root / "plugin.json").exists():
             from release_package import validate_release
             errors.extend(validate_release(root))
@@ -328,12 +329,13 @@ def main() -> int:
         if not args.source_tree:
             from write_guard import inspect_status
             guard = inspect_status(args.scope, args.project_root)
+            dispatch_guard = inspect_status(args.scope, args.project_root, 'dispatch')
         footprint = instruction_footprint(skill, agents, profile) if not errors else None
         if args.as_json:
             print(json.dumps({"policy": "FAIL" if errors else "PASS", "errors": errors,
                               "instruction_footprint": footprint,
                               "profile": profile.mode, "automatic_low": profile.allow_low,
-                              "source_identity": identity, "guard": guard,
+                              "source_identity": identity, "guard": guard, "dispatch_guard": dispatch_guard,
                               "enforcement": "NOT_VERIFIED", "runtime_loaded_version": "UNKNOWN",
                               "catalog": "EXPORTED_ONLY" if args.catalog else "NOT_CHECKED"}, indent=2))
             return int(bool(errors))
@@ -344,6 +346,7 @@ def main() -> int:
         print("live Codex discovery/model execution: NOT VERIFIED")
         if guard:
             print(f"guard registration: {guard['registration']}; trust: UNKNOWN; enforcement: NOT VERIFIED")
+            print(f"dispatch registration: {dispatch_guard['registration']}; trust: UNKNOWN; enforcement: NOT VERIFIED")
         print("catalog: checked supplied export only" if args.catalog else "catalog: NOT CHECKED")
         return int(bool(errors))
     except (OSError, ValueError, TypeError) as exc:

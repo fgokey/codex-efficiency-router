@@ -14,7 +14,36 @@ Before a task-bearing send to an existing worker, run verified Python `-I -B <Sk
 
 Astra new work additionally requires current `signals.very_complex=true`, `complexity_reason`, and `signals.sol61_unsuitable_reason`. Self-reported `force_astra` cannot waive these checks. Success returns only short `prefix`, `body_sha256`, recipient `dispatch_arguments`, and a policy/scope/work fingerprint `receipt`. Check exit/status, verify the exact body hash, then send `prefix + message`; the shared `assignment_message` function rejects a changed body. Never validate one body and send another. The prefix includes readable parent complexity judgment and Sol61-unsuitable reason for Astra. Failure/UNKNOWN has nonzero exit and no execution parameters. Pure exact `continue`/`status`/`stop` (or `继续`/`状态`/`停止`) may supply the previous current-policy `receipt` and same scope/binding; additional body text always needs fresh admission. Pure waits need no preflight, rule reload, or repeated binding check; contradictions do require rechecking.
 
-Receipts reference caller-supplied observed evidence; they are not signatures or host authentication. Native tools can bypass this policy-consumed entry. Canary shares its boundary checks for offline replay and does not prove live enforcement. No hook, trust setting, persistent ledger, background process, or model call is added. Installation updates files and future/reloaded role instructions; an existing live Astra child cannot hot-load receiver rules. Use a freshly bound Sol61 worker for ordinary new work; do not treat the old child's binding as current task admission. A hard host guarantee would require a separately trusted recipient-aware dispatcher; the current write Guard does not provide that guarantee.
+Receipts reference caller-supplied observed evidence; they are not signatures or host authentication. New-unit prefixes now also carry the complete current admission inputs, without copying the task body. Native tools can bypass this policy-consumed entry unless the separate dispatch registration below covers the actual native call. Canary shares boundary checks for offline replay and does not prove live enforcement. Ordinary Skill installation adds no hook, trust setting, persistent ledger, background process, or model call. Installation updates files and future/reloaded role instructions; an existing live Astra child cannot hot-load receiver rules. Use a freshly bound Sol61 worker for ordinary new work; do not treat the old child's binding as current task admission.
+
+## Optional native dispatch admission
+
+Use a verified Python 3.11+ interpreter and an explicit existing project root:
+
+```text
+python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT> --dry-run
+python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT>
+python -B scripts/write_guard.py status --boundary dispatch --scope project --project-root <ROOT> --json
+python -B scripts/write_guard.py remove --boundary dispatch --scope project --project-root <ROOT>
+```
+
+Install the matching complete Skill in the same scope first. The independent owner is `cer-native-dispatch-guard`; `--boundary writes` remains the separate strict Astra write Guard. Dispatch registration preserves that Guard and all other hook groups, including r2c. It never changes parent model settings or writes trust hashes. Review/trust this exact new command in `/hooks`; registration is not enforcement. Updates, collision checks, owned customization backups, rollback and removal use the existing lifecycle safeguards. A saved write-Guard Canary cannot verify this different boundary.
+
+The narrow matcher covers explicit native `spawn_agent`, `Agent`, `resume_agent`, `send_input`, `followup_task`, `send_message`, their listed `collaboration`/`functions` aliases, and listed `send_message_to_thread` application aliases. Unknown Agent schemas and extra message carriers such as `items`/`input_items` are denied. Application messages cannot switch the recorded recipient model/effort or route to an unverified remote host. All native resume aliases are denied. Non-dispatch tools, including parent Astra shell, patches and tests, are not targeted by this mode.
+
+Spawn must use explicit role/effort and the observed `fork_turns=none` or native `fork_context=false` form. Conflicting flags, inheritance and unknown shapes are denied. Its only permitted body is exactly:
+
+```text
+HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.
+```
+
+Sol61/high may use that plain body. Astra HOLD creation must already carry a fresh Reader assignment prefix containing current `very_complex`, `complexity_reason`, and `sol61_unsuitable_reason`; use recipient id `unbound-spawn` and the explicitly requested model/effort when generating this creation-only prefix. Other effort choices also need the complete fresh assignment. The requested pin does not prove the new child's actual binding. Verify the real spawned identity before admitting formal work.
+
+Task sends require a fresh `purpose=new_unit` Reader assignment with the exact body and complete current readiness fields. The handler independently looks up the target id, or a unique agent path within the current caller's direct children, using the host-supplied session id and read-only `Path.home()/.codex/state_5.sqlite`. It ignores request-supplied database/owner/model claims. The adapter requires the documented `threads` column set; missing/unsupported identity, missing DB/schema, archived rows, ownership mismatch and path ambiguity deny the call. It uses no transcript scans or persistent ledger. Custom host directories and other schema generations need an explicit adapter; they are not guessed.
+
+Recorded recipient model/effort, canonical target, exact body and current installed policy fingerprint must match. The handler re-runs current admission for every message; old receipts and `continue` never waive Astra's current complexity and Sol61-unsuitable reasons. Use dedicated wait/interrupt/close tools for control. SQLite metadata is a recorded identity snapshot, not proof of current loaded state or a guarantee against identity changes between hook and dispatch.
+
+Malformed input and catchable handler/SQLite errors produce the official `permissionDecision=deny`. The host may still bypass a hook on specialized paths or fail open on external timeouts/errors. Code-mode JavaScript is not parsed to guess nested calls: the host must invoke the hook for each inner native tool. Real native-name, namespace, application-tool and code-mode coverage, trust, loaded-worker binding and failure behavior remain **UNKNOWN until operator-witnessed live acceptance**. Ordinary static tests cannot remove these limits.
 
 Select either user scope or one explicit existing project root. Keep the repository clone to update/uninstall. `$CODEX_HOME` changes user agent and backup locations, not `~/.agents/skills`. Use the same scope, project and environment for subsequent operations. A project-root flag without project scope is rejected.
 

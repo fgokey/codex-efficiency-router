@@ -109,4 +109,38 @@ class GuardLifecycleTests(unittest.TestCase):
         self.assertNotIn('.agents/skills',self.config.read_text())
 
 
+class DispatchLifecycleTests(GuardLifecycleTests):
+    def setUp(self):
+        super().setUp()
+        self.directory,self.config,self.backups=wg.targets('project',self.root,'dispatch')
+
+    def runop(self,action='install',**kwargs):
+        return wg.lifecycle(action,'project',self.root,boundary='dispatch',**kwargs)
+
+    def test_guard_is_independent_of_main_skill_uninstall(self):
+        self.runop()
+        group=json.loads(self.config.read_text())['hooks']['PreToolUse'][0]
+        self.assertNotEqual(group['matcher'],'*')
+        self.assertIn('--dispatch-only',group['hooks'][0]['command'])
+        self.assertIn('--policy-root',group['hooks'][0]['command'])
+        status=wg.inspect_status('project',self.root,'dispatch')
+        self.assertEqual(status['registration'],'PRESENT')
+        self.assertEqual(status['trust'],'UNKNOWN')
+        self.assertEqual(status['live_verification'],'NOT_RUN')
+
+    def test_dispatch_and_strict_registrations_preserve_each_other_and_foreign_hook(self):
+        self.config.parent.mkdir(parents=True)
+        foreign={'matcher':'Bash','hooks':[{'type':'command','command':'r2c-owned'}]}
+        self.config.write_text(json.dumps({'hooks':{'PreToolUse':[foreign]}}))
+        wg.lifecycle('install','project',self.root)
+        strict=json.loads(self.config.read_text())['hooks']['PreToolUse'][1]
+        self.runop()
+        groups=json.loads(self.config.read_text())['hooks']['PreToolUse']
+        self.assertEqual(groups[:2],[foreign,strict])
+        self.runop('remove')
+        self.assertEqual(json.loads(self.config.read_text())['hooks']['PreToolUse'],[foreign,strict])
+        wg.lifecycle('remove','project',self.root)
+        self.assertEqual(json.loads(self.config.read_text())['hooks']['PreToolUse'],[foreign])
+
+
 if __name__=='__main__':unittest.main()

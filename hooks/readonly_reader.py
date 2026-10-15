@@ -904,14 +904,25 @@ Minimal engineering review input (replace recipient/evidence with observed value
   unit/scope/recipient/current-policy receipt may cache admission; added work text
   re-admits, even with unchanged IDs. Wait needs none. New spawn: explicit role/effort,
   HOLD identity report; verify binding before this existing-worker entry releases work.
+Native dispatch mode (independent trusted registration):
+  Every task message requires purpose=new_unit with complete current admission fields;
+  old receipts and continue do not waive admission. Dedicated wait/stop tools are separate.
+  Spawn body must be exactly this fixed identity HOLD, with no additional work:
+  HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.
+  Sol61/high may spawn with that plain body. For Astra creation, run assignment with
+  recipient.id="unbound-spawn", the explicitly requested model/effort, purpose=new_unit,
+  scope="identity HOLD", and message equal to the fixed HOLD above. Supply all readiness
+  signals plus very_complex=true, complexity_reason, and sol61_unsuitable_reason as above.
+  Check VERIFIED/exit 0, then send prefix + that exact HOLD as the spawn message.
+  Requested spawn parameters are not an actual binding; verify host identity before work.
 '''
 
 
-def assignment_policy_sha256() -> str:
+def assignment_policy_sha256(skill_root: Path | None = None) -> str:
     """Fingerprint this installed validator and its current rules, not host identity."""
     here = Path(__file__).resolve()
-    skill = here.parents[1]
-    if not (skill / 'SKILL.md').is_file():
+    skill = skill_root if skill_root is not None else here.parents[1]
+    if skill_root is None and not (skill / 'SKILL.md').is_file():
         skill = skill / 'skills/codex-efficiency-router'
     digest = hashlib.sha256(here.read_bytes())
     for path in (skill / 'SKILL.md', *sorted((skill / 'references').glob('*.md'))):
@@ -962,7 +973,7 @@ def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
     return result
 
 
-def assignment_preflight(request: dict) -> dict:
+def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> dict:
     """Installed pre-dispatch entry; never authenticates supplied recipient evidence."""
     if not isinstance(request, dict):
         raise ValueError('assignment object required')
@@ -1021,7 +1032,12 @@ def assignment_preflight(request: dict) -> dict:
                'model': receiver['model'], 'effort': receiver['effort'], 'evidence_ref': receiver['evidence_ref'],
                'scope_sha256': hashlib.sha256(scope.encode('utf-8')).hexdigest(),
                'message_sha256': hashlib.sha256(message.encode('utf-8')).hexdigest(),
-               'policy_sha256': assignment_policy_sha256()}
+               'policy_sha256': policy_sha256 or assignment_policy_sha256()}
+    if boundary['effective_purpose'] == 'new_unit':
+        # Current admission inputs, never an identity signature or cached permission.
+        receipt['admission'] = {key: request[key] for key in (
+            'unit_id', 'purpose', 'scope', 'signals', 'complexity_reason',
+            'confirmed_simple', 'effort_supported', 'effort_reason') if key in request}
     if boundary['effective_purpose'] != 'new_unit':
         receipt = request['receipt']  # Retain the admitted work fingerprint across pure controls.
     prefix = 'CER assignment (caller evidence): ' + json.dumps(receipt, ensure_ascii=False, separators=(',', ':')) + '\n'

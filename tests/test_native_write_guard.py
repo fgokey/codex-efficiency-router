@@ -2,6 +2,7 @@
 Not a claim that an untested Codex version loads/trusts/enforces the hook.
 """
 import json
+from contextlib import contextmanager
 import base64
 import os
 from pathlib import Path
@@ -19,6 +20,211 @@ from unittest import mock
 ROOT=Path(__file__).resolve().parents[1]
 GUARD=ROOT/'hooks/astra_write_guard.py'
 MODULE=runpy.run_path(str(GUARD))
+
+
+class NativeDispatchTests(unittest.TestCase):
+    def setUp(self):
+        import sqlite3
+        self.sql = sqlite3
+        self.tmp = tempfile.TemporaryDirectory(); self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name).resolve()
+        self.database = self.root / 'state_5.sqlite'
+        self.policy = ROOT / 'skills/codex-efficiency-router'
+        self.reader = runpy.run_path(str(ROOT / 'hooks/readonly_reader.py'))
+        with self.connect() as db:
+            db.execute('CREATE TABLE threads (id TEXT, model TEXT, reasoning_effort TEXT, source TEXT, '
+                       'thread_source TEXT, agent_role TEXT, agent_path TEXT, archived INTEGER, rollout_path TEXT)')
+        self.row('parent', 'gpt-6-astra', None, '/root')
+        self.row('sol', 'gpt-6.1-sol', 'parent', '/root/sol')
+        self.row('astra', 'gpt-6-astra', 'parent', '/root/astra')
+
+    @contextmanager
+    def connect(self):
+        db = self.sql.connect(self.database)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    def row(self, identifier, model, owner, path, effort='high', archived=0):
+        source = json.dumps({'subagent': {'thread_spawn': {'parent_thread_id': owner}}}) if owner else 'desktop'
+        with self.connect() as db:
+            db.execute('INSERT INTO threads VALUES (?,?,?,?,?,?,?,?,?)',
+                       (identifier, model, effort, source, '', '', path, archived, ''))
+
+    def request(self, recipient='sol', model='gpt-6.1-sol', message='Review the owned source unit', **changes):
+        request = {'unit_id': 'source-review', 'purpose': 'new_unit', 'scope': 'owned source unit',
+                   'message': message, 'recipient': {'id': recipient, 'model': model, 'effort': 'high',
+                   'evidence_ref': 'caller claim is independently checked'},
+                   'signals': dict.fromkeys(('spec_complete', 'authority_ready', 'environment_ready',
+                                            'observability_ready'), True)}
+        if model == 'gpt-6-astra':
+            request['signals'].update(very_complex=True, reasoning_bound=True, cheap_check_available=False,
+                                     sol61_unsuitable_reason='Conflicting causal evidence needs joint arbitration')
+            request['complexity_reason'] = 'Several competing lifecycle explanations remain unresolved'
+        request.update(changes)
+        return request
+
+    def text(self, request):
+        result = self.reader['assignment_preflight'](request)
+        self.assertEqual(result['status'], 'VERIFIED', result)
+        return self.reader['assignment_message'](result, request['message'])
+
+    def hook(self, target='sol', text=None, name='send_input', data=None, session='parent'):
+        event = {'hook_event_name': 'PreToolUse', 'tool_name': name, 'session_id': session,
+                 'model': 'gpt-6-astra', 'tool_input': data if data is not None else {
+                     'id': target, 'message': text if text is not None else self.text(self.request())}}
+        return MODULE['decide'](event, dispatch_only=True, host_directory=self.root, policy_root=self.policy)
+
+    def denied(self, result):
+        self.assertEqual(result['hookSpecificOutput']['permissionDecision'], 'deny', result)
+
+    def test_current_sol61_admission_and_parent_astra_tools(self):
+        before = self.database.read_bytes()
+        self.assertEqual(self.hook(), {})
+        for name in ('Bash', 'exec_command', 'apply_patch', 'functions.exec', 'wait', 'interrupt_agent'):
+            self.assertEqual(self.hook(name=name, data={'command': 'owned action'}), {})
+        self.assertEqual(self.database.read_bytes(), before)
+
+    def test_current_astra_dual_reasons_for_every_message(self):
+        request = self.request('astra', 'gpt-6-astra')
+        self.assertEqual(self.hook('astra', self.text(request)), {})
+        self.denied(self.hook('astra', 'continue'))
+        for field in ('very_complex', 'sol61_unsuitable_reason'):
+            bad = json.loads(json.dumps(request)); bad['signals'].pop(field)
+            # Forge an envelope without asking the already strict Reader to admit it.
+            text = self.text(request)
+            header, body = text.split('\n', 1)
+            receipt = json.loads(header[len(MODULE['ASSIGNMENT_PREFIX']):])
+            receipt['admission']['signals'] = bad['signals']
+            self.denied(self.hook('astra', MODULE['ASSIGNMENT_PREFIX'] + json.dumps(receipt) + '\n' + body))
+        bad = self.text(request).replace(request['complexity_reason'], '', 1)
+        self.denied(self.hook('astra', bad))
+
+    def test_forged_model_old_receipt_controls_and_work_body(self):
+        self.denied(self.hook('astra', self.text(self.request())))
+        text = self.text(self.request('astra', 'gpt-6-astra'))
+        header, body = text.split('\n', 1)
+        receipt = json.loads(header[len(MODULE['ASSIGNMENT_PREFIX']):])
+        receipt.pop('admission')
+        self.denied(self.hook('astra', MODULE['ASSIGNMENT_PREFIX'] + json.dumps(receipt) + '\ncontinue'))
+        self.denied(self.hook('astra', text + '\nAdditional unrelated work'))
+        self.denied(self.hook(text=self.text(self.request()) + ' changed'))
+
+    def test_target_policy_scope_and_actual_effort_are_bound(self):
+        text = self.text(self.request())
+        self.denied(self.hook('astra', text))
+        header, body = text.split('\n', 1)
+        original = json.loads(header[len(MODULE['ASSIGNMENT_PREFIX']):])
+        for key in ('policy_sha256', 'scope_sha256', 'unit_id', 'message_sha256'):
+            receipt = dict(original); receipt[key] = 'forged'
+            self.denied(self.hook(text=MODULE['ASSIGNMENT_PREFIX'] + json.dumps(receipt) + '\n' + body))
+        with self.connect() as db:
+            db.execute("UPDATE threads SET reasoning_effort='medium' WHERE id='sol'")
+        self.denied(self.hook(text=text))
+
+    def test_missing_schema_database_caller_owner_and_path_ambiguity(self):
+        self.denied(self.hook(session='unknown-parent'))
+        self.row('foreign', 'gpt-6-astra', 'another-parent', '/root/astra')
+        self.denied(self.hook('foreign', self.text(self.request('foreign', 'gpt-6-astra'))))
+        self.assertEqual(self.hook('/root/sol'), {})
+        self.row('duplicate', 'gpt-6.1-sol', 'parent', '/root/sol')
+        self.denied(self.hook('/root/sol'))
+        with self.connect() as db:
+            db.execute('ALTER TABLE threads RENAME COLUMN agent_role TO unsupported_role')
+        self.denied(self.hook())
+        self.database.unlink()
+        self.denied(self.hook())
+        self.assertFalse(self.database.exists())
+
+    def test_archived_unknown_model_and_malformed_source_are_denied(self):
+        for column, value in (('archived', 1), ('model', 'gpt-6.1-sol-lookalike'),
+                              ('source', '{}')):
+            with self.connect() as db:
+                previous = db.execute('SELECT ' + column + " FROM threads WHERE id='sol'").fetchone()[0]
+                db.execute('UPDATE threads SET ' + column + "=? WHERE id='sol'", (value,))
+            self.denied(self.hook())
+            with self.connect() as db:
+                db.execute('UPDATE threads SET ' + column + "=? WHERE id='sol'", (previous,))
+
+    def test_task_aliases_and_application_identity_override(self):
+        for name in ('send_input', 'collaboration.send_input', 'functions.send_input',
+                     'followup_task', 'send_message', 'collaboration.followup_task', 'collaboration.send_message'):
+            key = 'target' if name.endswith(('followup_task', 'send_message')) else 'id'
+            self.assertEqual(self.hook(name=name, data={key: '/root/sol', 'message': self.text(self.request())}), {})
+            self.denied(self.hook(name=name, data={key: 'astra', 'message': 'new hidden work',
+                                                  'model': 'gpt-6.1-sol', 'db': str(self.database)}))
+        name = 'mcp__codex_app__send_message_to_thread'
+        data = {'threadId': 'sol', 'prompt': self.text(self.request())}
+        self.assertEqual(self.hook(name=name, data=data), {})
+        for override in ({'model': 'gpt-6-astra'}, {'thinking': 'ultra'}):
+            self.denied(self.hook(name=name, data=dict(data, **override)))
+
+    def test_spawn_hold_requires_astra_current_admission_and_rejects_work(self):
+        data = {'agent_type': 'sol61_engineer', 'fork_turns': 'none', 'message': MODULE['HOLD_MESSAGE']}
+        self.assertEqual(self.hook(name='spawn_agent', data=data), {})
+        self.denied(self.hook(name='spawn_agent', data=dict(data, message='Review code now')))
+        astra = dict(data, agent_type='astra_architect')
+        self.denied(self.hook(name='spawn_agent', data=astra))
+        request = self.request('unbound-spawn', 'gpt-6-astra', MODULE['HOLD_MESSAGE'])
+        astra['message'] = self.text(request)
+        self.assertEqual(self.hook(name='collaboration.spawn_agent', data=astra), {})
+        request['message'] += ' Also review the code'
+        self.denied(self.hook(name='spawn_agent', data=dict(astra, message=self.text(request))))
+
+    def test_observed_native_and_collaboration_no_context_shapes(self):
+        base = {'agent_type': 'sol61_engineer', 'message': MODULE['HOLD_MESSAGE']}
+        for name, flags in (('spawn_agent', {'fork_context': False}),
+                            ('collaboration.spawn_agent', {'fork_turns': 'none'}),
+                            ('spawn_agent', {'fork_context': False, 'fork_turns': 'none'})):
+            self.assertEqual(self.hook(name=name, data=dict(base, **flags)), {})
+        for flags in ({'fork_context': True}, {'fork_context': 'false'}, {'fork_turns': 'all'},
+                      {'fork_context': False, 'fork_turns': 'all'}, {'fork_turns': None}, {}):
+            self.denied(self.hook(name='spawn_agent', data=dict(base, **flags)))
+
+    def test_spawn_denial_provides_executable_help_with_exact_installed_protocol(self):
+        result = self.hook(name='spawn_agent', data={'agent_type': 'astra_architect',
+                           'fork_turns': 'none', 'message': '只读核查身份，等待释放'})
+        self.denied(result)
+        reason = result['hookSpecificOutput']['permissionDecisionReason']
+        self.assertIn('assignment', reason)
+        self.assertIn('--help', reason)
+        command = reason.split(' Help: ', 1)[1]
+        argv = ['pwsh', '-NoProfile', '-NonInteractive', '-Command', command] if os.name == 'nt' else ['/bin/sh', '-c', command]
+        proc = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', timeout=15)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        for required in (MODULE['HOLD_MESSAGE'], 'purpose=new_unit', 'unbound-spawn',
+                         'complexity_reason', 'sol61_unsuitable_reason', 'prefix + that exact HOLD'):
+            self.assertIn(required, proc.stdout)
+
+    def test_resume_agent_aliases_and_extra_task_carriers_are_denied(self):
+        for name in ('resume_agent', 'collaboration.resume_agent', 'functions.resume_agent'):
+            self.denied(self.hook(name=name, data={'id': 'astra'}))
+        for name in ('Agent', 'collaboration.Agent', 'functions.Agent'):
+            self.denied(self.hook(name=name, data={'prompt': 'hidden new work', 'subagent_type': 'general'}))
+            self.assertEqual(self.hook(name=name, data={'agent_type': 'sol61_engineer',
+                'fork_turns': 'none', 'message': MODULE['HOLD_MESSAGE']}), {})
+        for carrier in ('items', 'input_items', 'prompt', 'input'):
+            self.denied(self.hook(data={'id': 'sol', 'message': self.text(self.request()), carrier: 'extra work'}))
+        header, body = self.text(self.request()).split('\n', 1)
+        for location in ('envelope', 'admission', 'signals'):
+            receipt = json.loads(header[len(MODULE['ASSIGNMENT_PREFIX']):])
+            destination = receipt if location == 'envelope' else receipt['admission']
+            if location == 'signals': destination = destination['signals']
+            destination['hidden_work'] = 'another task'
+            self.denied(self.hook(text=MODULE['ASSIGNMENT_PREFIX'] + json.dumps(receipt) + '\n' + body))
+
+    def test_caught_processing_failures_and_cli_argument_errors_return_official_deny(self):
+        with mock.patch.dict(MODULE['decide_dispatch'].__globals__, host_recipient=mock.Mock(side_effect=RuntimeError('injected'))):
+            self.denied(self.hook())
+        for args, raw in ((['--dispatch-only'], '{bad'),
+                          (['--dispatch-only', '--policy-root'], '{}'),
+                          (['--dispatch-only'], json.dumps({'hook_event_name': 'PreToolUse', 'tool_name': 'send_input'}))):
+            proc = subprocess.run([sys.executable, '-I', '-B', str(GUARD), *args], input=raw,
+                                  capture_output=True, text=True, timeout=10)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.denied(json.loads(proc.stdout))
 
 
 class NativeGuardTests(unittest.TestCase):

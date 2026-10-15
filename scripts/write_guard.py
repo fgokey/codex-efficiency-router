@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import shlex
 import sys
 import tomllib
@@ -24,6 +25,7 @@ from package import resolve_targets, MANIFEST
 from release_identity import GUARD_FILES, bundle_hash, source_identity, canonical, sha, policy_hash
 
 OWNER = 'cer-astra-write-guard'
+DISPATCH_OWNER = 'cer-native-dispatch-guard'
 FILES = GUARD_FILES
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,18 +53,32 @@ def shell_command(args):
     return shlex.join(args)
 
 
-def targets(scope, project_root):
+def targets(scope, project_root, boundary='writes'):
+    if boundary not in ('writes', 'dispatch'):
+        raise ValueError('unknown Guard boundary')
     _, agents, backups = resolve_targets(scope, project_root)
     base = agents.parent
-    return base / 'hooks' / OWNER, base / 'hooks.json', backups / OWNER
+    owner = DISPATCH_OWNER if boundary == 'dispatch' else OWNER
+    return base / 'hooks' / owner, base / 'hooks.json', backups / owner
 
 
-def group_for(directory):
+def guard_argv(directory, interpreter, bundle, boundary='writes', policy_root=None):
+    args = [interpreter, '-I', '-B', str(directory / FILES[0]), '--expected-bundle', bundle]
+    if boundary == 'dispatch':
+        if policy_root is None or not policy_root.is_absolute():
+            raise ValueError('dispatch registration requires the exact installed policy root')
+        args.extend(('--dispatch-only', '--policy-root', str(policy_root)))
+    return args
+
+
+def group_for(directory, boundary='writes', policy_root=None):
     identity = source_identity(ROOT)
-    return {'matcher': '*', 'hooks': [{'type': 'command',
-            'command': shell_command([str(Path(sys.executable).resolve()), '-I', '-B',
-                       str(directory / FILES[0]), '--expected-bundle', identity['guard_sha256']]),
-              'timeout': 5, 'statusMessage': f"CER {identity['version']} strict Astra write boundary"}]}
+    matcher = runpy.run_path(str(ROOT / 'hooks' / FILES[0]))['DISPATCH_MATCHER'] if boundary == 'dispatch' else '*'
+    label = 'native dispatch admission' if boundary == 'dispatch' else 'strict Astra write boundary'
+    return {'matcher': matcher, 'hooks': [{'type': 'command',
+            'command': shell_command(guard_argv(directory, str(Path(sys.executable).resolve()),
+                       identity['guard_sha256'], boundary, policy_root)),
+              'timeout': 5, 'statusMessage': f"CER {identity['version']} {label}"}]}
 
 
 def load_config(raw):
@@ -75,12 +91,13 @@ def load_config(raw):
     return doc
 
 
-def owned_manifest(directory):
+def owned_manifest(directory, boundary='writes'):
     raw = read_bytes(directory / 'manifest.json')
     if raw is None:
         return None
     doc = loads(raw)
-    if (not isinstance(doc, dict) or doc.get('owner') != OWNER or doc.get('schema') != 1
+    owner = DISPATCH_OWNER if boundary == 'dispatch' else OWNER
+    if (not isinstance(doc, dict) or doc.get('owner') != owner or doc.get('schema') != 1
             or not isinstance(doc.get('files'), dict) or set(doc['files']) != set(FILES)
             or not isinstance(doc.get('group'), dict)):
         raise ValueError('invalid guard ownership manifest')
@@ -145,11 +162,11 @@ def lock(backups):
         path.unlink(missing_ok=True)
 
 
-def inspect_status(scope='project', project_root=None):
+def inspect_status(scope='project', project_root=None, boundary='writes'):
     """Inspect only this config layer. Do not execute any command found in config."""
-    directory, config, _ = targets(scope, project_root)
+    directory, config, _ = targets(scope, project_root, boundary)
     identity = source_identity(ROOT)
-    result = {'registration_kind': 'standalone-native',
+    result = {'registration_kind': 'standalone-native', 'boundary': boundary,
               'plugin_registration': 'UNKNOWN', 'other_config_layers': 'UNKNOWN','schema': 1, 'router': identity, 'installation_mode': 'policy-only',
               'scope': scope, 'registration_path': str(config), 'guard_directory': str(directory),
               'registration': 'ABSENT', 'registered_version': 'UNKNOWN',
@@ -160,13 +177,17 @@ def inspect_status(scope='project', project_root=None):
               'coverage': {'native_hooked_paths': 'NOT_LIVE_VERIFIED', 'write_stdin': 'UNPROTECTED',
                            'hosted_tools': 'UNPROTECTED', 'specialized_paths': 'UNKNOWN',
                            'other_config_layers': 'UNKNOWN'}}
+    if boundary == 'dispatch':
+        result['coverage'].update(non_dispatch_tools='NOT_TARGETED', code_mode_inner_hooks='UNKNOWN',
+                                  native_dispatch='NOT_LIVE_VERIFIED', application_messages='NOT_LIVE_VERIFIED')
+        result['recipient_identity'] = 'RECORDED_SQLITE_ONLY; not proof of a loaded/live worker'
     try:
         reject_links(directory)
         reject_links(config)
         raw = read_bytes(config)
         result['config_sha256'] = digest(raw)
         doc = load_config(raw)
-        manifest = owned_manifest(directory)
+        manifest = owned_manifest(directory, boundary)
         groups = doc.get('hooks', {}).get('PreToolUse', [])
         result['config_parse'] = 'PASS'
         if not manifest:
@@ -196,8 +217,9 @@ def inspect_status(scope='project', project_root=None):
                 if not result['interpreter_exists']:
                     result['errors'].append('registered Python interpreter is missing')
                 else:
-                    expected = shell_command([interpreter, '-I', '-B', str(directory / FILES[0]),
-                                              '--expected-bundle', manifest.get('guard_sha256', '')])
+                    policy_root, _, _ = resolve_targets(scope, project_root)
+                    expected = shell_command(guard_argv(directory, interpreter,
+                        manifest.get('guard_sha256', ''), boundary, policy_root))
                     handler = manifest['group'].get('hooks', [{}])[0]
                     if handler.get('command') != expected:
                         result['errors'].append('registered command differs from the declared interpreter/scripts')
@@ -213,7 +235,7 @@ def inspect_status(scope='project', project_root=None):
                 result['registration'] = 'BROKEN'
             for index, group in enumerate(groups):
                 if group != manifest['group'] or count > 1:
-                    # Ours is '*': ANY other matcher can overlap; no regex guessing.
+                    # Other matchers may overlap; preserve them without regex guessing.
                     result['overlapping_groups'].append({'index': index, 'matcher': group.get('matcher', '*')})
             if result['overlapping_groups']:
                 result['warnings'].append('overlapping PreToolUse definitions; preserved, not disabled')
@@ -250,22 +272,22 @@ def inspect_status(scope='project', project_root=None):
     return result
 
 
-def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False):
+def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False, boundary='writes'):
     if action not in ('install', 'update', 'remove', 'status', 'doctor'):
         raise ValueError('unknown action')
     if action in ('status', 'doctor'):
-        result = inspect_status(scope, project_root)
+        result = inspect_status(scope, project_root, boundary)
         print('guard registration: ' + result['registration'])
         print('native trust/coverage: UNKNOWN; inspect /hooks and run live canary')
         for message in result['errors'] + result['warnings']:
             print('- ' + message)
         return result
-    directory, config, backups = targets(scope, project_root)
+    directory, config, backups = targets(scope, project_root, boundary)
     for path in (directory, config, backups):
         reject_links(path)
 
     def operation():
-        manifest = owned_manifest(directory)
+        manifest = owned_manifest(directory, boundary)
         raw = read_bytes(config)
         doc = load_config(raw)
         groups = doc.get('hooks', {}).get('PreToolUse', [])
@@ -296,7 +318,8 @@ def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False):
             for name in (*FILES, 'manifest.json'):
                 if (directory / name).exists():
                     raise ValueError(f'unowned guard collision: {name}')
-        group = group_for(directory)
+        policy_root, _, _ = resolve_targets(scope, project_root)
+        group = group_for(directory, boundary, policy_root)
         if not manifest and group in groups:
             raise ValueError('unowned identical registration exists; reconcile before claiming it')
         if manifest:
@@ -305,7 +328,8 @@ def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False):
             groups = [*groups, group]
         doc.setdefault('hooks', {})['PreToolUse'] = groups
         identity = source_identity(ROOT)
-        state = {'owner': OWNER, 'schema': 1, 'version': identity['version'],
+        owner = DISPATCH_OWNER if boundary == 'dispatch' else OWNER
+        state = {'owner': owner, 'schema': 1, 'boundary': boundary, 'version': identity['version'],
                  'base_commit': identity['base_commit'], 'policy_sha256': identity['policy_sha256'],
                  'guard_sha256': identity['guard_sha256'], 'interpreter': str(Path(sys.executable).resolve()),
                  'files': {n: digest(b) for n, b in payload.items()}, 'group': group}
@@ -314,7 +338,9 @@ def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False):
         changes[config] = encode(doc)
         apply(changes, backups, dry_run, expected={config: raw})
         print('Review/trust this exact definition using /hooks. Registration is NOT proof of enforcement.')
-        print('Guard applies to Astra/unknown-model calls in this configuration scope, even without the Skill.')
+        print('Dispatch mode requires the installed current Skill; host identity/coverage remain unverified.'
+              if boundary == 'dispatch' else
+              'Guard applies to Astra/unknown-model calls in this configuration scope, even without the Skill.')
     if dry_run:
         operation()
     else:
@@ -326,6 +352,8 @@ def build_parser():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('action', choices=('install', 'update', 'remove', 'status', 'doctor'))
     p.add_argument('--scope', choices=('user', 'project'), default='project')
+    p.add_argument('--boundary', choices=('writes', 'dispatch'), default='writes',
+                   help='dispatch is an independent narrow registration; does not enable the write Guard')
     p.add_argument('--project-root', type=Path)
     p.add_argument('--dry-run', action='store_true')
     p.add_argument('--json', action='store_true', dest='as_json')
@@ -339,8 +367,10 @@ def main():
     args = build_parser().parse_args()
     try:
         if args.action in ('status', 'doctor'):
-            result = inspect_status(args.scope, args.project_root)
+            result = inspect_status(args.scope, args.project_root, args.boundary)
             if args.canary_report:
+                if args.boundary == 'dispatch':
+                    raise ValueError('write Canary cannot verify dispatch admission; native dispatch acceptance required')
                 from canary import evaluate_saved_report
                 result = evaluate_saved_report(result, loads(args.canary_report.read_bytes()), args.codex_version)
             if args.as_json:
@@ -354,11 +384,11 @@ def main():
         if args.as_json:
             output = io.StringIO()
             with redirect_stdout(output):
-                lifecycle(args.action, args.scope, args.project_root, dry_run=args.dry_run, force=args.force)
+                lifecycle(args.action, args.scope, args.project_root, dry_run=args.dry_run, force=args.force, boundary=args.boundary)
             print(json.dumps({'action': args.action, 'dry_run': args.dry_run, 'status': 'PASS',
                               'operations': output.getvalue().splitlines()}, indent=2))
         else:
-            lifecycle(args.action, args.scope, args.project_root, dry_run=args.dry_run, force=args.force)
+            lifecycle(args.action, args.scope, args.project_root, dry_run=args.dry_run, force=args.force, boundary=args.boundary)
         return 0
     except (ValueError, OSError, TypeError) as exc:
         if args.as_json:

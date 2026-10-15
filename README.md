@@ -226,6 +226,18 @@ installation does not register or trust it.** Registration affects its Codex con
 scope, even outside this Skill, so consent/trust is explicit and project scope is preferred.
 This is not another routing mode. [Guard setup, removal and limits](docs/WRITE-GATE.md).
 
+For recipient-aware task admission alone, use the independent
+`python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT>`
+registration, then review its exact definition in `/hooks`. Remove it with the same
+command using `remove`. This preserves the strict write Guard and other hooks;
+it does not restrict parent Astra shell/patch tools. It checks recorded recipient
+identity using local read-only `~/.codex/state_5.sqlite` and requires current task
+admission, including both Astra reasons on every task and Astra HOLD spawn.
+Recorded DB fields do not prove a worker remains loaded or that a later host
+dispatch preserves identity. Native aliases, application messages, code-mode inner
+hooks, trust and failure/timeout behavior still require real host acceptance.
+See [dispatch setup and exact HOLD protocol](docs/INSTALL.md#optional-native-dispatch-admission).
+
 ## One install, capability-aware execution
 
 After deciding capability and delegation benefit, the parent uses actual native schemas, loaded roles and supported model/effort pairs:

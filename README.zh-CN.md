@@ -198,6 +198,8 @@ Git 工作区可按下方命令快进更新，并记录实际 commit。下载 ZI
 
 Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Codex 原生同步 PreToolUse 门禁，拦截已覆盖路径上的直接写入，并提供受限只读读取方式。**门禁必须显式注册并在 `/hooks` 中信任；普通 Skill 安装不改共享 hooks.json，也不等于硬拦截已生效。** 这是一项作用于配置范围的权限保护，不是又一个路由模式。优先按项目一次安装，详见[写入门禁、安装/卸载与验收](docs/WRITE-GATE.md)。
 
+仅需要任务准入时，可独立注册：`python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT>`，随后在 `/hooks` 审阅并信任这个确切定义。卸载使用同一命令并将 `install` 换成 `remove`。它保留 strict 写入 Guard 和其他 hooks，不限制父 Astra 的 shell/patch 工具；通过本地只读 `~/.codex/state_5.sqlite` 检查接收者记录，每条 Astra 任务及 Astra HOLD 创建都重新要求双理由。数据库字段不能证明子任务仍已加载，也不能证明后续宿主派发仍保持该身份。原生别名、应用消息、code-mode 内层 hook、信任和异常/超时行为均需真实宿主验收。详见[独立任务准入及固定 HOLD 协议](docs/INSTALL.md#optional-native-dispatch-admission)。
+
 ## 一次安装，运行时自动适配
 
 父 Agent 先判断必要能力和委派收益，再依据实际工具、已加载角色和支持的模型/档位选择：
