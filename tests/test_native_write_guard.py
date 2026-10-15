@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import base64
 import os
 from pathlib import Path
+import re
 import runpy
 import shlex
 import shutil
@@ -160,6 +161,67 @@ class NativeDispatchTests(unittest.TestCase):
         self.assertEqual(self.hook(name=name, data=data), {})
         for override in ({'model': 'gpt-6-astra'}, {'thinking': 'ultra'}):
             self.denied(self.hook(name=name, data=dict(data, **override)))
+
+    def test_observed_concatenated_followup_alias_checks_current_admission(self):
+        name = 'collaborationfollowup_task'
+        admitted = self.text(self.request('astra', 'gpt-6-astra'))
+        for label, message in (('unadmitted', 'new engineering work'),
+                               ('stale-body', admitted + '\nadditional work'), ('continue', 'continue')):
+            with self.subTest(case=label):
+                result = self.hook(name=name, data={'target': 'astra', 'message': message})
+                self.assertEqual(result.get('hookSpecificOutput', {}).get('permissionDecision'), 'deny')
+        self.assertIsNotNone(re.fullmatch(MODULE['DISPATCH_MATCHER'], name))
+        self.assertEqual(MODULE['DISPATCH_ALIASES'][name], 'followup_task')
+        self.assertEqual(self.hook(name=name, data={'target': 'sol', 'message': self.text(self.request())}), {})
+
+    def test_observed_concatenated_spawn_alias_preserves_hold_admission(self):
+        name = 'collaborationspawn_agent'
+        admitted = self.text(self.request('unbound-spawn', 'gpt-6-astra', MODULE['HOLD_MESSAGE']))
+        for label, message in (('unadmitted', MODULE['HOLD_MESSAGE']),
+                               ('stale-body', admitted + '\nadditional work'), ('continue', 'continue')):
+            with self.subTest(case=label):
+                result = self.hook(name=name, data={'agent_type': 'astra_architect',
+                                   'fork_context': False, 'message': message})
+                self.assertEqual(result.get('hookSpecificOutput', {}).get('permissionDecision'), 'deny')
+        self.assertIsNotNone(re.fullmatch(MODULE['DISPATCH_MATCHER'], name))
+        self.assertEqual(MODULE['DISPATCH_ALIASES'][name], 'spawn_agent')
+        valid = self.text(self.request('unbound-spawn', 'gpt-6.1-sol', MODULE['HOLD_MESSAGE']))
+        self.assertEqual(self.hook(name=name, data={'agent_type': 'sol61_engineer',
+                         'fork_context': False, 'message': valid}), {})
+
+    def test_complete_finite_concatenated_dispatch_family_is_exactly_mapped(self):
+        expected = {'collaborationfollowup_task': 'followup_task', 'collaborationspawn_agent': 'spawn_agent',
+                    'collaborationsend_input': 'send_input', 'collaborationsend_message': 'send_message',
+                    'collaborationresume_agent': 'resume_agent'}
+        self.assertEqual(set(expected.values()), MODULE['DISPATCH_TOOLS'])
+        for name, canonical in expected.items():
+            with self.subTest(name=name):
+                self.assertIsNotNone(re.fullmatch(MODULE['DISPATCH_MATCHER'], name))
+                self.assertEqual(MODULE['DISPATCH_ALIASES'].get(name), canonical)
+
+    def test_concatenated_send_family_requires_current_admission_for_work_and_controls(self):
+        admitted = self.text(self.request('astra', 'gpt-6-astra'))
+        for name, key in (('collaborationsend_input', 'id'), ('collaborationsend_message', 'target')):
+            for label, message in (('unadmitted', 'new engineering work'),
+                                   ('stale-body', admitted + '\nadditional work'), ('continue', 'continue')):
+                with self.subTest(name=name, case=label):
+                    result = self.hook(name=name, data={key: 'astra', 'message': message})
+                    self.assertEqual(result.get('hookSpecificOutput', {}).get('permissionDecision'), 'deny')
+            for message in ('Review the owned source unit', 'continue'):
+                valid = self.text(self.request(message=message))
+                self.assertEqual(self.hook(name=name, data={key: 'sol', 'message': valid}), {})
+
+    def test_concatenated_resume_is_denied_for_astra_and_sol61(self):
+        for target in ('astra', 'sol'):
+            with self.subTest(target=target):
+                result = self.hook(name='collaborationresume_agent', data={'id': target})
+                self.assertEqual(result.get('hookSpecificOutput', {}).get('permissionDecision'), 'deny')
+
+    def test_concatenated_dispatch_aliases_do_not_broaden_non_dispatch_matching(self):
+        for name in ('collaborationwait_agent', 'collaborationinterrupt_agent', 'exec_command', 'apply_patch',
+                     'collaborationsend_message_other', 'collaborationspawn_agent_extra'):
+            self.assertIsNone(re.fullmatch(MODULE['DISPATCH_MATCHER'], name))
+            self.assertEqual(self.hook(name=name, data={'command': 'owned parent action'}), {})
 
     def test_spawn_hold_requires_astra_current_admission_and_rejects_work(self):
         data = {'agent_type': 'sol61_engineer', 'fork_turns': 'none', 'message': MODULE['HOLD_MESSAGE']}

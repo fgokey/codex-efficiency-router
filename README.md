@@ -6,6 +6,8 @@
 
 ## v0.8.5: explicit dispatch and bounded evidence
 
+An optional [pinned native host patch](docs/INSTALL.md#pinned-host-compatibility-patch) handles encrypted collaboration arguments through a separate plaintext admission entry. Native Windows tests cover Sol61/high success and denial of unadmitted/stale/continue/raw Astra reuse. It requires a matching host build, trusted hook and explicit activation; ordinary Skill installation alone does not enable it or change the parent model.
+
 Canonical `spawn_agent` preflight rejects unbound default/inherit, missing effort and inherited history before executor/coordination passthrough. Fixed roles and explicit exact model/effort pins remain valid; native host binding and user authority still need independent checks. The `Agent` parameter shape is unverified. This check only runs where the native Hook is registered; local tests do not prove host enforcement.
 
 Legacy reader `read/search/list/diff/status` CLI responses now page selected text within 4096 bytes including JSON, cursor and CRLF. Encoded small results retain their text format; large ones return a JSON page. Continue with the same request plus `cursor`; oversized batches fail and must be split. Git captures at most 128 KiB and reports PARTIAL even after the captured prefix is exhausted. File-read limits remain 16 MiB. Other tools need their own capture/projection budget.

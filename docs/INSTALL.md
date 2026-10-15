@@ -18,6 +18,20 @@ Receipts reference caller-supplied observed evidence; they are not signatures or
 
 ## Optional native dispatch admission
 
+### Pinned host compatibility patch
+
+[`host/required-agent-admission.patch`](../host/required-agent-admission.patch) targets the upstream [Codex source at `740e5af33c71225640e0c1c1555c514c2c93ab74`](https://github.com/openai/codex/tree/740e5af33c71225640e0c1c1555c514c2c93ab74) (Apache-2.0). It is an opt-in host change, not part of ordinary Skill installation. Do not apply it to an unverified host revision or replace a running official binary.
+
+The provider-reserved collaboration arguments can arrive encrypted. The patch leaves those schemas intact and adds the plaintext native `admitted_agent_task` entry. Exact task text is consequently visible to the local admission hook and normal tool transcript. With `agent_admission_hook` configured, raw native dispatch is blocked; only the new entry can submit work after the designated trusted synchronous hook succeeds. Missing/untrusted/asynchronous hooks, errors, malformed output and input rewrites fail closed. Empty stdout with exit 0 remains the hook's documented success contract. This does not authenticate caller-supplied complexity claims: the parent still owns that judgment.
+
+Use `operation=spawn_hold` with explicit role and the fixed HOLD body, verify the new native identity, then `operation=assign` with `target` and the exact fresh Reader assignment in `body`. `model` and `reasoning_effort` default to `gpt-6.1-sol` and `high`; Astra requires explicit values plus its current admission reasons. Role resolution must preserve the admitted identity. Assignment checks the loaded direct child's owner/model/effort immediately before submission and never reloads an unloaded child. Wait/interrupt/close remain separate controls.
+
+Build in an isolated checkout at the exact base: `git apply --check <PATCH>` then `git apply <PATCH>`, and run `cargo build -p codex-cli --bin codex` in `codex-rs`. Windows database migration source line endings must match the existing host's embedded checksums (the tested Windows build uses CRLF); never alter the user's database checksums to force startup. Retain matching auxiliary executables from the same host release beside the candidate. An installed desktop version that supports `CODEX_CLI_PATH` can select that side-by-side CLI on its next launch.
+
+After installing and trusting the dispatch hook below, obtain its current `displayOrder` and `sourcePath` from native `hooks/list`. Set the top-level `agent_admission_hook` to `pre-tool-use:<displayOrder>:<sourcePath>`; do not copy another machine's order/path or include a tool call suffix. This pins a specific hook registration. A changed registration requires rechecking the setting; it must not silently fall back to an arbitrary hook. Preserve existing parent model settings and trust hashes. To roll back, remove only this new setting and restore the previous `CODEX_CLI_PATH`, then restart the desktop; ordinary Skill/guard removal remains separate.
+
+Native Windows acceptance on 2026-10-15, in an isolated app-server from this patch: observed Sol61/high creation and completed task; admitted Astra/high control task completed; unadmitted new work, old receipt with changed body, bare `继续`, and raw native `followup_task` each returned explicit denial with zero new Astra turns. Parent remained Astra/high. This proves these candidate-host paths, not automatic adoption by an already-running desktop, arbitrary application connectors, other platforms, token savings, or business-task completion.
+
 Use a verified Python 3.11+ interpreter and an explicit existing project root:
 
 ```text
@@ -30,6 +44,8 @@ python -B scripts/write_guard.py remove --boundary dispatch --scope project --pr
 Install the matching complete Skill in the same scope first. The independent owner is `cer-native-dispatch-guard`; `--boundary writes` remains the separate strict Astra write Guard. Dispatch registration preserves that Guard and all other hook groups, including r2c. It never changes parent model settings or writes trust hashes. Review/trust this exact new command in `/hooks`; registration is not enforcement. Updates, collision checks, owned customization backups, rollback and removal use the existing lifecycle safeguards. A saved write-Guard Canary cannot verify this different boundary.
 
 The narrow matcher covers explicit native `spawn_agent`, `Agent`, `resume_agent`, `send_input`, `followup_task`, `send_message`, their listed `collaboration`/`functions` aliases, and listed `send_message_to_thread` application aliases. Unknown Agent schemas and extra message carriers such as `items`/`input_items` are denied. Application messages cannot switch the recorded recipient model/effort or route to an unverified remote host. All native resume aliases are denied. Non-dispatch tools, including parent Astra shell, patches and tests, are not targeted by this mode.
+
+The concatenated native `collaboration` namespace is explicitly enumerated for the finite dispatch family: `collaborationfollowup_task`, `collaborationspawn_agent`, `collaborationsend_input`, `collaborationsend_message`, and `collaborationresume_agent`. They use the same admission checks. This does not use a wildcard or establish real hook payload encoding/coverage; those still require native acceptance.
 
 Spawn must use explicit role/effort and the observed `fork_turns=none` or native `fork_context=false` form. Conflicting flags, inheritance and unknown shapes are denied. Its only permitted body is exactly:
 

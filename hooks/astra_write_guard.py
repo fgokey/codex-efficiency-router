@@ -31,6 +31,11 @@ ASSIGNMENT_PREFIX = 'CER assignment (caller evidence): '
 DISPATCH_TOOLS = frozenset(('spawn_agent', 'resume_agent', 'send_input', 'followup_task', 'send_message'))
 DISPATCH_ALIASES = {name: name for name in DISPATCH_TOOLS}
 DISPATCH_ALIASES.update({f'collaboration.{name}': name for name in DISPATCH_TOOLS})
+DISPATCH_ALIASES.update({'collaborationfollowup_task': 'followup_task',
+                         'collaborationspawn_agent': 'spawn_agent',
+                         'collaborationsend_input': 'send_input',
+                         'collaborationsend_message': 'send_message',
+                         'collaborationresume_agent': 'resume_agent'})
 DISPATCH_ALIASES.update({f'functions.{name}': name for name in DISPATCH_TOOLS})
 DISPATCH_ALIASES.update({name: 'spawn_agent' for name in ('Agent', 'collaboration.Agent', 'functions.Agent')})
 DISPATCH_ALIASES.update({name: 'send_message_to_thread' for name in (

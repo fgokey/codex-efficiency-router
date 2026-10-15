@@ -1,5 +1,7 @@
 # Codex Efficiency Router
 
+可选的[固定版本宿主补丁](docs/INSTALL.md#pinned-host-compatibility-patch)用独立明文准入入口处理原生协作参数加密的问题。Windows 原生实测已覆盖 Sol61/high 正常完成，以及 Astra 无准入、旧凭据改正文、裸“继续”和原生复用入口被拒绝。需要匹配版本的宿主、已信任 Hook 和明确启用；普通 Skill 安装不会自动启用，也不改变父模型。回滚只移除新增宿主设置、恢复原 `CODEX_CLI_PATH` 并重启，Skill/Hook 的卸载独立处理。
+
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
 **v0.8.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**

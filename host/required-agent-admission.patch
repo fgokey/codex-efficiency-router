@@ -1,0 +1,897 @@
+diff --git a/codex-rs/config/src/config_toml.rs b/codex-rs/config/src/config_toml.rs
+index 3e5cc07..da6bd15 100644
+--- a/codex-rs/config/src/config_toml.rs
++++ b/codex-rs/config/src/config_toml.rs
+@@ -166,6 +166,8 @@ pub struct FeatureToggleToml {
+ pub struct ConfigToml {
+     /// Optional override of model selection.
+     pub model: Option<String>,
++    /// Trusted synchronous PreToolUse handler ID required for agent dispatch.
++    pub agent_admission_hook: Option<String>,
+     /// Default Daybreak preference for new threads and non-interactive turns.
+     pub daybreak: Option<bool>,
+     /// Review model override used by the `/review` feature.
+diff --git a/codex-rs/core/config.schema.json b/codex-rs/core/config.schema.json
+index f22c202..4a9056c 100644
+--- a/codex-rs/core/config.schema.json
++++ b/codex-rs/core/config.schema.json
+@@ -6725,6 +6725,10 @@
+   },
+   "description": "Base config deserialized from ~/.codex/config.toml.",
+   "properties": {
++    "agent_admission_hook": {
++      "description": "Trusted synchronous PreToolUse handler ID required for agent dispatch.",
++      "type": "string"
++    },
+     "agents": {
+       "allOf": [
+         {
+diff --git a/codex-rs/core/src/agent/api.rs b/codex-rs/core/src/agent/api.rs
+index d9c8948..5c48ceb 100644
+--- a/codex-rs/core/src/agent/api.rs
++++ b/codex-rs/core/src/agent/api.rs
+@@ -214,6 +214,8 @@ pub struct SpawnRequest {
+ }
+
+ pub struct SendRequest {
++    /// Admission-bound identity. Such sends may not reload a recipient or cross owners.
++    pub admitted_identity: Option<(String, codex_protocol::openai_models::ReasoningEffort)>,
+     pub caller: ThreadId,
+     pub target: AgentTarget,
+     /// Captured caller settings used if the recipient must be restored.
+diff --git a/codex-rs/core/src/agent/control.rs b/codex-rs/core/src/agent/control.rs
+index 9526320..e7b2db2 100644
+--- a/codex-rs/core/src/agent/control.rs
++++ b/codex-rs/core/src/agent/control.rs
+@@ -263,6 +263,9 @@ impl LocalAgentControl {
+         {
+             // Keep unloaded delivery atomic with publication of a reloaded session.
+             let threads = state.threads.read().await;
++            if context.admitted_identity.is_some() && !threads.contains_key(&agent_id) {
++                return Err(CodexErr::ThreadNotFound(agent_id));
++            }
+             if !communication.trigger_turn && !threads.contains_key(&agent_id) {
+                 let _membership = self.runtime.admit_start()?;
+                 self.runtime.ensure_agent_known(agent_id)?;
+@@ -297,7 +300,7 @@ impl LocalAgentControl {
+                 agent_id,
+                 state,
+                 state
+-                    .send_op(
++                    .send_op_admitted(
+                         agent_id,
+                         Op::InterAgentCommunication {
+                             communication,
+@@ -305,6 +308,10 @@ impl LocalAgentControl {
+                         },
+                         parent_turn_id,
+                         root_turn_id,
++                        context
++                            .admitted_identity
++                            .as_ref()
++                            .map(|identity| (context.sender_thread_id(), identity)),
+                     )
+                     .await,
+             )
+diff --git a/codex-rs/core/src/agent/control/api.rs b/codex-rs/core/src/agent/control/api.rs
+index ef0a699..2a015f1 100644
+--- a/codex-rs/core/src/agent/control/api.rs
++++ b/codex-rs/core/src/agent/control/api.rs
+@@ -100,6 +100,7 @@ impl AgentControl for LocalAgentControl {
+     fn send(&self, request: SendRequest) -> BoxFuture<'_, Result<DeliveryReceipt>> {
+         Box::pin(async move {
+             let SendRequest {
++                admitted_identity,
+                 caller,
+                 target,
+                 resume_config,
+@@ -140,9 +141,10 @@ impl AgentControl for LocalAgentControl {
+                     // locally evicted recipients can retain mail without reloading.
+                     // Loaded recipients go straight to delivery, which rejects sends
+                     // racing an in-progress eviction when it acquires the residency pin.
+-                    if mode == MessageDeliveryMode::TriggerTurn
+-                        || (self.runtime.upgrade()?.get_thread(target).await.is_err()
+-                            && self.runtime.registry.evicted_environments(target).is_none())
++                    if admitted_identity.is_none()
++                        && (mode == MessageDeliveryMode::TriggerTurn
++                            || (self.runtime.upgrade()?.get_thread(target).await.is_err()
++                                && self.runtime.registry.evicted_environments(target).is_none()))
+                     {
+                         self.ensure_v2_agent_loaded(resume_config, target, /*parent*/ None)
+                             .await?;
+@@ -159,7 +161,8 @@ impl AgentControl for LocalAgentControl {
+                         .send_inter_agent_communication(
+                             target,
+                             communication,
+-                            AgentCommunicationContext::new(kind, caller),
++                            AgentCommunicationContext::new(kind, caller)
++                                .with_admitted_identity(admitted_identity),
+                             start_options,
+                         )
+                         .await?;
+diff --git a/codex-rs/core/src/agent/control_tests.rs b/codex-rs/core/src/agent/control_tests.rs
+index efe6299..a6df6c2 100644
+--- a/codex-rs/core/src/agent/control_tests.rs
++++ b/codex-rs/core/src/agent/control_tests.rs
+@@ -1566,6 +1566,7 @@ async fn cold_resume_with_thread_instructions_preserves_lazy_v2_child_inheritanc
+             .services
+             .agent_control
+             .send(crate::SendRequest {
++                admitted_identity: None,
+                 caller: parent_thread_id,
+                 target: crate::AgentTarget::Id(target_thread_id),
+                 resume_config: crate::agent::child_config::build_agent_resume_config(&turn)
+@@ -1715,6 +1716,7 @@ async fn v2_reload_preserves_shared_instructions_after_root_unloads(
+         .services
+         .agent_control
+         .send(crate::SendRequest {
++            admitted_identity: None,
+             caller: sender_id,
+             target: crate::AgentTarget::Id(target_id),
+             resume_config: crate::agent::child_config::build_agent_resume_config(&sender_turn)
+@@ -5453,3 +5455,64 @@ async fn resume_agent_from_rollout_skips_descendants_when_parent_resume_fails()
+         .await
+         .expect("tree shutdown after partial subtree resume should succeed");
+ }
++
++#[tokio::test]
++async fn admitted_send_checks_live_identity_owner_and_never_reloads() {
++    use codex_protocol::openai_models::ReasoningEffort;
++    let (home, mut config) = test_config().await;
++    let _ = config.features.enable(Feature::MultiAgentV2);
++    config.model = Some("gpt-6.1-sol".to_string());
++    config.model_reasoning_effort = Some(ReasoningEffort::High);
++    let harness = AgentControlHarness::new_with_config(home, config).await;
++    let (parent_id, parent) = harness.start_thread().await;
++    let control = parent
++        .session
++        .services
++        .local_agent_runtime
++        .control(parent.session.session_id());
++    let child =
++        spawn_v2_reload_test_child(&control, harness.config.clone(), &parent, "admitted").await;
++    let make_request = |caller, model: &str, effort| crate::SendRequest {
++        admitted_identity: Some((model.to_string(), effort)),
++        caller,
++        target: crate::AgentTarget::Id(child.thread_id),
++        resume_config: harness.config.clone(),
++        input: AgentInput::Message {
++            message: AgentMessage::Plaintext("checked body".to_string()),
++            mode: MessageDeliveryMode::QueueOnly,
++        },
++        start_options: Default::default(),
++    };
++    for request in [
++        make_request(parent_id, "gpt-6-astra", ReasoningEffort::High),
++        make_request(parent_id, "gpt-6.1-sol", ReasoningEffort::Low),
++        make_request(child.thread_id, "gpt-6.1-sol", ReasoningEffort::High),
++    ] {
++        assert!(control.send(request).await.is_err());
++    }
++    control
++        .send(make_request(
++            parent_id,
++            "gpt-6.1-sol",
++            ReasoningEffort::High,
++        ))
++        .await
++        .expect("live exact recipient accepted");
++    let thread = harness
++        .manager
++        .remove_thread(&child.thread_id)
++        .await
++        .expect("remove child");
++    thread.shutdown_and_wait().await.expect("shutdown child");
++    assert!(
++        control
++            .send(make_request(
++                parent_id,
++                "gpt-6.1-sol",
++                ReasoningEffort::High
++            ))
++            .await
++            .is_err()
++    );
++    assert_thread_not_loaded(&harness.manager, child.thread_id).await;
++}
+diff --git a/codex-rs/core/src/agent_communication.rs b/codex-rs/core/src/agent_communication.rs
+index 9925d61..e0a245e 100644
+--- a/codex-rs/core/src/agent_communication.rs
++++ b/codex-rs/core/src/agent_communication.rs
+@@ -29,13 +29,27 @@ impl AgentCommunicationKind {
+ pub(crate) struct AgentCommunicationContext {
+     kind: AgentCommunicationKind,
+     sender_thread_id: ThreadId,
++    pub(crate) admitted_identity: Option<(String, codex_protocol::openai_models::ReasoningEffort)>,
+ }
+
+ impl AgentCommunicationContext {
++    pub(crate) fn with_admitted_identity(
++        mut self,
++        identity: Option<(String, codex_protocol::openai_models::ReasoningEffort)>,
++    ) -> Self {
++        self.admitted_identity = identity;
++        self
++    }
++
++    pub(crate) fn sender_thread_id(&self) -> ThreadId {
++        self.sender_thread_id
++    }
++
+     pub(crate) fn new(kind: AgentCommunicationKind, sender_thread_id: ThreadId) -> Self {
+         Self {
+             kind,
+             sender_thread_id,
++            admitted_identity: None,
+         }
+     }
+ }
+diff --git a/codex-rs/core/src/config/mod.rs b/codex-rs/core/src/config/mod.rs
+index 4259308..452a0b9 100644
+--- a/codex-rs/core/src/config/mod.rs
++++ b/codex-rs/core/src/config/mod.rs
+@@ -1110,6 +1110,7 @@ pub struct Config {
+
+     /// Settings specific to the task-path-based multi-agent tool surface.
+     pub multi_agent_v2: MultiAgentV2Config,
++    pub agent_admission_hook: Option<String>,
+
+     /// Context-window token budget configuration, when enabled.
+     pub token_budget: Option<TokenBudgetConfig>,
+@@ -4482,6 +4483,7 @@ impl Config {
+             thread_unload_delay,
+             ghost_snapshot,
+             multi_agent_v2,
++            agent_admission_hook: cfg.agent_admission_hook.clone(),
+             token_budget,
+             token_budget_startup_config: None,
+             rollout_budget,
+diff --git a/codex-rs/core/src/hook_runtime.rs b/codex-rs/core/src/hook_runtime.rs
+index 30c4162..1c971be 100644
+--- a/codex-rs/core/src/hook_runtime.rs
++++ b/codex-rs/core/src/hook_runtime.rs
+@@ -180,6 +180,27 @@ pub(crate) async fn run_pending_session_start_hooks(
+     false
+ }
+
++fn is_agent_dispatch(name: &str) -> bool {
++    let name = name.strip_prefix("functions.").unwrap_or(name);
++    let name = name
++        .strip_prefix("collaboration.")
++        .or_else(|| name.strip_prefix("collaboration"))
++        .or_else(|| name.strip_prefix("multi_agent_v1."))
++        .unwrap_or(name);
++    matches!(
++        name,
++        "spawn_agent"
++            | "Agent"
++            | "send_message"
++            | "send_input"
++            | "followup_task"
++            | "resume_agent"
++            | "send_message_to_thread"
++            | "mcp__codex_app__send_message_to_thread"
++            | "mcp__codex_app.send_message_to_thread"
++    )
++}
++
+ /// Runs matching `PreToolUse` hooks before a tool executes.
+ ///
+ /// `tool_name` is the canonical name serialized to hook stdin. Matcher aliases
+@@ -191,6 +212,7 @@ pub(crate) async fn run_pre_tool_use_hooks(
+     tool_use_id: String,
+     tool_name: &HookToolName,
+     tool_input: &Value,
++    admitted_dispatch: bool,
+ ) -> PreToolUseHookResult {
+     let turn_context = &step_context.turn;
+     let request = PreToolUseRequest {
+@@ -207,18 +229,56 @@ pub(crate) async fn run_pre_tool_use_hooks(
+         tool_input: tool_input.clone(),
+     };
+     let hooks = sess.hooks();
++    let required_hook = turn_context
++        .config
++        .agent_admission_hook
++        .as_deref()
++        .filter(|_| is_agent_dispatch(tool_name.name()));
++    if required_hook.is_some() && !admitted_dispatch {
++        return PreToolUseHookResult::Blocked(
++            "Agent dispatch requires admitted_agent_task; raw native dispatch cannot bypass admission".to_string(),
++        );
++    }
++    let required_run = required_hook.map(|id| format!("{id}:{}", request.tool_use_id));
+     let preview_runs = hooks.preview_pre_tool_use(&request);
++    if let Some(id) = required_run.as_deref() {
++        let matches: Vec<_> = preview_runs.iter().filter(|run| run.id == id).collect();
++        if turn_context.config.bypass_hook_trust
++            || matches.len() != 1
++            || matches[0].execution_mode != codex_protocol::protocol::HookExecutionMode::Sync
++        {
++            return PreToolUseHookResult::Blocked(
++                "Required trusted synchronous agent admission hook is unavailable".to_string(),
++            );
++        }
++    }
+     emit_hook_started_events(sess, turn_context, preview_runs).await;
+
+     let PreToolUseOutcome {
++        successful_runs,
+         hook_events,
+         should_block,
+         block_reason,
+         additional_contexts,
+         updated_input,
+     } = hooks.run_pre_tool_use(request).await;
++    let required_failed = required_run.as_deref().is_some_and(|id| {
++        let matches: Vec<_> = hook_events
++            .iter()
++            .filter(|event| event.run.id == id)
++            .collect();
++        !successful_runs.iter().any(|allowed| allowed == id)
++            || matches.len() != 1
++            || matches[0].run.status != codex_protocol::protocol::HookRunStatus::Completed
++            || updated_input.is_some()
++    });
+     emit_hook_completed_events(sess, turn_context, hook_events).await;
+     record_additional_contexts(sess, turn_context, additional_contexts).await;
++    if required_failed || (required_run.is_some() && should_block) {
++        return PreToolUseHookResult::Blocked(block_reason.unwrap_or_else(|| {
++            "Required agent admission failed or attempted to rewrite the checked task".to_string()
++        }));
++    }
+
+     if !should_block {
+         return PreToolUseHookResult::Continue { updated_input };
+@@ -1101,6 +1161,22 @@ mod tests {
+     use codex_utils_absolute_path::test_support::PathBufExt;
+     use codex_utils_absolute_path::test_support::test_path_buf;
+
++    #[test]
++    fn required_admission_covers_native_dispatch_aliases_only() {
++        for name in [
++            "spawn_agent",
++            "collaboration.followup_task",
++            "collaborationsend_message",
++            "functions.send_input",
++            "multi_agent_v1.resume_agent",
++            "mcp__codex_app__send_message_to_thread",
++        ] {
++            assert!(super::is_agent_dispatch(name), "{name}");
++        }
++        assert!(!super::is_agent_dispatch("collaboration.wait_agent"));
++        assert!(!super::is_agent_dispatch("my_spawn_agent"));
++    }
++
+     #[test]
+     fn additional_context_messages_stay_separate_and_ordered() {
+         let messages = additional_context_messages(vec![
+diff --git a/codex-rs/core/src/thread_manager.rs b/codex-rs/core/src/thread_manager.rs
+index 770a19d..badd250 100644
+--- a/codex-rs/core/src/thread_manager.rs
++++ b/codex-rs/core/src/thread_manager.rs
+@@ -1749,6 +1749,21 @@ impl ThreadManagerState {
+         op: Op,
+         parent_turn_id: Option<String>,
+         root_turn_id: Option<String>,
++    ) -> CodexResult<String> {
++        self.send_op_admitted(thread_id, op, parent_turn_id, root_turn_id, None)
++            .await
++    }
++
++    pub(crate) async fn send_op_admitted(
++        &self,
++        thread_id: ThreadId,
++        op: Op,
++        parent_turn_id: Option<String>,
++        root_turn_id: Option<String>,
++        admitted_identity: Option<(
++            ThreadId,
++            &(String, codex_protocol::openai_models::ReasoningEffort),
++        )>,
+     ) -> CodexResult<String> {
+         let thread = self.get_thread(thread_id).await?;
+         let residency_guard = if matches!(op, Op::InterAgentCommunication { .. }) {
+@@ -1761,6 +1776,17 @@ impl ThreadManagerState {
+         } else {
+             None
+         };
++        if let Some((caller, (model, effort))) = admitted_identity {
++            let config = thread.config_snapshot().await;
++            if config.parent_thread_id != Some(caller)
++                || config.model != *model
++                || config.reasoning_effort.as_ref() != Some(effort)
++            {
++                return Err(CodexErr::UnsupportedOperation(
++                    "Recipient identity or owner differs from the admitted task".to_string(),
++                ));
++            }
++        }
+         if let Some(ops_log) = &self.ops_log
+             && let Ok(mut log) = ops_log.lock()
+             && let Some(captured_op) = capture_test_op(&op)
+diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2.rs
+index ea44c0a..75d5718 100644
+--- a/codex-rs/core/src/tools/handlers/multi_agents_v2.rs
++++ b/codex-rs/core/src/tools/handlers/multi_agents_v2.rs
+@@ -32,6 +32,8 @@ pub(crate) use send_message::Handler as SendMessageHandler;
+ pub(crate) use spawn::Handler as SpawnAgentHandler;
+ pub(crate) use wait::Handler as WaitAgentHandler;
+
++pub(crate) use admitted_task::Handler as AdmittedTaskHandler;
++mod admitted_task;
+ mod analytics;
+ mod followup_task;
+ mod interrupt_agent;
+diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
+new file mode 100644
+index 0000000..eca76d6
+--- /dev/null
++++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
+@@ -0,0 +1,199 @@
++//! Plaintext task admission followed by native agent control, without a client-side broker.
++use super::*;
++use crate::agent::agent_resolver::resolve_agent_target;
++use crate::agent::api::{AgentInput, AgentTarget, SendRequest};
++use crate::agent::child_config::build_agent_resume_config;
++use crate::agent::types::MessageDeliveryMode;
++use crate::hook_runtime::{PreToolUseHookResult, run_pre_tool_use_hooks};
++use crate::tools::context::{FunctionToolOutput, ToolCallSource};
++use crate::tools::hook_names::HookToolName;
++use crate::tools::registry::PreToolUsePayload;
++use codex_protocol::turn_input::TurnStartOptions;
++use codex_tools::{JsonSchema, ResponsesApiTool, ToolSpec};
++use serde_json::json;
++use std::collections::BTreeMap;
++
++pub(crate) struct Handler;
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct Args {
++    operation: String,
++    body: String,
++    task_name: Option<String>,
++    target: Option<String>,
++    agent_type: Option<String>,
++    model: Option<String>,
++    reasoning_effort: Option<ReasoningEffort>,
++}
++
++impl ToolExecutor<ToolInvocation> for Handler {
++    fn tool_name(&self) -> ToolName {
++        ToolName::plain("admitted_agent_task")
++    }
++
++    fn spec(&self) -> ToolSpec {
++        let fields = [
++            (
++                "operation",
++                "spawn_hold or assign; every call requires the configured trusted admission hook",
++            ),
++            (
++                "body",
++                "Exact plaintext task and admission envelope; spawn_hold permits only the policy HOLD handshake",
++            ),
++            ("task_name", "New child task name; only for spawn_hold"),
++            (
++                "target",
++                "Existing direct child id or task name; only for assign; no reload",
++            ),
++            (
++                "agent_type",
++                "Explicit role for spawn_hold; omit for assign",
++            ),
++            ("model", "Explicit admitted model; defaults to gpt-6.1-sol"),
++            (
++                "reasoning_effort",
++                "Admitted reasoning effort; defaults to high",
++            ),
++        ];
++        ToolSpec::Function(ResponsesApiTool {
++            name: "admitted_agent_task".to_string(),
++            description: "Submit an exact plaintext task to mandatory trusted admission, then dispatch through native agent control. First spawn_hold, verify identity, then assign a freshly admitted task. Ordinary engineering and review default to gpt-6.1-sol/high. This does not change the parent model or weaken existing native collaboration hooks.".to_string(),
++            strict: false,
++            defer_loading: None,
++            parameters: JsonSchema::object(
++                fields.into_iter().map(|(key, desc)| (key.to_string(), JsonSchema::string(Some(desc.to_string())))).collect::<BTreeMap<_, _>>(),
++                Some(vec!["operation".to_string(), "body".to_string()]), Some(false.into())),
++            output_schema: None,
++        })
++    }
++
++    fn handle<'a>(&'a self, mut invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        Box::pin(async move {
++            if invocation
++                .turn
++                .config
++                .agent_admission_hook
++                .as_deref()
++                .is_none_or(str::is_empty)
++            {
++                return Err(FunctionCallError::RespondToModel(
++                    "Required agent admission hook is not configured".to_string(),
++                ));
++            }
++            let args: Args = parse_arguments(&function_arguments(invocation.payload.clone())?)?;
++            let model = args.model.unwrap_or_else(|| "gpt-6.1-sol".to_string());
++            let effort = args.reasoning_effort.unwrap_or(ReasoningEffort::High);
++            let (tool, input, recipient) = match args.operation.as_str() {
++                "spawn_hold"
++                    if args.target.is_none()
++                        && args.task_name.is_some()
++                        && args.agent_type.is_some() =>
++                {
++                    (
++                        HookToolName::spawn_agent(),
++                        json!({"message": args.body, "task_name": args.task_name,
++                        "agent_type": args.agent_type, "model": model,
++                        "reasoning_effort": effort, "fork_turns": "none"}),
++                        None,
++                    )
++                }
++                "assign"
++                    if args.target.is_some()
++                        && args.task_name.is_none()
++                        && args.agent_type.is_none() =>
++                {
++                    let id = resolve_agent_target(
++                        &invocation.session,
++                        &invocation.turn,
++                        args.target.as_deref().unwrap(),
++                    )
++                    .await?;
++                    (
++                        HookToolName::new("followup_task"),
++                        json!({"target": id.to_string(), "message": args.body}),
++                        Some(id),
++                    )
++                }
++                _ => {
++                    return Err(FunctionCallError::RespondToModel(
++                        "Invalid admitted task operation or operation-specific fields".to_string(),
++                    ));
++                }
++            };
++            match run_pre_tool_use_hooks(
++                &invocation.session,
++                &invocation.step_context,
++                invocation.call_id.clone(),
++                &tool,
++                &input,
++                /*admitted_dispatch*/ true,
++            )
++            .await
++            {
++                PreToolUseHookResult::Continue {
++                    updated_input: None,
++                } => {}
++                PreToolUseHookResult::Blocked(reason) => {
++                    return Err(FunctionCallError::RespondToModel(reason));
++                }
++                _ => {
++                    return Err(FunctionCallError::RespondToModel(
++                        "Admission may not rewrite the checked task".to_string(),
++                    ));
++                }
++            }
++            invocation.source = ToolCallSource::DirectPlaintextMessage;
++            if let Some(id) = recipient {
++                let receipt = invocation
++                    .session
++                    .services
++                    .agent_control
++                    .send(SendRequest {
++                        admitted_identity: Some((model, effort)),
++                        caller: invocation.session.thread_id,
++                        target: AgentTarget::Id(id),
++                        resume_config: build_agent_resume_config(&invocation.turn)
++                            .map_err(FunctionCallError::RespondToModel)?,
++                        input: AgentInput::Message {
++                            message: AgentMessage::Plaintext(args.body),
++                            mode: MessageDeliveryMode::TriggerTurn,
++                        },
++                        start_options: TurnStartOptions {
++                            parent_turn_id: Some(invocation.turn.sub_id.clone()),
++                            root_turn_id: invocation.turn.turn_metadata_state.root_turn_id(),
++                            turn_trigger: invocation
++                                .turn
++                                .turn_metadata_state
++                                .current_turn_trigger(),
++                            cyber_access_program: invocation.turn.cyber_access_program,
++                            ..Default::default()
++                        },
++                    })
++                    .await
++                    .map_err(|error| FunctionCallError::RespondToModel(error.to_string()))?;
++                Ok(boxed_tool_output(FunctionToolOutput::from_text(
++                    json!({"agent_id": id, "submission_id": receipt.submission_id}).to_string(),
++                    Some(true),
++                )))
++            } else {
++                invocation.payload = ToolPayload::Function {
++                    arguments: input.to_string(),
++                };
++                super::spawn::Handler::default().handle(invocation).await
++            }
++        })
++    }
++}
++
++impl CoreToolRuntime for Handler {
++    // Admission runs on the final normalized native operation inside handle. No earlier hook
++    // can rewrite the plaintext body between that check and its native dispatch.
++    fn pre_tool_use_payload(&self, _: &ToolInvocation) -> Option<PreToolUsePayload> {
++        None
++    }
++}
+diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs
+index 26d329f..25fa328 100644
+--- a/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs
++++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/message_tool.rs
+@@ -62,6 +62,7 @@ pub(super) async fn handle_message_string_tool(
+         .services
+         .agent_control
+         .send(SendRequest {
++            admitted_identity: None,
+             caller: session.thread_id,
+             target: AgentTarget::Id(receiver_thread_id),
+             resume_config,
+diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
+index 218fbdc..939597c 100644
+--- a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
++++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
+@@ -116,6 +116,7 @@ async fn handle_spawn_agent(
+         payload,
+         call_id,
+         source,
++        tool_name,
+         ..
+     } = invocation;
+     let turn = &step_context.turn;
+@@ -145,6 +146,15 @@ async fn handle_spawn_agent(
+     .await
+     .map_err(FunctionCallError::RespondToModel)?;
+     let config = prepared.config;
++    if tool_name.name == "admitted_agent_task"
++        && (config.model.as_deref() != args.model.as_deref()
++            || config.model_reasoning_effort != args.reasoning_effort
++            || fork_mode.is_some())
++    {
++        return Err(FunctionCallError::RespondToModel(
++            "Resolved child identity differs from the admitted identity".to_string(),
++        ));
++    }
+     let is_full_history_fork = matches!(fork_mode, Some(SpawnAgentForkMode::FullHistory));
+     let spawn_source = thread_spawn_source(
+         session.thread_id,
+diff --git a/codex-rs/core/src/tools/registry.rs b/codex-rs/core/src/tools/registry.rs
+index e0acae2..4021cce 100644
+--- a/codex-rs/core/src/tools/registry.rs
++++ b/codex-rs/core/src/tools/registry.rs
+@@ -613,6 +613,7 @@ impl ToolRegistry {
+                 invocation.call_id.clone(),
+                 &pre_tool_use_payload.tool_name,
+                 &pre_tool_use_payload.tool_input,
++                /*admitted_dispatch*/ false,
+             )
+             .await
+             {
+diff --git a/codex-rs/core/src/tools/spec_plan.rs b/codex-rs/core/src/tools/spec_plan.rs
+index 7e22134..09eb060 100644
+--- a/codex-rs/core/src/tools/spec_plan.rs
++++ b/codex-rs/core/src/tools/spec_plan.rs
+@@ -1375,6 +1375,12 @@ fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, registry: &mut Too
+     let turn_context = context.turn_context;
+     if collab_tools_enabled(turn_context, context.model_info) {
+         if multi_agent_v2_enabled(turn_context) {
++            if turn_context.config.agent_admission_hook.is_some() {
++                registry.register_trusted_with_exposure(
++                    Arc::new(crate::tools::handlers::multi_agents_v2::AdmittedTaskHandler),
++                    ToolExposure::DirectModelOnly,
++                );
++            }
+             let model_messages = ResolvedModelMessages::from_model(context.model_info);
+             let spawn_agent_description =
+                 model_messages.multi_agent_tool_description_override("spawn_agent");
+diff --git a/codex-rs/hooks/src/events/pre_tool_use.rs b/codex-rs/hooks/src/events/pre_tool_use.rs
+index e57b823..afd7735 100644
+--- a/codex-rs/hooks/src/events/pre_tool_use.rs
++++ b/codex-rs/hooks/src/events/pre_tool_use.rs
+@@ -37,6 +37,8 @@ pub struct PreToolUseRequest {
+
+ #[derive(Debug)]
+ pub struct PreToolUseOutcome {
++    /// Successful synchronous handlers with a supported allow response and no rewrite.
++    pub successful_runs: Vec<String>,
+     pub hook_events: Vec<HookCompletedEvent>,
+     pub should_block: bool,
+     pub block_reason: Option<String>,
+@@ -46,6 +48,7 @@ pub struct PreToolUseOutcome {
+
+ #[derive(Debug, Default, PartialEq, Eq)]
+ struct PreToolUseHandlerData {
++    successful_allow: bool,
+     should_block: bool,
+     block_reason: Option<String>,
+     additional_contexts_for_model: Vec<AdditionalContext>,
+@@ -81,6 +84,7 @@ pub(crate) async fn run(
+     );
+     if matched.is_empty() {
+         return PreToolUseOutcome {
++            successful_runs: Vec::new(),
+             hook_events: Vec::new(),
+             should_block: false,
+             block_reason: None,
+@@ -133,6 +137,11 @@ pub(crate) async fn run(
+     };
+
+     PreToolUseOutcome {
++        successful_runs: results
++            .iter()
++            .filter(|r| r.data.successful_allow)
++            .map(|r| format!("{}:{}", r.completed.run.id, request.tool_use_id))
++            .collect(),
+         hook_events: results
+             .into_iter()
+             .map(|result| {
+@@ -197,6 +206,7 @@ fn parse_completed(
+ ) -> dispatcher::ParsedHandler<PreToolUseHandlerData> {
+     let mut entries = Vec::new();
+     let mut status = HookRunStatus::Completed;
++    let mut successful_allow = false;
+     let mut should_block = false;
+     let mut block_reason = None;
+     let mut additional_contexts_for_model = Vec::new();
+@@ -214,6 +224,8 @@ fn parse_completed(
+             Some(0) => {
+                 let trimmed_stdout = run_result.stdout.trim();
+                 if trimmed_stdout.is_empty() {
++                    // The native hook contract permits a successful hook to emit no output.
++                    successful_allow = handler.can_apply_control_effects();
+                 } else if let Some(parsed) = output_parser::parse_pre_tool_use(&run_result.stdout) {
+                     if let Some(system_message) = parsed.universal.system_message {
+                         entries.push(HookOutputEntry {
+@@ -248,6 +260,7 @@ fn parse_completed(
+                             });
+                         } else {
+                             updated_input = parsed.updated_input;
++                            successful_allow = updated_input.is_none();
+                         }
+                     }
+                 } else if output_parser::looks_like_json(&run_result.stdout) {
+@@ -300,6 +313,7 @@ fn parse_completed(
+     dispatcher::ParsedHandler {
+         completed,
+         data: PreToolUseHandlerData {
++            successful_allow,
+             should_block,
+             block_reason,
+             additional_contexts_for_model,
+@@ -311,6 +325,7 @@ fn parse_completed(
+
+ fn serialization_failure_outcome(hook_events: Vec<HookCompletedEvent>) -> PreToolUseOutcome {
+     PreToolUseOutcome {
++        successful_runs: Vec::new(),
+         hook_events,
+         should_block: false,
+         block_reason: None,
+@@ -341,6 +356,27 @@ mod tests {
+     use crate::output_spill::AdditionalContext;
+     use crate::output_spill::AdditionalContextLimit;
+
++    #[test]
++    fn required_admission_accepts_documented_success_without_rewrite() {
++        for output in [
++            "plain success",
++            "{broken",
++            r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"denied"}}"#,
++            r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","updatedInput":{"body":"changed"}}}"#,
++        ] {
++            let parsed = parse_completed(&handler(), run_result(Some(0), output, ""), None);
++            assert!(!parsed.data.successful_allow, "{output}");
++        }
++        let silent = parse_completed(&handler(), run_result(Some(0), "", ""), None);
++        assert!(silent.data.successful_allow);
++        let silent_failure = parse_completed(&handler(), run_result(Some(1), "", "error"), None);
++        assert!(!silent_failure.data.successful_allow);
++        let allowed = parse_completed(&handler(), run_result(Some(0), "{}", ""), None);
++        assert!(allowed.data.successful_allow);
++        let failed = parse_completed(&handler(), run_result(Some(1), "{}", "error"), None);
++        assert!(!failed.data.successful_allow);
++    }
++
+     #[test]
+     fn command_input_uses_request_tool_name() {
+         let mut request = request_for_tool_use("call-apply-patch");
+@@ -368,6 +404,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: true,
+                 block_reason: Some("do not run that".to_string()),
+                 additional_contexts_for_model: Vec::new(),
+@@ -399,6 +436,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -450,6 +488,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -496,6 +535,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: true,
+                 block_reason: Some("do not run that".to_string()),
+                 additional_contexts_for_model: Vec::new(),
+@@ -527,6 +567,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: true,
+                 block_reason: Some("do not run that".to_string()),
+                 additional_contexts_for_model: vec![AdditionalContext {
+@@ -567,6 +608,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -594,6 +636,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -627,6 +670,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: true,
+                 block_reason: Some("do not run that".to_string()),
+                 additional_contexts_for_model: vec![AdditionalContext {
+@@ -663,6 +707,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -684,6 +729,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: false,
+                 block_reason: None,
+                 additional_contexts_for_model: Vec::new(),
+@@ -711,6 +757,7 @@ mod tests {
+         assert_eq!(
+             parsed.data,
+             PreToolUseHandlerData {
++                successful_allow: false,
+                 should_block: true,
+                 block_reason: Some("blocked by policy".to_string()),
+                 additional_contexts_for_model: Vec::new(),
