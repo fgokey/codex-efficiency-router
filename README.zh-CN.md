@@ -4,6 +4,8 @@
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
+准入入口支持保留 V1 状态的旧会话和 V2 会话，也可由代码模式发现。旧宿主曾只向 V2 暴露入口，导致 V1 的旧调用被拦却无可用新入口；这需要更新宿主并完全重启桌面，单独重装 Skill 无法解决，不需要改变父模型或会话历史。
+
 **v0.8.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 ## v0.8.5：明确委派与有界证据

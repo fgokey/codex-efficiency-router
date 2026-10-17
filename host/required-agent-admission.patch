@@ -110,7 +110,7 @@ index ef0a699..2a015f1 100644
                          )
                          .await?;
 diff --git a/codex-rs/core/src/agent/control_tests.rs b/codex-rs/core/src/agent/control_tests.rs
-index efe6299..a6df6c2 100644
+index efe6299..f70c1dc 100644
 --- a/codex-rs/core/src/agent/control_tests.rs
 +++ b/codex-rs/core/src/agent/control_tests.rs
 @@ -1566,6 +1566,7 @@ async fn cold_resume_with_thread_instructions_preserves_lazy_v2_child_inheritanc
@@ -129,16 +129,30 @@ index efe6299..a6df6c2 100644
              caller: sender_id,
              target: crate::AgentTarget::Id(target_id),
              resume_config: crate::agent::child_config::build_agent_resume_config(&sender_turn)
-@@ -5453,3 +5455,64 @@ async fn resume_agent_from_rollout_skips_descendants_when_parent_resume_fails()
+@@ -5453,3 +5455,78 @@ async fn resume_agent_from_rollout_skips_descendants_when_parent_resume_fails()
          .await
          .expect("tree shutdown after partial subtree resume should succeed");
  }
 +
 +#[tokio::test]
 +async fn admitted_send_checks_live_identity_owner_and_never_reloads() {
++    check_admitted_send(true).await;
++}
++
++#[tokio::test]
++async fn admitted_send_in_legacy_session_checks_identity_owner_and_never_reloads() {
++    check_admitted_send(false).await;
++}
++
++async fn check_admitted_send(v2: bool) {
 +    use codex_protocol::openai_models::ReasoningEffort;
 +    let (home, mut config) = test_config().await;
-+    let _ = config.features.enable(Feature::MultiAgentV2);
++    let _ = config.features.enable(Feature::Collab);
++    if v2 {
++        let _ = config.features.enable(Feature::MultiAgentV2);
++    } else {
++        let _ = config.features.disable(Feature::MultiAgentV2);
++    }
 +    config.model = Some("gpt-6.1-sol".to_string());
 +    config.model_reasoning_effort = Some(ReasoningEffort::High);
 +    let harness = AgentControlHarness::new_with_config(home, config).await;
@@ -641,10 +655,39 @@ index 26d329f..25fa328 100644
              target: AgentTarget::Id(receiver_thread_id),
              resume_config,
 diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
-index 218fbdc..939597c 100644
+index 218fbdc..25b1d25 100644
 --- a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
 +++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
-@@ -116,6 +116,7 @@ async fn handle_spawn_agent(
+@@ -54,6 +54,7 @@ impl ToolExecutor<ToolInvocation> for Handler {
+         ToolInvocation: 'a,
+     {
+         Box::pin(async move {
++            let admitted = invocation.tool_name.name == "admitted_agent_task";
+             let analytics = invocation.session.services.analytics_events_client.clone();
+             let sender_thread_id = invocation.session.thread_id;
+             let turn_id = invocation.step_context.turn.sub_id.clone();
+@@ -94,7 +95,19 @@ impl ToolExecutor<ToolInvocation> for Handler {
+                 completed_at_ms,
+             );
+
+-            result.map(|(output, _, _, _)| boxed_tool_output(output))
++            result.map(|(output, agent_id, _, _)| {
++                if admitted {
++                    // V1 wait/close controls require an id rather than a task path.
++                    let mut value = serde_json::to_value(output).expect("spawn result serializes");
++                    value["agent_id"] = serde_json::json!(agent_id);
++                    boxed_tool_output(crate::tools::context::FunctionToolOutput::from_text(
++                        value.to_string(),
++                        Some(true),
++                    ))
++                } else {
++                    boxed_tool_output(output)
++                }
++            })
+         })
+     }
+ }
+@@ -116,6 +129,7 @@ async fn handle_spawn_agent(
          payload,
          call_id,
          source,
@@ -652,7 +695,7 @@ index 218fbdc..939597c 100644
          ..
      } = invocation;
      let turn = &step_context.turn;
-@@ -145,6 +146,15 @@ async fn handle_spawn_agent(
+@@ -145,6 +159,15 @@ async fn handle_spawn_agent(
      .await
      .map_err(FunctionCallError::RespondToModel)?;
      let config = prepared.config;
@@ -669,7 +712,7 @@ index 218fbdc..939597c 100644
      let spawn_source = thread_spawn_source(
          session.thread_id,
 diff --git a/codex-rs/core/src/tools/registry.rs b/codex-rs/core/src/tools/registry.rs
-index e0acae2..4021cce 100644
+index e0acae2..a8dcdbe 100644
 --- a/codex-rs/core/src/tools/registry.rs
 +++ b/codex-rs/core/src/tools/registry.rs
 @@ -613,6 +613,7 @@ impl ToolRegistry {
@@ -680,23 +723,137 @@ index e0acae2..4021cce 100644
              )
              .await
              {
+@@ -845,6 +846,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
+         return HookToolName::spawn_agent();
+     }
+
++    if invocation.tool_name.namespace.as_deref() == Some(MULTI_AGENT_V1_NAMESPACE)
++        && matches!(
++            invocation.tool_name.name.as_str(),
++            "send_input" | "resume_agent"
++        )
++    {
++        return HookToolName::new(invocation.tool_name.name.clone());
++    }
++
+     HookToolName::new(flat_tool_name(&invocation.tool_name).into_owned())
+ }
+
+diff --git a/codex-rs/core/src/tools/registry_tests.rs b/codex-rs/core/src/tools/registry_tests.rs
+index 895d8d4..aa3e0a9 100644
+--- a/codex-rs/core/src/tools/registry_tests.rs
++++ b/codex-rs/core/src/tools/registry_tests.rs
+@@ -576,6 +576,36 @@ async fn code_mode_wait_does_not_expose_default_hook_payloads() {
+     assert_eq!(wait.post_tool_use_payload(&wait_invocation, &output), None);
+ }
+
++#[tokio::test]
++async fn legacy_reuse_has_canonical_hook_names() {
++    let (session, turn) = crate::session::tests::make_session_and_context().await;
++    let session = Arc::new(session);
++    let turn = Arc::new(turn);
++    for name in ["send_input", "resume_agent"] {
++        let tool_name = ToolName::namespaced(MULTI_AGENT_V1_NAMESPACE, name);
++        let handler = TestHandler {
++            tool_name: tool_name.clone(),
++        };
++        let invocation = ToolInvocation {
++            payload: ToolPayload::Function {
++                arguments: serde_json::json!({"target": "old-astra", "message": "继续"})
++                    .to_string(),
++            },
++            ..test_invocation(
++                Arc::clone(&session),
++                Arc::clone(&turn),
++                "legacy-reuse",
++                tool_name,
++            )
++        };
++        let payload = handler
++            .pre_tool_use_payload(&invocation)
++            .expect("hook payload");
++        assert_eq!(payload.tool_name, HookToolName::new(name));
++        assert_eq!(payload.tool_input["target"], "old-astra");
++    }
++}
++
+ #[tokio::test]
+ async fn write_stdin_does_not_expose_default_pre_tool_use_payload() {
+     let (session, turn) = crate::session::tests::make_session_and_context().await;
 diff --git a/codex-rs/core/src/tools/spec_plan.rs b/codex-rs/core/src/tools/spec_plan.rs
-index 7e22134..09eb060 100644
+index 7e22134..d4d26fa 100644
 --- a/codex-rs/core/src/tools/spec_plan.rs
 +++ b/codex-rs/core/src/tools/spec_plan.rs
-@@ -1375,6 +1375,12 @@ fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, registry: &mut Too
+@@ -1374,6 +1374,14 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+ fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, registry: &mut ToolRegistry) {
      let turn_context = context.turn_context;
      if collab_tools_enabled(turn_context, context.model_info) {
++        // Stored V1 conversations also have raw dispatch blocked by the admission hook.
++        // Keep the checked entry available to both direct calls and code-mode discovery.
++        if turn_context.config.agent_admission_hook.is_some() {
++            registry.register_trusted_with_exposure(
++                Arc::new(crate::tools::handlers::multi_agents_v2::AdmittedTaskHandler),
++                ToolExposure::Direct,
++            );
++        }
          if multi_agent_v2_enabled(turn_context) {
-+            if turn_context.config.agent_admission_hook.is_some() {
-+                registry.register_trusted_with_exposure(
-+                    Arc::new(crate::tools::handlers::multi_agents_v2::AdmittedTaskHandler),
-+                    ToolExposure::DirectModelOnly,
-+                );
-+            }
              let model_messages = ResolvedModelMessages::from_model(context.model_info);
              let spawn_agent_description =
-                 model_messages.multi_agent_tool_description_override("spawn_agent");
+diff --git a/codex-rs/core/src/tools/spec_plan_tests.rs b/codex-rs/core/src/tools/spec_plan_tests.rs
+index 395cc95..2c61f83 100644
+--- a/codex-rs/core/src/tools/spec_plan_tests.rs
++++ b/codex-rs/core/src/tools/spec_plan_tests.rs
+@@ -2743,6 +2743,50 @@ async fn code_mode_excludes_default_namespace_tools() {
+     assert!(!exec.description.contains("update_plan(args:"));
+ }
+
++#[tokio::test]
++async fn admitted_dispatch_available_in_legacy_and_v2_tool_plans() {
++    for version in [MultiAgentVersion::V1, MultiAgentVersion::V2] {
++        for code_mode in [false, true] {
++            let plan = probe(|turn| {
++                set_feature(turn, Feature::Collab, true);
++                set_feature(
++                    turn,
++                    Feature::MultiAgentV2,
++                    version == MultiAgentVersion::V2,
++                );
++                set_feature(turn, Feature::CodeMode, code_mode);
++                // Existing conversations retain their stored collaboration version.
++                turn.multi_agent_version = version;
++                update_config(turn, |config| {
++                    config.agent_admission_hook = Some("pre-tool-use:0:test".to_string());
++                });
++            })
++            .await;
++            plan.assert_registered_contains(&["admitted_agent_task"]);
++            assert_eq!(plan.exposure("admitted_agent_task"), ToolExposure::Direct);
++            if code_mode {
++                assert!(
++                    plan.code_mode_tool_names
++                        .values()
++                        .any(|name| name == &ToolName::plain("admitted_agent_task"))
++                );
++            } else {
++                plan.assert_visible_contains(&["admitted_agent_task"]);
++            }
++        }
++    }
++    let unconfigured = probe(|turn| {
++        set_feature(turn, Feature::Collab, true);
++        update_config(turn, |config| config.agent_admission_hook = None);
++    })
++    .await;
++    assert!(
++        !unconfigured
++            .registered_names
++            .contains(&"admitted_agent_task".to_string())
++    );
++}
++
+ #[tokio::test]
+ async fn multi_agent_feature_selects_one_agent_tool_family() {
+     let v1 = probe(|turn| {
 diff --git a/codex-rs/hooks/src/events/pre_tool_use.rs b/codex-rs/hooks/src/events/pre_tool_use.rs
 index e57b823..afd7735 100644
 --- a/codex-rs/hooks/src/events/pre_tool_use.rs
