@@ -2,6 +2,8 @@
 
 可选的[固定版本宿主补丁](docs/INSTALL.md#pinned-host-compatibility-patch)用独立明文准入入口处理原生协作参数加密的问题。Windows 原生实测已覆盖 Sol61/high 正常完成，以及 Astra 无准入、旧凭据改正文、裸“继续”和原生复用入口被拒绝。需要匹配版本的宿主、已信任 Hook 和明确启用；普通 Skill 安装不会自动启用，也不改变父模型。回滚只移除新增宿主设置、恢复原 `CODEX_CLI_PATH` 并重启，Skill/Hook 的卸载独立处理。
 
+宿主工具说明现已写明子任务命名格式、派发与文件读取分开执行，以及工具检索只输出匹配名称。更新这些说明需要重建宿主并完整重启桌面应用；这不等于新增了宿主级输出拦截。
+
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 
 准入入口支持保留 V1 状态的旧会话和 V2 会话，也可由代码模式发现。旧宿主曾只向 V2 暴露入口，导致 V1 的旧调用被拦却无可用新入口；这需要更新宿主并完全重启桌面，单独重装 Skill 无法解决，不需要改变父模型或会话历史。

@@ -439,10 +439,10 @@ index ea44c0a..75d5718 100644
  mod interrupt_agent;
 diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
 new file mode 100644
-index 0000000..eca76d6
+index 0000000..2a871d0
 --- /dev/null
 +++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
-@@ -0,0 +1,199 @@
+@@ -0,0 +1,202 @@
 +//! Plaintext task admission followed by native agent control, without a client-side broker.
 +use super::*;
 +use crate::agent::agent_resolver::resolve_agent_target;
@@ -485,9 +485,12 @@ index 0000000..eca76d6
 +            ),
 +            (
 +                "body",
-+                "Exact plaintext task and admission envelope; spawn_hold permits only the policy HOLD handshake",
++                "For assign: exact plaintext task and fresh admission envelope. For spawn_hold use exactly: HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.",
 +            ),
-+            ("task_name", "New child task name; only for spawn_hold"),
++            (
++                "task_name",
++                "New child identifier matching [a-z][a-z0-9_]{0,63}, e.g. review_memory; no hyphens or path; only for spawn_hold",
++            ),
 +            (
 +                "target",
 +                "Existing direct child id or task name; only for assign; no reload",
@@ -504,7 +507,7 @@ index 0000000..eca76d6
 +        ];
 +        ToolSpec::Function(ResponsesApiTool {
 +            name: "admitted_agent_task".to_string(),
-+            description: "Submit an exact plaintext task to mandatory trusted admission, then dispatch through native agent control. First spawn_hold, verify identity, then assign a freshly admitted task. Ordinary engineering and review default to gpt-6.1-sol/high. This does not change the parent model or weaken existing native collaboration hooks.".to_string(),
++            description: "Submit an exact plaintext task to mandatory trusted admission, then dispatch through native agent control. First spawn_hold, verify identity, then assign a freshly admitted task. Ordinary engineering and review default to gpt-6.1-sol/high. Invoke alone; in code mode emit only this result, with file reads in separate Reader calls. For tool discovery, emit matching ALL_TOOLS names only, never full descriptions. This does not change the parent model or weaken existing native collaboration hooks.".to_string(),
 +            strict: false,
 +            defer_loading: None,
 +            parameters: JsonSchema::object(

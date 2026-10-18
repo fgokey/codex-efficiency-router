@@ -8,6 +8,8 @@
 
 An optional [pinned native host patch](docs/INSTALL.md#pinned-host-compatibility-patch) handles encrypted collaboration arguments through a separate plaintext admission entry. Native Windows tests cover Sol61/high success and denial of unadmitted/stale/continue/raw Astra reuse. It requires a matching host build, trusted hook and explicit activation; ordinary Skill installation alone does not enable it or change the parent model.
 
+The host tool description now exposes the accepted child-name format, asks for separate dispatch/file reads, and limits tool discovery to matching names. Updating these descriptions requires a rebuilt host and desktop restart; it does not add a host-wide output filter.
+
 The checked entry supports persisted V1 conversations and V2, including code-mode discovery. Updating only the Skill does not repair an older host that blocks raw dispatch but exposes the checked entry only in V2; that host must be updated and the desktop restarted.
 
 Canonical `spawn_agent` preflight rejects unbound default/inherit, missing effort and inherited history before executor/coordination passthrough. Fixed roles and explicit exact model/effort pins remain valid; native host binding and user authority still need independent checks. The `Agent` parameter shape is unverified. This check only runs where the native Hook is registered; local tests do not prove host enforcement.
