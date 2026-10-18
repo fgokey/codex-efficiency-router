@@ -8,6 +8,8 @@
 
 An optional [pinned native host patch](docs/INSTALL.md#pinned-host-compatibility-patch) handles encrypted collaboration arguments through a separate plaintext admission entry. Native Windows tests cover Sol61/high success and denial of unadmitted/stale/continue/raw Astra reuse. It requires a matching host build, trusted hook and explicit activation; ordinary Skill installation alone does not enable it or change the parent model.
 
+The updated opt-in host also enforces Astra/unknown models' read-only execution at the common native tool dispatcher, including code-mode inner calls and terminal continuation. Use `read_only` for bounded filesystem pages and `prepare_agent_task` for a fresh Reader envelope through the required trusted hook, then `admitted_agent_task` for executor work. Arbitrary shell, patch/build/test and third-party tools are denied for those models; the bounded root-repair policy exception does not apply. Sol61 executors retain normal tools. Updating Skill prose or the dispatch hook alone does not activate this boundary: rebuild the patched host and restart it.
+
 The host tool description now exposes the accepted child-name format, asks for separate dispatch/file reads, and limits tool discovery to matching names. Updating these descriptions requires a rebuilt host and desktop restart; it does not add a host-wide output filter.
 
 The checked entry supports persisted V1 conversations and V2, including code-mode discovery. Updating only the Skill does not repair an older host that blocks raw dispatch but exposes the checked entry only in V2; that host must be updated and the desktop restarted.

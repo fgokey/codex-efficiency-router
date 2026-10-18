@@ -82,7 +82,7 @@ class InstructionFootprintTests(unittest.TestCase):
                        'repo rules, current permissions/read-only roles',
                        'Unknown identity/effects grant no writes', 'exact pins', 'Low is opt-in',
                        'Sends require Reader `assignment`', 'Root Astra defaults read-only',
-                       'read dispatch for exceptions'):
+                       'native admission has no repair exceptions'):
             self.assertIn(phrase, text)
         chain = doctor.instruction_chain(SKILL)
         self.assertEqual(set(chain), {'SKILL.md', 'references/dispatch.md', 'references/effort.md',
@@ -171,7 +171,7 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_readonly_diagnosis_and_limits_remain_reachable(self):
         text = contract_text()
         for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
-                       'one bounded local repair unit', 'Unknown identity/effects grant no writes',
+                       'native admission has no repair exceptions', 'Unknown identity/effects grant no writes',
                        'no auto-revert', 'Two writers max',
                        'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
                        'Retries persist per task/unit/signature across ALL owners',

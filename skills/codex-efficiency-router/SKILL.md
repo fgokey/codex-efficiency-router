@@ -23,7 +23,7 @@ New engineering/readonly review (send_input/followup_task/send_message): default
 
 ## Delegate
 
-Read [dispatch.md](references/dispatch.md) before delegation, binding or delivery review. Children start read-only; parent verifies/releases writes. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; read dispatch for exceptions.
+Read [dispatch.md](references/dispatch.md) before delegation, binding or delivery review. Children start read-only; parent verifies/releases writes. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; native admission has no repair exceptions.
 
 ## Handoff
 

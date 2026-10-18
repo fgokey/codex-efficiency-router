@@ -157,12 +157,13 @@ class DocumentedContractTests(unittest.TestCase):
         self.assertIn('explicit effort', effort)
         self.assertIn('exact role/catalog pair', effort)
 
-    def test_bounded_root_astra_exception_and_strict_guard_are_not_conflated(self):
+    def test_native_root_astra_boundary_has_no_repair_exception(self):
         core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('one bounded local repair unit', 'two failed qualified executor attempts',
-                       'current-workspace target', 'no observed active strict Guard'):
+        for phrase in ('read-only without repair exceptions', '`read_only`', '`prepare_agent_task`',
+                       'Capacity never grants writes'):
             self.assertIn(phrase, core)
+        self.assertNotIn('one bounded local repair unit', dispatch)
         self.assertIn('Strict Guard denies Astra', dispatch)
         self.assertIn('UNKNOWN may deny', dispatch)
 

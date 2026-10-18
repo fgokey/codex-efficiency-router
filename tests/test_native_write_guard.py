@@ -88,6 +88,22 @@ class NativeDispatchTests(unittest.TestCase):
             self.assertEqual(self.hook(name=name, data={'command': 'owned action'}), {})
         self.assertEqual(self.database.read_bytes(), before)
 
+    def test_caller_projection_lag_does_not_replace_native_event_identity(self):
+        with self.connect() as db:
+            db.execute('UPDATE threads SET model=NULL, reasoning_effort=NULL WHERE id=?', ('parent',))
+        self.assertEqual(self.hook(), {})
+        self.denied(self.hook(text='continue'))
+        for column in ('model', 'reasoning_effort'):
+            with self.connect() as db:
+                previous = db.execute('SELECT ' + column + ' FROM threads WHERE id=?', ('sol',)).fetchone()[0]
+                db.execute('UPDATE threads SET ' + column + '=NULL WHERE id=?', ('sol',))
+            self.denied(self.hook())
+            with self.connect() as db:
+                db.execute('UPDATE threads SET ' + column + '=? WHERE id=?', (previous, 'sol'))
+        with self.connect() as db:
+            db.execute('UPDATE threads SET archived=1 WHERE id=?', ('parent',))
+        self.denied(self.hook())
+
     def test_current_astra_dual_reasons_for_every_message(self):
         request = self.request('astra', 'gpt-6-astra')
         self.assertEqual(self.hook('astra', self.text(request)), {})
@@ -102,6 +118,36 @@ class NativeDispatchTests(unittest.TestCase):
             self.denied(self.hook('astra', MODULE['ASSIGNMENT_PREFIX'] + json.dumps(receipt) + '\n' + body))
         bad = self.text(request).replace(request['complexity_reason'], '', 1)
         self.denied(self.hook('astra', bad))
+
+    def test_native_reader_preparation_returns_fresh_envelope_without_shell(self):
+        request = self.request()
+        result = self.hook(name='prepare_agent_task', data={'request': request})
+        hook = result['hookSpecificOutput']
+        self.assertNotIn('permissionDecision', hook)  # Native Codex rejects an explicit allow.
+        prepared = json.loads(hook['additionalContext'])
+        self.assertEqual(prepared['status'], 'VERIFIED')
+        self.assertLessEqual(len(hook['additionalContext'].encode('utf-8')), 3500)
+        text = self.reader['assignment_message'](prepared, request['message'])
+        self.assertEqual(self.hook(text=text), {})
+        self.denied(self.hook(text=text + ' extra work'))
+        misplaced = dict(request, recipient=dict(request['recipient']))
+        misplaced['evidence_ref'] = misplaced['recipient'].pop('evidence_ref')
+        self.denied(self.hook(name='prepare_agent_task', data={'request': misplaced}))
+        astra = self.request('astra', 'gpt-6-astra')
+        prepared_astra = self.hook(name='prepare_agent_task', data={'request': astra})
+        self.assertEqual(json.loads(prepared_astra['hookSpecificOutput']['additionalContext'])['status'], 'VERIFIED')
+        no_complexity = dict(astra)
+        no_complexity.pop('complexity_reason')
+        self.denied(self.hook(name='prepare_agent_task', data={'request': no_complexity}))
+        no_unsuitable = dict(astra, signals=dict(astra['signals']))
+        no_unsuitable['signals'].pop('sol61_unsuitable_reason')
+        self.denied(self.hook(name='prepare_agent_task', data={'request': no_unsuitable}))
+        for bad in ({'request': dict(request, purpose='continue')},
+                    {'request': dict(request, receipt={})},
+                    {'request': dict(request, signals={})},
+                    {'request': request, 'cmd': 'arbitrary command'},
+                    {'request': 'not an object'}):
+            self.denied(self.hook(name='prepare_agent_task', data=bad))
 
     def test_forged_model_old_receipt_controls_and_work_body(self):
         self.denied(self.hook('astra', self.text(self.request())))

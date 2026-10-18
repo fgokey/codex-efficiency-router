@@ -37,6 +37,8 @@ DISPATCH_ALIASES.update({'collaborationfollowup_task': 'followup_task',
                          'collaborationsend_message': 'send_message',
                          'collaborationresume_agent': 'resume_agent'})
 DISPATCH_ALIASES.update({f'functions.{name}': name for name in DISPATCH_TOOLS})
+DISPATCH_ALIASES.update({'prepare_agent_task': 'prepare_agent_task',
+                         'functions.prepare_agent_task': 'prepare_agent_task'})
 DISPATCH_ALIASES.update({name: 'spawn_agent' for name in ('Agent', 'collaboration.Agent', 'functions.Agent')})
 DISPATCH_ALIASES.update({name: 'send_message_to_thread' for name in (
     'send_message_to_thread', 'mcp__codex_app__send_message_to_thread', 'mcp__codex_app.send_message_to_thread',
@@ -113,10 +115,13 @@ def host_recipient(session_id: object, target: object, directory: Path) -> dict:
         columns = {row[1] for row in db.execute('PRAGMA table_info(threads)')}
         if not required <= columns:
             raise ValueError('unsupported native state_5 threads schema')
-        current = db.execute('SELECT model, reasoning_effort, archived FROM threads WHERE id=? LIMIT 2',
+        # The trusted native event identifies the live caller. This row checks its
+        # persisted membership/archival only; model/effort projection may be NULL.
+        # Recipient owner/model/effort stay mandatory below and are checked again by
+        # the host's loaded-child control immediately before native assignment.
+        current = db.execute('SELECT archived FROM threads WHERE id=? LIMIT 2',
                              (session_id,)).fetchall()
-        if len(current) != 1 or current[0][2] != 0 or not all(
-                isinstance(value, str) and value for value in current[0][:2]):
+        if len(current) != 1 or current[0][0] != 0:
             raise ValueError('current host caller identity UNKNOWN')
         rows = db.execute('SELECT id, model, reasoning_effort, source, archived FROM threads '
                           'WHERE id=? LIMIT 2', (target,)).fetchall()
@@ -236,6 +241,26 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
         canonical = DISPATCH_ALIASES.get(name)
         if canonical is None:
             return {}  # This separate boundary never imposes the Astra write Guard.
+        if canonical == 'prepare_agent_task':
+            if (not isinstance(data, dict) or set(data) != {'request'}
+                    or not isinstance(data['request'], dict)
+                    or len(json.dumps(data, ensure_ascii=False).encode('utf-8')) > 16 * 1024):
+                raise ValueError('bounded Reader assignment request required')
+            request = data['request']
+            if request.get('purpose') != 'new_unit' or 'receipt' in request:
+                raise ValueError('native preparation requires fresh purpose=new_unit')
+            if policy_root is None or not policy_root.is_absolute():
+                raise ValueError('registered policy root UNKNOWN')
+            reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+            result = reader['assignment_preflight'](request,
+                policy_sha256=reader['assignment_policy_sha256'](policy_root))
+            if result.get('status') != 'VERIFIED':
+                raise ValueError('Reader assignment ' + result.get('status', 'UNKNOWN'))
+            context = json.dumps(result, ensure_ascii=False, separators=(',', ':'))
+            if len(context.encode('utf-8')) > 3500:
+                raise ValueError('Reader assignment result exceeds bounded context; narrow scope/evidence')
+            return {'hookSpecificOutput': {'hookEventName': 'PreToolUse',
+                    'additionalContext': context}}
         if canonical == 'resume_agent':
             raise ValueError('native resume cannot bind current model/effort; fresh admitted HOLD spawn required')
         if canonical == 'spawn_agent':
@@ -342,6 +367,13 @@ def main() -> int:
         dispatch_only = '--dispatch-only' in args
         if dispatch_only:
             args.remove('--dispatch-only')
+        host_directory = HOST_DIRECTORY
+        if '--host-directory' in args:
+            index = args.index('--host-directory')
+            host_directory = Path(args[index + 1])
+            if not host_directory.is_absolute():
+                raise ValueError('absolute native host directory required')
+            del args[index:index + 2]
         policy_root = None
         if '--policy-root' in args:
             index = args.index('--policy-root')
@@ -361,7 +393,8 @@ def main() -> int:
         if len(raw) > 1024 * 1024:
             raise ValueError('oversized event')
         event = json.loads(raw, object_pairs_hook=duplicate_checked, parse_constant=reject_constant)
-        output = decide(event, dispatch_only=dispatch_only, policy_root=policy_root)
+        output = decide(event, dispatch_only=dispatch_only, policy_root=policy_root,
+                        host_directory=host_directory)
     except Exception:
         output = deny('CER: guard input/processing failed; do not execute this call.')
     if output:

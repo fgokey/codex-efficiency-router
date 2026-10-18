@@ -6,7 +6,7 @@ Reader `assignment --help`: schema. Receipt is not proof. Wait exempt. Spawn: ex
 
 When exposed, use `admitted_agent_task`: `spawn_hold`, bind, `assign` fresh envelope in `body`; no raw dispatch.
 
-Root Astra review: host permission. one bounded local repair unit: two failed qualified executor attempts/material critical-context loss; capacity never qualifies; authority/current-workspace target/exclusive ownership/checks; no observed active strict Guard; shared attempts/absolute cap.
+Root Astra: configured native admission is read-only without repair exceptions. Use `read_only` for files; `prepare_agent_task` for fresh Reader envelopes. Capacity never grants writes.
 
 Parent-assigned Ultra Sol/Astra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority/exact repo/ref/destination/checks; grants none. Deduct context/copy/handoff/review costs.
 

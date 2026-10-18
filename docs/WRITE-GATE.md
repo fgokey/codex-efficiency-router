@@ -10,6 +10,10 @@ and exhausted-slot fallbacks. Unknown effect/identity is not permission.
 All Astra leaves and read-only roles stay read-only. Root Astra also defaults read-only,
 but can apply **one bounded local repair unit** when every condition below is observed:
 
+The configured native admission host always denies Astra local repair, shell, builds/tests,
+terminal continuation and unknown tools. The policy-only exception below is unavailable
+under that setting. Use native `read_only`, `prepare_agent_task` and admitted executors.
+
 1. Two qualified executor attempts failed on the same task/unit/failure signature for a
    classified implementation, capability or unexplained issue, or a handoff would
    materially lose reasoning context needed for the fix. Prerequisite, environment,

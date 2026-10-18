@@ -1,18 +1,43 @@
+diff --git a/codex-rs/Cargo.lock b/codex-rs/Cargo.lock
+index 95b790c..ce0e16d 100644
+--- a/codex-rs/Cargo.lock
++++ b/codex-rs/Cargo.lock
+@@ -3038,6 +3038,7 @@ dependencies = [
+  "serde_json",
+  "serial_test",
+  "sha1 0.10.6",
++ "sha2 0.10.9",
+  "shlex",
+  "similar",
+  "tempfile",
 diff --git a/codex-rs/config/src/config_toml.rs b/codex-rs/config/src/config_toml.rs
-index 3e5cc07..da6bd15 100644
+index 3e5cc07..9fc59da 100644
 --- a/codex-rs/config/src/config_toml.rs
 +++ b/codex-rs/config/src/config_toml.rs
-@@ -166,6 +166,8 @@ pub struct FeatureToggleToml {
+@@ -166,6 +166,9 @@ pub struct FeatureToggleToml {
  pub struct ConfigToml {
      /// Optional override of model selection.
      pub model: Option<String>,
-+    /// Trusted synchronous PreToolUse handler ID required for agent dispatch.
++    /// Trusted synchronous PreToolUse handler ID required for agent dispatch and Reader preparation.
++    /// Also enforces native read-only execution for Astra and unknown models.
 +    pub agent_admission_hook: Option<String>,
      /// Default Daybreak preference for new threads and non-interactive turns.
      pub daybreak: Option<bool>,
      /// Review model override used by the `/review` feature.
+diff --git a/codex-rs/core/Cargo.toml b/codex-rs/core/Cargo.toml
+index cfd7236..92a29b6 100644
+--- a/codex-rs/core/Cargo.toml
++++ b/codex-rs/core/Cargo.toml
+@@ -108,6 +108,7 @@ rmcp = { workspace = true, default-features = false, features = [
+ serde = { workspace = true, features = ["derive"] }
+ serde_json = { workspace = true }
+ sha1 = { workspace = true }
++sha2 = { workspace = true }
+ shlex = { workspace = true }
+ similar = { workspace = true }
+ tempfile = { workspace = true }
 diff --git a/codex-rs/core/config.schema.json b/codex-rs/core/config.schema.json
-index f22c202..4a9056c 100644
+index f22c202..8054468 100644
 --- a/codex-rs/core/config.schema.json
 +++ b/codex-rs/core/config.schema.json
 @@ -6725,6 +6725,10 @@
@@ -20,12 +45,19 @@ index f22c202..4a9056c 100644
    "description": "Base config deserialized from ~/.codex/config.toml.",
    "properties": {
 +    "agent_admission_hook": {
-+      "description": "Trusted synchronous PreToolUse handler ID required for agent dispatch.",
++      "description": "Trusted synchronous PreToolUse handler ID required for agent dispatch and Reader preparation. Also enforces native read-only execution for Astra and unknown models.",
 +      "type": "string"
 +    },
      "agents": {
        "allOf": [
          {
+@@ -7928,4 +7932,4 @@
+   },
+   "title": "ConfigToml",
+   "type": "object"
+-}
+\ No newline at end of file
++}
 diff --git a/codex-rs/core/src/agent/api.rs b/codex-rs/core/src/agent/api.rs
 index d9c8948..5c48ceb 100644
 --- a/codex-rs/core/src/agent/api.rs
@@ -261,7 +293,7 @@ index 4259308..452a0b9 100644
              token_budget_startup_config: None,
              rollout_budget,
 diff --git a/codex-rs/core/src/hook_runtime.rs b/codex-rs/core/src/hook_runtime.rs
-index 30c4162..1c971be 100644
+index 30c4162..9de4ab4 100644
 --- a/codex-rs/core/src/hook_runtime.rs
 +++ b/codex-rs/core/src/hook_runtime.rs
 @@ -180,6 +180,27 @@ pub(crate) async fn run_pending_session_start_hooks(
@@ -300,7 +332,7 @@ index 30c4162..1c971be 100644
  ) -> PreToolUseHookResult {
      let turn_context = &step_context.turn;
      let request = PreToolUseRequest {
-@@ -207,18 +229,56 @@ pub(crate) async fn run_pre_tool_use_hooks(
+@@ -207,18 +229,96 @@ pub(crate) async fn run_pre_tool_use_hooks(
          tool_input: tool_input.clone(),
      };
      let hooks = sess.hooks();
@@ -308,8 +340,10 @@ index 30c4162..1c971be 100644
 +        .config
 +        .agent_admission_hook
 +        .as_deref()
-+        .filter(|_| is_agent_dispatch(tool_name.name()));
-+    if required_hook.is_some() && !admitted_dispatch {
++        .filter(|_| {
++            is_agent_dispatch(tool_name.name()) || tool_name.name() == "prepare_agent_task"
++        });
++    if required_hook.is_some() && is_agent_dispatch(tool_name.name()) && !admitted_dispatch {
 +        return PreToolUseHookResult::Blocked(
 +            "Agent dispatch requires admitted_agent_task; raw native dispatch cannot bypass admission".to_string(),
 +        );
@@ -337,27 +371,65 @@ index 30c4162..1c971be 100644
          additional_contexts,
          updated_input,
      } = hooks.run_pre_tool_use(request).await;
-+    let required_failed = required_run.as_deref().is_some_and(|id| {
-+        let matches: Vec<_> = hook_events
++    let preparation_missing = tool_name.name() == "prepare_agent_task"
++        && !additional_contexts.iter().any(|context| {
++            context.len() <= 3500
++                && serde_json::from_str::<Value>(context).is_ok_and(|value| {
++                    value["status"] == "VERIFIED"
++                        && value["prefix"].as_str().is_some_and(|prefix| {
++                            prefix.starts_with("CER assignment (caller evidence): ")
++                        })
++                        && value["body_sha256"]
++                            .as_str()
++                            .is_some_and(|hash| hash.len() == 64)
++                })
++        });
++    let required_failed = preparation_missing
++        || required_run.as_deref().is_some_and(|id| {
++            let matches: Vec<_> = hook_events
++                .iter()
++                .filter(|event| event.run.id == id)
++                .collect();
++            !successful_runs.iter().any(|allowed| allowed == id)
++                || matches.len() != 1
++                || matches[0].run.status != codex_protocol::protocol::HookRunStatus::Completed
++                || updated_input.is_some()
++        });
++    let required_diagnostic = if required_failed {
++        hook_events
 +            .iter()
-+            .filter(|event| event.run.id == id)
-+            .collect();
-+        !successful_runs.iter().any(|allowed| allowed == id)
-+            || matches.len() != 1
-+            || matches[0].run.status != codex_protocol::protocol::HookRunStatus::Completed
-+            || updated_input.is_some()
-+    });
++            .filter(|event| Some(event.run.id.as_str()) == required_run.as_deref())
++            .map(|event| {
++                format!(
++                    "{:?}: {}",
++                    event.run.status,
++                    event
++                        .run
++                        .entries
++                        .iter()
++                        .filter(|entry| entry.kind
++                            == codex_protocol::protocol::HookOutputEntryKind::Error)
++                        .take(1)
++                        .map(|entry| entry.text.chars().take(200).collect::<String>())
++                        .collect::<String>()
++                )
++            })
++            .collect::<Vec<_>>()
++            .join("; ")
++    } else {
++        String::new()
++    };
      emit_hook_completed_events(sess, turn_context, hook_events).await;
      record_additional_contexts(sess, turn_context, additional_contexts).await;
 +    if required_failed || (required_run.is_some() && should_block) {
 +        return PreToolUseHookResult::Blocked(block_reason.unwrap_or_else(|| {
-+            "Required agent admission failed or attempted to rewrite the checked task".to_string()
++            format!("Required agent admission failed or attempted to rewrite the checked task (Reader context missing={preparation_missing}; {required_diagnostic})")
 +        }));
 +    }
 
      if !should_block {
          return PreToolUseHookResult::Continue { updated_input };
-@@ -1101,6 +1161,22 @@ mod tests {
+@@ -1101,6 +1201,22 @@ mod tests {
      use codex_utils_absolute_path::test_support::PathBufExt;
      use codex_utils_absolute_path::test_support::test_path_buf;
 
@@ -424,6 +496,27 @@ index 770a19d..badd250 100644
          if let Some(ops_log) = &self.ops_log
              && let Ok(mut log) = ops_log.lock()
              && let Some(captured_op) = capture_test_op(&op)
+diff --git a/codex-rs/core/src/tools/handlers/mod.rs b/codex-rs/core/src/tools/handlers/mod.rs
+index 710c089..58ae484 100644
+--- a/codex-rs/core/src/tools/handlers/mod.rs
++++ b/codex-rs/core/src/tools/handlers/mod.rs
+@@ -17,6 +17,7 @@ pub(crate) mod multi_agents_v2;
+ mod new_context_window;
+ pub(crate) mod new_context_window_spec;
+ mod plan;
++mod read_only;
+ pub(crate) mod plan_spec;
+ mod request_permissions;
+ mod request_plugin_install;
+@@ -67,6 +68,8 @@ pub use mcp_resource::ListMcpResourcesHandler;
+ pub use mcp_resource::ReadMcpResourceHandler;
+ pub use new_context_window::NewContextWindowHandler;
+ pub use plan::PlanHandler;
++pub use read_only::PrepareAgentTaskHandler;
++pub use read_only::ReadOnlyHandler;
+ pub(crate) use request_permissions::RequestPermissionsEnvironmentArgs;
+ pub use request_permissions::RequestPermissionsHandler;
+ pub use request_plugin_install::RequestPluginInstallHandler;
 diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2.rs
 index ea44c0a..75d5718 100644
 --- a/codex-rs/core/src/tools/handlers/multi_agents_v2.rs
@@ -439,7 +532,7 @@ index ea44c0a..75d5718 100644
  mod interrupt_agent;
 diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
 new file mode 100644
-index 0000000..2a871d0
+index 0000000..54cff41
 --- /dev/null
 +++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/admitted_task.rs
 @@ -0,0 +1,202 @@
@@ -489,7 +582,7 @@ index 0000000..2a871d0
 +            ),
 +            (
 +                "task_name",
-+                "New child identifier matching [a-z][a-z0-9_]{0,63}, e.g. review_memory; no hyphens or path; only for spawn_hold",
++                "New child identifier matching [a-z][a-z0-9_]{0,63}, e.g. review_memory; no hyphens or path; only for spawn_hold. Its result includes host-observed binding model/effort/role/owner/permissions; verify before RELEASE without shell or full-log scans.",
 +            ),
 +            (
 +                "target",
@@ -658,7 +751,7 @@ index 26d329f..25fa328 100644
              target: AgentTarget::Id(receiver_thread_id),
              resume_config,
 diff --git a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
-index 218fbdc..25b1d25 100644
+index 218fbdc..80b4694 100644
 --- a/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
 +++ b/codex-rs/core/src/tools/handlers/multi_agents_v2/spawn.rs
 @@ -54,6 +54,7 @@ impl ToolExecutor<ToolInvocation> for Handler {
@@ -669,16 +762,35 @@ index 218fbdc..25b1d25 100644
              let analytics = invocation.session.services.analytics_events_client.clone();
              let sender_thread_id = invocation.session.thread_id;
              let turn_id = invocation.step_context.turn.sub_id.clone();
-@@ -94,7 +95,19 @@ impl ToolExecutor<ToolInvocation> for Handler {
+@@ -94,7 +95,38 @@ impl ToolExecutor<ToolInvocation> for Handler {
                  completed_at_ms,
              );
 
 -            result.map(|(output, _, _, _)| boxed_tool_output(output))
-+            result.map(|(output, agent_id, _, _)| {
++            result.map(|(output, agent_id, _, snapshot)| {
 +                if admitted {
 +                    // V1 wait/close controls require an id rather than a task path.
 +                    let mut value = serde_json::to_value(output).expect("spawn result serializes");
 +                    value["agent_id"] = serde_json::json!(agent_id);
++                    let role = match &snapshot.session_source {
++                        codex_protocol::protocol::SessionSource::SubAgent(
++                            codex_protocol::protocol::SubAgentSource::ThreadSpawn { agent_role, .. },
++                        ) => agent_role.clone(),
++                        _ => None,
++                    };
++                    value["binding"] = serde_json::json!({
++                        "evidence": "host-observed loaded child spawn snapshot",
++                        "agent_id": agent_id,
++                        "model": snapshot.model,
++                        "reasoning_effort": snapshot.reasoning_effort,
++                        "role": role,
++                        "owner_thread_id": sender_thread_id,
++                        "session_source": snapshot.session_source,
++                        "approval_policy": snapshot.approval_policy,
++                        "permission_profile": snapshot.permission_profile,
++                        "full_access": snapshot.full_access,
++                        "workspace_roots": snapshot.workspace_roots,
++                    });
 +                    boxed_tool_output(crate::tools::context::FunctionToolOutput::from_text(
 +                        value.to_string(),
 +                        Some(true),
@@ -690,7 +802,7 @@ index 218fbdc..25b1d25 100644
          })
      }
  }
-@@ -116,6 +129,7 @@ async fn handle_spawn_agent(
+@@ -116,6 +148,7 @@ async fn handle_spawn_agent(
          payload,
          call_id,
          source,
@@ -698,7 +810,7 @@ index 218fbdc..25b1d25 100644
          ..
      } = invocation;
      let turn = &step_context.turn;
-@@ -145,6 +159,15 @@ async fn handle_spawn_agent(
+@@ -145,6 +178,15 @@ async fn handle_spawn_agent(
      .await
      .map_err(FunctionCallError::RespondToModel)?;
      let config = prepared.config;
@@ -714,11 +826,411 @@ index 218fbdc..25b1d25 100644
      let is_full_history_fork = matches!(fork_mode, Some(SpawnAgentForkMode::FullHistory));
      let spawn_source = thread_spawn_source(
          session.thread_id,
+diff --git a/codex-rs/core/src/tools/handlers/read_only.rs b/codex-rs/core/src/tools/handlers/read_only.rs
+new file mode 100644
+index 0000000..8265643
+--- /dev/null
++++ b/codex-rs/core/src/tools/handlers/read_only.rs
+@@ -0,0 +1,374 @@
++use crate::function_tool::FunctionCallError;
++use crate::tools::context::FunctionToolOutput;
++use crate::tools::context::ToolInvocation;
++use crate::tools::context::ToolPayload;
++use crate::tools::context::boxed_tool_output;
++use crate::tools::handlers::parse_arguments;
++use crate::tools::handlers::resolve_tool_environment;
++use crate::tools::registry::CoreToolRuntime;
++use crate::tools::registry::ToolExecutor;
++use codex_exec_server::GetMetadataOptions;
++use codex_exec_server::ReadFileOptions;
++use codex_tools::JsonSchema;
++use codex_tools::ResponsesApiTool;
++use codex_tools::ToolName;
++use codex_tools::ToolSpec;
++use serde::Deserialize;
++use serde_json::Value;
++use serde_json::json;
++use sha2::Digest;
++use sha2::Sha256;
++use std::collections::BTreeMap;
++
++const MAX_FILE_BYTES: usize = 16 * 1024 * 1024;
++const MAX_OUTPUT_BYTES: usize = 3072;
++
++pub struct ReadOnlyHandler;
++
++#[derive(Deserialize)]
++#[serde(deny_unknown_fields)]
++struct ReadOnlyArgs {
++    path: String,
++    #[serde(default)]
++    offset: usize,
++    sha256: Option<String>,
++    environment_id: Option<String>,
++}
++
++fn error(message: impl Into<String>) -> FunctionCallError {
++    FunctionCallError::RespondToModel(message.into())
++}
++
++impl ToolExecutor<ToolInvocation> for ReadOnlyHandler {
++    fn tool_name(&self) -> ToolName {
++        ToolName::plain("read_only")
++    }
++
++    fn spec(&self) -> ToolSpec {
++        let properties = BTreeMap::from([
++            ("path".to_string(), JsonSchema::string(Some("Literal file or directory path.".to_string()))),
++            ("offset".to_string(), JsonSchema::number(Some("Continuation offset returned by the previous page; default 0.".to_string()))),
++            ("sha256".to_string(), JsonSchema::string(Some("For continuation, pass the previous page's sha256; changed sources are rejected.".to_string()))),
++            ("environment_id".to_string(), JsonSchema::string(Some("Optional environment identifier.".to_string()))),
++        ]);
++        ToolSpec::Function(ResponsesApiTool {
++            name: "read_only".to_string(),
++            description: "Read one bounded UTF-8 file or directory page through the environment filesystem and its read permissions. No shell, interpreter, command execution or writes. Output is at most 3072 JSON bytes and 200 lines. Continue using next_offset and sha256; do not merge pages into full files.".to_string(),
++            strict: false,
++            defer_loading: None,
++            parameters: JsonSchema::object(properties, Some(vec!["path".to_string()]), Some(false.into())),
++            output_schema: None,
++        })
++    }
++
++    fn supports_parallel_tool_calls(&self) -> bool {
++        true
++    }
++
++    fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        Box::pin(async move {
++            let ToolPayload::Function { arguments } = invocation.payload else {
++                return Err(error("read_only requires structured function arguments"));
++            };
++            let args: ReadOnlyArgs = parse_arguments(&arguments)?;
++            if args.path.len() > 2048 {
++                return Err(error("read_only path exceeds 2048 bytes"));
++            }
++            let environment = resolve_tool_environment(
++                &invocation.step_context,
++                args.environment_id.as_deref(),
++                "read_only is unavailable in this session",
++            )?;
++            let path = environment
++                .cwd()
++                .join(&args.path)
++                .map_err(|e| error(e.to_string()))?;
++            let sandbox = environment.sandbox_context(None);
++            let fs = environment.environment.get_filesystem();
++            let metadata = fs
++                .get_metadata(&path, GetMetadataOptions::default(), Some(&sandbox))
++                .await
++                .map_err(|e| error(e.to_string()))?;
++            let text = if metadata.is_directory {
++                let mut entries = fs
++                    .read_directory(&path, Some(&sandbox))
++                    .await
++                    .map_err(|e| error(e.to_string()))?;
++                if entries.len() > 10_000 {
++                    return Err(error(
++                        "read_only directory exceeds 10000 entries; narrow the path",
++                    ));
++                }
++                entries.sort_by(|a, b| a.file_name.cmp(&b.file_name));
++                entries
++                    .into_iter()
++                    .map(|entry| {
++                        format!(
++                            "{}{}\n",
++                            entry.file_name,
++                            if entry.is_directory { "/" } else { "" }
++                        )
++                    })
++                    .collect::<String>()
++            } else if metadata.is_file && metadata.size <= MAX_FILE_BYTES as u64 {
++                let bytes = fs
++                    .read_file(&path, ReadFileOptions::default(), Some(&sandbox))
++                    .await
++                    .map_err(|e| error(e.to_string()))?;
++                if bytes.len() > MAX_FILE_BYTES {
++                    return Err(error(
++                        "read_only file grew beyond 16 MiB; narrow the source",
++                    ));
++                }
++                String::from_utf8(bytes).map_err(|_| error("read_only requires UTF-8 text"))?
++            } else {
++                return Err(error(
++                    "read_only requires a regular file up to 16 MiB or a directory",
++                ));
++            };
++            let page = read_page(&text, args.offset, args.sha256.as_deref())?;
++            Ok(boxed_tool_output(FunctionToolOutput::from_text(
++                page.to_string(),
++                Some(true),
++            )))
++        })
++    }
++}
++
++impl CoreToolRuntime for ReadOnlyHandler {}
++
++/// The required trusted hook runs the installed Reader's assignment preflight and
++/// injects its bounded result into context before this no-op handler can succeed.
++pub struct PrepareAgentTaskHandler;
++
++impl ToolExecutor<ToolInvocation> for PrepareAgentTaskHandler {
++    fn tool_name(&self) -> ToolName {
++        ToolName::plain("prepare_agent_task")
++    }
++
++    fn spec(&self) -> ToolSpec {
++        let recipient = JsonSchema::object(
++            ["id", "model", "effort", "evidence_ref"]
++                .into_iter()
++                .map(|key| (key.to_string(), JsonSchema::string(None)))
++                .collect(),
++            Some(
++                ["id", "model", "effort", "evidence_ref"]
++                    .into_iter()
++                    .map(str::to_string)
++                    .collect(),
++            ),
++            Some(false.into()),
++        );
++        let signals = JsonSchema::object(
++            [
++                "spec_complete",
++                "authority_ready",
++                "environment_ready",
++                "observability_ready",
++            ]
++            .into_iter()
++            .map(|key| (key.to_string(), JsonSchema::boolean(None)))
++            .collect(),
++            Some(
++                [
++                    "spec_complete",
++                    "authority_ready",
++                    "environment_ready",
++                    "observability_ready",
++                ]
++                .into_iter()
++                .map(str::to_string)
++                .collect(),
++            ),
++            Some(true.into()),
++        );
++        let mut request: BTreeMap<_, _> = ["unit_id", "purpose", "scope", "message"]
++            .into_iter()
++            .map(|key| (key.to_string(), JsonSchema::string(None)))
++            .collect();
++        request.insert("recipient".to_string(), recipient);
++        request.insert("signals".to_string(), signals);
++        for key in ["complexity_reason", "effort_reason"] {
++            request.insert(key.to_string(), JsonSchema::string(None));
++        }
++        for key in ["confirmed_simple", "effort_supported"] {
++            request.insert(key.to_string(), JsonSchema::boolean(None));
++        }
++        ToolSpec::Function(ResponsesApiTool {
++            name: "prepare_agent_task".to_string(),
++            description: "Generate a fresh Reader assignment envelope through the configured mandatory trusted admission hook, without shell access. Pass the Reader assignment request object with unit_id, purpose=new_unit, scope, exact message, observed recipient and readiness signals. The hook adds the VERIFIED result and exact prefix to context; only then may admitted_agent_task assign prefix + the checked message. This does not itself send work or grant write authority.".to_string(),
++            strict: false,
++            defer_loading: None,
++            parameters: JsonSchema::object(
++                BTreeMap::from([("request".to_string(), JsonSchema::object(request, Some(["unit_id", "purpose", "scope", "message", "recipient", "signals"].into_iter().map(str::to_string).collect()), Some(false.into())))]),
++                Some(vec!["request".to_string()]), Some(false.into()),
++            ),
++            output_schema: None,
++        })
++    }
++
++    fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        Box::pin(async move {
++            if invocation
++                .turn
++                .config
++                .agent_admission_hook
++                .as_deref()
++                .is_none_or(str::is_empty)
++            {
++                return Err(error("Required agent admission hook is not configured"));
++            }
++            Ok(boxed_tool_output(FunctionToolOutput::from_text(
++                "Fresh Reader assignment accepted by the required trusted hook. Use its context result's prefix with the exact checked message; recipient evidence still requires parent verification and RELEASE.".to_string(), Some(true),
++            )))
++        })
++    }
++}
++
++impl CoreToolRuntime for PrepareAgentTaskHandler {}
++
++fn read_page(
++    text: &str,
++    offset: usize,
++    expected_hash: Option<&str>,
++) -> Result<Value, FunctionCallError> {
++    let hash = format!("{:x}", Sha256::digest(text.as_bytes()));
++    if expected_hash.is_some_and(|expected| expected != hash) {
++        return Err(error("read_only source changed; restart at offset 0"));
++    }
++    if offset > text.len()
++        || !text.is_char_boundary(offset)
++        || (offset > 0 && expected_hash.is_none())
++    {
++        return Err(error(
++            "read_only continuation requires a valid UTF-8 offset and sha256",
++        ));
++    }
++    let mut page = json!({
++        "data": "", "start_line": text[..offset].bytes().filter(|b| *b == b'\n').count() + 1,
++        "offset": offset, "next_offset": null, "sha256": hash,
++    });
++    let mut end = offset;
++    let mut lines = 0;
++    for (index, ch) in text[offset..].char_indices() {
++        let candidate = offset + index + ch.len_utf8();
++        page["data"] = json!(&text[offset..candidate]);
++        page["next_offset"] = if candidate < text.len() {
++            json!(candidate)
++        } else {
++            Value::Null
++        };
++        if page.to_string().len() > MAX_OUTPUT_BYTES {
++            break;
++        }
++        end = candidate;
++        if ch == '\n' {
++            lines += 1;
++            if lines == 200 {
++                break;
++            }
++        }
++    }
++    page["data"] = json!(&text[offset..end]);
++    page["next_offset"] = if end < text.len() {
++        json!(end)
++    } else {
++        Value::Null
++    };
++    Ok(page)
++}
++
++#[cfg(test)]
++mod tests {
++    #[test]
++    fn preparation_discovery_exposes_required_recipient_evidence() {
++        use crate::tools::registry::ToolExecutor;
++        let codex_tools::ToolSpec::Function(spec) = super::PrepareAgentTaskHandler.spec() else {
++            panic!("expected function spec");
++        };
++        let schema = serde_json::to_value(spec.parameters).unwrap();
++        let request = &schema["properties"]["request"];
++        assert_eq!(request["additionalProperties"], false);
++        assert!(
++            request["properties"]["recipient"]["required"]
++                .as_array()
++                .unwrap()
++                .contains(&serde_json::json!("evidence_ref"))
++        );
++        assert!(request["properties"].get("evidence_ref").is_none());
++        for optional in [
++            "complexity_reason",
++            "effort_reason",
++            "confirmed_simple",
++            "effort_supported",
++        ] {
++            assert!(
++                request["properties"].get(optional).is_some(),
++                "Reader field {optional} must remain representable"
++            );
++            assert!(
++                !request["required"]
++                    .as_array()
++                    .unwrap()
++                    .contains(&serde_json::json!(optional))
++            );
++        }
++        for model in ["gpt-6.1-sol", "gpt-6-astra"] {
++            let mut input = serde_json::json!({"unit_id":"fixture","purpose":"new_unit","scope":"fixture", "message":"review fixture",
++                "recipient":{"id":"observed-child","model":model,"effort":"high","evidence_ref":"host-observed binding"},
++                "signals":{"spec_complete":true,"authority_ready":true,"environment_ready":true,"observability_ready":true}});
++            if model == "gpt-6-astra" {
++                input["complexity_reason"] =
++                    serde_json::json!("very complex cross-component evidence conflict");
++                input["signals"]["very_complex"] = serde_json::json!(true);
++                input["signals"]["sol61_unsuitable_reason"] = serde_json::json!(
++                    "unresolved evidence arbitration requires exceptional reasoning"
++                );
++            }
++            for key in input.as_object().unwrap().keys() {
++                assert!(
++                    request["properties"].get(key).is_some(),
++                    "{model}: unsupported Reader field {key}"
++                );
++            }
++            for key in request["required"].as_array().unwrap() {
++                assert!(input.get(key.as_str().unwrap()).is_some());
++            }
++        }
++    }
++
++    use super::*;
++
++    #[test]
++    fn pages_are_bounded_and_reject_invalid_or_changed_continuations() {
++        let text = "汉字\\\"\n".repeat(2000);
++        let first = read_page(&text, 0, None).unwrap();
++        assert!(first.to_string().len() <= MAX_OUTPUT_BYTES);
++        assert!(first["data"].as_str().unwrap().lines().count() <= 200);
++        let offset = first["next_offset"].as_u64().unwrap() as usize;
++        let hash = first["sha256"].as_str().unwrap();
++        let second = read_page(&text, offset, Some(hash)).unwrap();
++        assert_eq!(second["offset"], offset);
++        assert!(read_page(&text, offset, None).is_err());
++        assert!(read_page("changed", offset, Some(hash)).is_err());
++        assert!(read_page(&text, 1, Some(hash)).is_err());
++        assert!(read_page(&text, text.len() + 1, Some(hash)).is_err());
++    }
++
++    #[test]
++    fn empty_and_long_lines_have_explicit_continuations() {
++        assert!(read_page("", 0, None).unwrap()["next_offset"].is_null());
++        let text = "x".repeat(10000);
++        let page = read_page(&text, 0, None).unwrap();
++        assert!(page["next_offset"].as_u64().unwrap() < text.len() as u64);
++        assert!(page.to_string().len() <= MAX_OUTPUT_BYTES);
++        assert!(serde_json::from_str::<ReadOnlyArgs>(r#"{"path":"x","cmd":"write"}"#).is_err());
++    }
++}
 diff --git a/codex-rs/core/src/tools/registry.rs b/codex-rs/core/src/tools/registry.rs
-index e0acae2..a8dcdbe 100644
+index e0acae2..d9f8a29 100644
 --- a/codex-rs/core/src/tools/registry.rs
 +++ b/codex-rs/core/src/tools/registry.rs
-@@ -613,6 +613,7 @@ impl ToolRegistry {
+@@ -578,6 +578,19 @@ impl ToolRegistry {
+             }
+         };
+         let telemetry_tags = tool.telemetry_tags(&invocation);
++        if !admission_execution_allowed(&invocation, tool.as_ref()) {
++            let err = FunctionCallError::RespondToModel(
++                "Read-only agent execution boundary: Astra/unknown models cannot execute shell, patches, builds, tests, terminal continuations or third-party tools. Use read_only for bounded inspection, prepare_agent_task for a fresh Reader envelope, and admitted_agent_task for an authorized executor; keep the parent model.".to_string(),
++            );
++            dispatch_trace.record_failed(&err);
++            notify_tool_finish_if_unclaimed(
++                &invocation,
++                call_state.as_deref(),
++                ToolCallOutcome::Blocked,
++            )
++            .await;
++            return Err(err);
++        }
+         let mut tool_result_tags = Vec::with_capacity(2 + telemetry_tags.len() + 1);
+         let mut extra_trace_fields = Vec::new();
+         sandbox_tags.append_metric_tags(&mut tool_result_tags);
+@@ -613,6 +626,7 @@ impl ToolRegistry {
                  invocation.call_id.clone(),
                  &pre_tool_use_payload.tool_name,
                  &pre_tool_use_payload.tool_input,
@@ -726,7 +1238,80 @@ index e0acae2..a8dcdbe 100644
              )
              .await
              {
-@@ -845,6 +846,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
+@@ -837,6 +851,72 @@ async fn handle_any_tool(
+     Ok(result)
+ }
+
++fn admission_execution_allowed(invocation: &ToolInvocation, tool: &dyn CoreToolRuntime) -> bool {
++    if invocation.turn.config.agent_admission_hook.is_none() {
++        return true;
++    }
++    // Use the host-captured step identity, including the origin retained by code-mode cells.
++    // Unknown/snapshot aliases require an explicit audited addition, never prefix matching.
++    if matches!(
++        invocation.step_context.settings.model_info.slug.as_str(),
++        "gpt-6.1-sol"
++            | "gpt-6-sol"
++            | "gpt-6-luna"
++            | "gpt-5.6-sol"
++            | "gpt-5.6-terra"
++            | "gpt-5.6-luna"
++    ) {
++        return true;
++    }
++    if tool.is_third_party_tool() {
++        return false;
++    }
++    let name = &invocation.tool_name;
++    if name.is_default_namespace() {
++        return matches!(
++            name.name.as_str(),
++            "read_only"
++                | "view_image"
++                | "prepare_agent_task"
++                | "admitted_agent_task"
++                | "exec"
++                | "wait"
++                | "update_plan"
++                | "get_context_remaining"
++                | "tool_search"
++                | "request_user_input"
++                | "request_user_input_async"
++                | "send_message_to_user_async"
++                | "wait_agent"
++                | "list_agents"
++                | "interrupt_agent"
++                | "close_agent"
++                | "spawn_agent"
++                | "send_input"
++                | "send_message"
++                | "followup_task"
++                | "resume_agent"
++        );
++    }
++    match name.namespace.as_deref() {
++        Some("clock") => matches!(name.name.as_str(), "curr_time" | "sleep"),
++        Some("collaboration" | MULTI_AGENT_V1_NAMESPACE) => matches!(
++            name.name.as_str(),
++            "wait"
++                | "wait_agent"
++                | "list_agents"
++                | "interrupt_agent"
++                | "close_agent"
++                | "spawn_agent"
++                | "send_input"
++                | "send_message"
++                | "followup_task"
++                | "resume_agent"
++        ),
++        _ => false,
++    }
++}
++
+ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
+     if invocation.tool_name.name == "spawn_agent"
+         && (invocation.tool_name.is_default_namespace()
+@@ -845,6 +925,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
          return HookToolName::spawn_agent();
      }
 
@@ -743,7 +1328,7 @@ index e0acae2..a8dcdbe 100644
  }
 
 diff --git a/codex-rs/core/src/tools/registry_tests.rs b/codex-rs/core/src/tools/registry_tests.rs
-index 895d8d4..aa3e0a9 100644
+index 895d8d4..4e1d389 100644
 --- a/codex-rs/core/src/tools/registry_tests.rs
 +++ b/codex-rs/core/src/tools/registry_tests.rs
 @@ -576,6 +576,36 @@ async fn code_mode_wait_does_not_expose_default_hook_payloads() {
@@ -783,13 +1368,167 @@ index 895d8d4..aa3e0a9 100644
  #[tokio::test]
  async fn write_stdin_does_not_expose_default_pre_tool_use_payload() {
      let (session, turn) = crate::session::tests::make_session_and_context().await;
+@@ -842,3 +872,148 @@ fn test_invocation(
+         },
+     }
+ }
++
++#[tokio::test]
++async fn admission_host_enforces_read_only_models_before_tool_execution() -> anyhow::Result<()> {
++    use crate::tools::context::ToolCallSource;
++
++    for model in ["gpt-6-astra", "UNKNOWN", "gpt-6.1-sol"] {
++        for source in [
++            ToolCallSource::Direct,
++            ToolCallSource::CodeMode {
++                cell_id: "boundary-cell".to_string(),
++                runtime_tool_call_id: "nested-call".to_string(),
++            },
++        ] {
++            let (session, mut turn) = crate::session::tests::make_session_and_context().await;
++            Arc::make_mut(&mut turn.config).agent_admission_hook = Some("required".to_string());
++            let session = Arc::new(session);
++            let turn = Arc::new(turn);
++            for name in [
++                "exec_command",
++                "shell",
++                "apply_patch",
++                "write_stdin",
++                "unknown_mutation",
++                "read_only",
++                "admitted_agent_task",
++                "exec",
++                "wait",
++            ] {
++                let tool_name = ToolName::plain(name);
++                let registry = ToolRegistry::from_tools([Arc::new(TestHandler {
++                    tool_name: tool_name.clone(),
++                })
++                    as Arc<dyn CoreToolRuntime>]);
++                let mut invocation = test_invocation(
++                    Arc::clone(&session),
++                    Arc::clone(&turn),
++                    "boundary-call",
++                    tool_name,
++                );
++                invocation.source = source.clone();
++                let step = Arc::get_mut(&mut invocation.step_context).expect("unique step");
++                Arc::make_mut(&mut Arc::make_mut(&mut step.settings).model_info).slug =
++                    model.to_string();
++                let result = registry.dispatch_any_with_state(invocation, None).await;
++                let safe = matches!(name, "read_only" | "admitted_agent_task" | "exec" | "wait");
++                if model == "gpt-6.1-sol" || safe {
++                    assert!(result.is_ok(), "{model} {source:?} {name} should execute");
++                } else {
++                    let error = match result {
++                        Ok(_) => panic!("{model} {source:?} {name} executed without delegation"),
++                        Err(error) => error,
++                    };
++                    assert!(
++                        error
++                            .to_string()
++                            .contains("Read-only agent execution boundary")
++                    );
++                }
++            }
++        }
++    }
++    Ok(())
++}
++
++struct ThirdPartyNamedSafeTool(TestHandler);
++
++impl ToolExecutor<ToolInvocation> for ThirdPartyNamedSafeTool {
++    fn tool_name(&self) -> ToolName {
++        self.0.tool_name()
++    }
++    fn spec(&self) -> ToolSpec {
++        self.0.spec()
++    }
++    fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        self.0.handle(invocation)
++    }
++}
++
++impl CoreToolRuntime for ThirdPartyNamedSafeTool {
++    fn is_third_party_tool(&self) -> bool {
++        true
++    }
++}
++
++#[tokio::test]
++async fn admission_host_coordination_names_and_third_party_spoofing() {
++    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
++    Arc::make_mut(&mut turn.config).agent_admission_hook = Some("required".to_string());
++    let session = Arc::new(session);
++    let turn = Arc::new(turn);
++    for name in [
++        ToolName::namespaced("clock", "curr_time"),
++        ToolName::namespaced("collaboration", "wait_agent"),
++        ToolName::namespaced("collaboration", "list_agents"),
++        ToolName::namespaced("collaboration", "interrupt_agent"),
++        ToolName::namespaced("multi_agent_v1", "wait"),
++        ToolName::namespaced("multi_agent_v1", "close_agent"),
++        ToolName::plain("read_only"),
++        ToolName::plain("exec"),
++    ] {
++        let mut invocation = test_invocation(
++            Arc::clone(&session),
++            Arc::clone(&turn),
++            "coordination",
++            name.clone(),
++        );
++        let step = Arc::get_mut(&mut invocation.step_context).unwrap();
++        Arc::make_mut(&mut Arc::make_mut(&mut step.settings).model_info).slug =
++            "gpt-6-astra".to_string();
++        let builtin = TestHandler { tool_name: name };
++        assert!(admission_execution_allowed(&invocation, &builtin));
++        assert!(!admission_execution_allowed(
++            &invocation,
++            &ThirdPartyNamedSafeTool(builtin)
++        ));
++    }
++}
++
++#[tokio::test]
++async fn admission_host_preparation_cannot_succeed_without_required_hook() {
++    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
++    Arc::make_mut(&mut turn.config).agent_admission_hook = Some("missing-hook".to_string());
++    let tool_name = ToolName::plain("prepare_agent_task");
++    let registry = ToolRegistry::from_tools([Arc::new(TestHandler {
++        tool_name: tool_name.clone(),
++    }) as Arc<dyn CoreToolRuntime>]);
++    let result = registry
++        .dispatch_any_with_state(
++            test_invocation(Arc::new(session), Arc::new(turn), "prepare", tool_name),
++            None,
++        )
++        .await;
++    let error = match result {
++        Ok(_) => panic!("preparation executed without a trusted hook"),
++        Err(error) => error,
++    };
++    assert!(
++        error
++            .to_string()
++            .contains("Required trusted synchronous agent admission hook is unavailable")
++    );
++}
 diff --git a/codex-rs/core/src/tools/spec_plan.rs b/codex-rs/core/src/tools/spec_plan.rs
-index 7e22134..d4d26fa 100644
+index 7e22134..d68057a 100644
 --- a/codex-rs/core/src/tools/spec_plan.rs
 +++ b/codex-rs/core/src/tools/spec_plan.rs
-@@ -1374,6 +1374,14 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+@@ -1373,7 +1373,19 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+ #[instrument(level = "trace", skip_all)]
  fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, registry: &mut ToolRegistry) {
      let turn_context = context.turn_context;
++    if turn_context.config.agent_admission_hook.is_some() {
++        registry.add(crate::tools::handlers::ReadOnlyHandler);
++        registry.add(crate::tools::handlers::PrepareAgentTaskHandler);
++    }
      if collab_tools_enabled(turn_context, context.model_info) {
 +        // Stored V1 conversations also have raw dispatch blocked by the admission hook.
 +        // Keep the checked entry available to both direct calls and code-mode discovery.
@@ -803,10 +1542,10 @@ index 7e22134..d4d26fa 100644
              let model_messages = ResolvedModelMessages::from_model(context.model_info);
              let spawn_agent_description =
 diff --git a/codex-rs/core/src/tools/spec_plan_tests.rs b/codex-rs/core/src/tools/spec_plan_tests.rs
-index 395cc95..2c61f83 100644
+index 395cc95..e5e21ab 100644
 --- a/codex-rs/core/src/tools/spec_plan_tests.rs
 +++ b/codex-rs/core/src/tools/spec_plan_tests.rs
-@@ -2743,6 +2743,50 @@ async fn code_mode_excludes_default_namespace_tools() {
+@@ -2743,6 +2743,54 @@ async fn code_mode_excludes_default_namespace_tools() {
      assert!(!exec.description.contains("update_plan(args:"));
  }
 
@@ -829,7 +1568,11 @@ index 395cc95..2c61f83 100644
 +                });
 +            })
 +            .await;
-+            plan.assert_registered_contains(&["admitted_agent_task"]);
++            plan.assert_registered_contains(&[
++                "admitted_agent_task",
++                "read_only",
++                "prepare_agent_task",
++            ]);
 +            assert_eq!(plan.exposure("admitted_agent_task"), ToolExposure::Direct);
 +            if code_mode {
 +                assert!(
@@ -857,6 +1600,527 @@ index 395cc95..2c61f83 100644
  #[tokio::test]
  async fn multi_agent_feature_selects_one_agent_tool_family() {
      let v1 = probe(|turn| {
+diff --git a/codex-rs/core/tests/suite/admission_boundary.rs b/codex-rs/core/tests/suite/admission_boundary.rs
+new file mode 100644
+index 0000000..2f56d6f
+--- /dev/null
++++ b/codex-rs/core/tests/suite/admission_boundary.rs
+@@ -0,0 +1,431 @@
++use anyhow::Context;
++use anyhow::Result;
++use codex_features::Feature;
++use codex_models_manager::bundled_models_response;
++use codex_protocol::models::PermissionProfile;
++use codex_protocol::openai_models::ModelsResponse;
++use codex_protocol::openai_models::ReasoningEffort;
++use core_test_support::hooks::trust_discovered_hooks;
++use core_test_support::responses::ev_apply_patch_custom_tool_call;
++use core_test_support::responses::ev_assistant_message;
++use core_test_support::responses::ev_completed;
++use core_test_support::responses::ev_function_call;
++use core_test_support::responses::ev_response_created;
++use core_test_support::responses::mount_sse_sequence;
++use core_test_support::responses::sse;
++use core_test_support::responses::start_mock_server;
++use core_test_support::skip_if_no_network;
++use core_test_support::test_codex::test_codex;
++use serde_json::Value;
++use std::fs;
++use tempfile::TempDir;
++
++#[tokio::test]
++#[ignore = "requires CER_NATIVE_ROUTER_ROOT and CER_NATIVE_PYTHON for the real trusted Router hook"]
++async fn admission_host_real_reader_dispatches_sol61_child_without_parent_shell() -> Result<()> {
++    use std::collections::VecDeque;
++    use std::sync::Arc;
++    use std::sync::Mutex;
++    use wiremock::Mock;
++    use wiremock::ResponseTemplate;
++
++    fn turn(queue: &Arc<Mutex<VecDeque<String>>>, id: &str, name: &str, args: Value) {
++        queue.lock().unwrap().extend([
++            sse(vec![
++                ev_response_created(id),
++                ev_function_call(id, name, &args.to_string()),
++                ev_completed(id),
++            ]),
++            sse(vec![
++                ev_assistant_message(&format!("{id}-done"), "checked"),
++                ev_completed(&format!("{id}-end")),
++            ]),
++        ]);
++    }
++    fn output(requests: &[wiremock::Request], call_id: &str) -> Result<String> {
++        for request in requests.iter().rev() {
++            let body: Value = request.body_json()?;
++            for item in body["input"].as_array().into_iter().flatten() {
++                if item["type"] == "function_call_output" && item["call_id"] == call_id {
++                    return item["output"]
++                        .as_str()
++                        .map(str::to_string)
++                        .context("text tool result");
++                }
++            }
++        }
++        anyhow::bail!("missing native result {call_id}")
++    }
++    let router = std::path::PathBuf::from(
++        std::env::var_os("CER_NATIVE_ROUTER_ROOT").context("CER_NATIVE_ROUTER_ROOT")?,
++    );
++    let python = std::path::PathBuf::from(
++        std::env::var_os("CER_NATIVE_PYTHON").context("CER_NATIVE_PYTHON")?,
++    );
++    anyhow::ensure!(router.is_absolute() && python.is_absolute());
++    for v2 in [false, true] {
++        let server = start_mock_server().await;
++        let parent_queue = Arc::new(Mutex::new(VecDeque::<String>::new()));
++        let child_queue = Arc::new(Mutex::new(VecDeque::<String>::from([sse(vec![
++            ev_assistant_message(
++                "identity",
++                "HOLD identity: gpt-6.1-sol/high; fixture workspace",
++            ),
++            ev_completed("hold-done"),
++        ])])));
++        let parent_responses = Arc::clone(&parent_queue);
++        let child_responses = Arc::clone(&child_queue);
++        Mock::given(wiremock::matchers::method("POST"))
++            .respond_with(move |request: &wiremock::Request| {
++                let body: Value = request.body_json().unwrap();
++                let queue = if body["model"] == "gpt-6-astra" {
++                    &parent_responses
++                } else {
++                    &child_responses
++                };
++                let reply = queue
++                    .lock()
++                    .unwrap()
++                    .pop_front()
++                    .expect("scripted native model response");
++                ResponseTemplate::new(200)
++                    .insert_header("content-type", "text/event-stream")
++                    .set_body_string(reply)
++            })
++            .mount(&server)
++            .await;
++        let mut models = Vec::new();
++        let base = bundled_models_response()?
++            .models
++            .into_iter()
++            .find(|m| m.slug == "gpt-5.5")
++            .unwrap();
++        for slug in ["gpt-6-astra", "gpt-6.1-sol"] {
++            let mut model = base.clone();
++            model.slug = slug.to_string();
++            models.push(model);
++        }
++        let guard = router.join("hooks/astra_write_guard.py");
++        let policy = router.join("skills/codex-efficiency-router");
++        use sha2::Digest;
++        let mut guard_files = std::collections::BTreeMap::new();
++        for name in ["astra_write_guard.py", "readonly_reader.py"] {
++            guard_files.insert(
++                name,
++                format!(
++                    "{:x}",
++                    sha2::Sha256::digest(fs::read(router.join("hooks").join(name))?)
++                ),
++            );
++        }
++        let bundle = format!(
++            "{:x}",
++            sha2::Sha256::digest(serde_json::to_vec(&guard_files)?)
++        );
++        let python_for_hook = python.clone();
++        let mut builder = test_codex()
++            .with_model("gpt-6-astra")
++            .with_pre_build_hook(move |home| {
++                let args = [
++                    python_for_hook.clone(),
++                    "-I".into(),
++                    "-B".into(),
++                    guard.clone(),
++                    "--expected-bundle".into(),
++                    bundle.clone().into(),
++                    "--dispatch-only".into(),
++                    "--policy-root".into(),
++                    policy.clone(),
++                    "--host-directory".into(),
++                    home.to_path_buf(),
++                ];
++                let command = format!(
++                    "{}{}",
++                    if cfg!(windows) { "& " } else { "" },
++                    args.iter()
++                        .map(|arg| format!("'{}'", arg.display()))
++                        .collect::<Vec<_>>()
++                        .join(" ")
++                );
++                fs::write(
++                    home.join("hooks.json"),
++                    serde_json::json!({"hooks":{"PreToolUse":[{
++                        "matcher":"^(spawn_agent|followup_task|prepare_agent_task)$",
++                        "hooks":[{"type":"command","command":command,"timeout":10}]
++                    }]}})
++                    .to_string(),
++                )
++                .unwrap();
++            })
++            .with_config(move |config| {
++                trust_discovered_hooks(config);
++                let listed = codex_hooks::list_hooks(codex_hooks::HooksConfig {
++                    feature_enabled: true,
++                    config_layer_stack: Some(config.config_layer_stack.clone()),
++                    ..Default::default()
++                });
++                config.agent_admission_hook = Some(format!(
++                    "pre-tool-use:{}:{}",
++                    listed.hooks[0].display_order,
++                    listed.hooks[0].source_path.as_path().display()
++                ));
++                config.model_catalog = Some(ModelsResponse { models });
++                config.model_reasoning_effort = Some(ReasoningEffort::High);
++                config.features.enable(Feature::Collab).unwrap();
++                if v2 {
++                    config.features.enable(Feature::MultiAgentV2).unwrap();
++                } else {
++                    config.features.disable(Feature::MultiAgentV2).unwrap();
++                }
++            });
++        let test = builder.build(&server).await?;
++        fs::write(
++            test.workspace_path("evidence.txt"),
++            "owned native fixture\n",
++        )?;
++        turn(
++            &parent_queue,
++            "inspect",
++            "read_only",
++            serde_json::json!({"path":"evidence.txt"}),
++        );
++        test.submit_turn_with_permission_profile(
++            "read bounded evidence",
++            PermissionProfile::Disabled,
++        )
++        .await?;
++        assert!(
++            output(&server.received_requests().await.unwrap(), "inspect")?
++                .contains("owned native fixture")
++        );
++        turn(
++            &parent_queue,
++            "spawn",
++            "admitted_agent_task",
++            serde_json::json!({
++                "operation":"spawn_hold", "task_name":"fixture_executor", "agent_type":"default",
++                "model":"gpt-6.1-sol", "reasoning_effort":"high",
++                "body":"HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE."
++            }),
++        );
++        test.submit_turn("spawn identity HOLD").await?;
++        let spawn_output = output(&server.received_requests().await.unwrap(), "spawn")?;
++        let spawned: Value = serde_json::from_str(&spawn_output)
++            .with_context(|| format!("native spawn response: {spawn_output}"))?;
++        let child_id = spawned["agent_id"].as_str().context("spawned agent_id")?;
++        let binding = &spawned["binding"];
++        assert_eq!(binding["model"], "gpt-6.1-sol");
++        assert_eq!(binding["reasoning_effort"], "high");
++        assert_eq!(
++            binding["owner_thread_id"],
++            test.session_configured.session_id.to_string()
++        );
++        assert!(!binding["role"].is_null(), "host-observed resolved role");
++        assert!(!binding["approval_policy"].is_null());
++        assert!(!binding["permission_profile"].is_null());
++        assert_eq!(binding["full_access"], true);
++        let child = test
++            .thread_manager
++            .get_thread(codex_protocol::ThreadId::from_string(child_id)?)
++            .await?;
++        tokio::time::timeout(std::time::Duration::from_secs(15), async {
++            while !matches!(
++                child.agent_status().await,
++                codex_protocol::protocol::AgentStatus::Completed(_)
++            ) {
++                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++            }
++        })
++        .await?;
++        let message = "RELEASE. Own fixture.txt only. Write the fixture and run its assertion. Preserve other edits.";
++        // Fault injection removes only the real parent's asynchronous DB projection.
++        // Parent/recipient binding still comes from the native spawn result above.
++        let injection = std::process::Command::new(&python).args([
++            "-I", "-B", "-c",
++            "import sqlite3,sys; db=sqlite3.connect(sys.argv[1]); cur=db.execute('UPDATE threads SET model=NULL,reasoning_effort=NULL WHERE id=?',(sys.argv[2],)); assert cur.rowcount==1; db.commit(); assert db.execute('SELECT model,reasoning_effort FROM threads WHERE id=?',(sys.argv[2],)).fetchone()==(None,None); db.close()",
++        ]).arg(test.codex_home_path().join("state_5.sqlite"))
++            .arg(test.session_configured.session_id.to_string()).output()?;
++        assert!(
++            injection.status.success(),
++            "{}",
++            String::from_utf8_lossy(&injection.stderr)
++        );
++        let request = serde_json::json!({"unit_id":"native-fixture", "purpose":"new_unit",
++            "scope":"fixture.txt and its assertion", "message":message,
++            "recipient":{"id":child_id,"model":binding["model"],"effort":binding["reasoning_effort"],"evidence_ref":"fresh parent-visible host spawn binding and completed HOLD"},
++            "signals":{"spec_complete":true,"authority_ready":true,"environment_ready":true,"observability_ready":true}});
++        turn(
++            &parent_queue,
++            "prepare",
++            "prepare_agent_task",
++            serde_json::json!({"request":request}),
++        );
++        test.submit_turn("prepare exact new fixture task").await?;
++        let requests = server.received_requests().await.unwrap();
++        let preparation_output = output(&requests, "prepare")?;
++        assert!(
++            preparation_output.contains("Fresh Reader assignment accepted"),
++            "{preparation_output}"
++        );
++        let mut prepared = None;
++        for req in &requests {
++            let body: Value = req.body_json()?;
++            for item in body["input"].as_array().into_iter().flatten() {
++                for content in item["content"].as_array().into_iter().flatten() {
++                    if let Some(text) = content["text"].as_str()
++                        && let Some(start) = text.find("{\"status\":\"VERIFIED\"")
++                    {
++                        prepared = serde_json::Deserializer::from_str(&text[start..])
++                            .into_iter::<Value>()
++                            .next()
++                            .transpose()?;
++                    }
++                }
++            }
++        }
++        let prepared = prepared.context("fresh Reader context reaches parent")?;
++        let prefix = prepared["prefix"].as_str().context("Reader prefix")?;
++        let body = format!("{prefix}{message}");
++        let patch =
++            "*** Begin Patch\n*** Add File: fixture.txt\n+native child wrote this\n*** End Patch";
++        child_queue.lock().unwrap().extend([
++            sse(vec![ev_response_created("child-write"), ev_apply_patch_custom_tool_call("child-patch", patch), ev_completed("child-write")]),
++            sse(vec![ev_response_created("child-test"), ev_function_call("child-test", "exec_command", &serde_json::json!({
++                "cmd": if cfg!(windows) { "if ((Get-Content -Raw -LiteralPath fixture.txt).Trim() -ne 'native child wrote this') { throw 'fixture assertion failed' }; Write-Output 'FIXTURE_ASSERTION_PASS'" }
++                    else { "test \"$(cat fixture.txt)\" = 'native child wrote this' && printf FIXTURE_ASSERTION_PASS" }
++            }).to_string()), ev_completed("child-test")]),
++            sse(vec![ev_assistant_message("child-done", "fixture assertion passed"), ev_completed("child-done")]),
++        ]);
++        turn(
++            &parent_queue,
++            "assign",
++            "admitted_agent_task",
++            serde_json::json!({"operation":"assign", "target":child_id,"body":body}),
++        );
++        test.submit_turn("assign exact admitted fixture task")
++            .await?;
++        let assignment_output = output(&server.received_requests().await.unwrap(), "assign")?;
++        assert!(
++            assignment_output.contains("submission_id"),
++            "{assignment_output}"
++        );
++        tokio::time::timeout(std::time::Duration::from_secs(20), async {
++            while child_queue.lock().unwrap().len() > 0
++                || !matches!(
++                    child.agent_status().await,
++                    codex_protocol::protocol::AgentStatus::Completed(_)
++                )
++            {
++                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++            }
++        })
++        .await?;
++        assert_eq!(
++            fs::read_to_string(test.workspace_path("fixture.txt"))?,
++            "native child wrote this\n"
++        );
++        assert!(
++            output(&server.received_requests().await.unwrap(), "child-test")?
++                .contains("FIXTURE_ASSERTION_PASS")
++        );
++        assert_eq!(test.codex.config_snapshot().await.model, "gpt-6-astra");
++    }
++    Ok(())
++}
++
++#[tokio::test]
++async fn admission_host_direct_execution_and_reads_use_current_model_in_v1_and_v2() -> Result<()> {
++    skip_if_no_network!(Ok(()));
++    for v2 in [false, true] {
++        for model in ["gpt-6-astra", "gpt-6.1-sol"] {
++            let server = start_mock_server().await;
++            let fixture = TempDir::new()?;
++            let marker = fixture.path().join("shell-write");
++            let patched = fixture.path().join("patch-write.txt");
++            let source = fixture.path().join("source.txt");
++            fs::write(&source, "bounded native reader evidence\n")?;
++            let command = format!("git init --quiet \"{}\"", marker.display());
++            let patch = format!(
++                "*** Begin Patch\n*** Add File: {}\n+fixture written\n*** End Patch",
++                patched.display()
++            );
++            let responses = mount_sse_sequence(
++                &server,
++                vec![
++                    sse(vec![
++                        ev_response_created("boundary-1"),
++                        ev_function_call(
++                            "boundary-shell",
++                            "exec_command",
++                            &serde_json::json!({"cmd": command}).to_string(),
++                        ),
++                        ev_apply_patch_custom_tool_call("boundary-patch", &patch),
++                        ev_function_call(
++                            "boundary-stdin",
++                            "write_stdin",
++                            r#"{"session_id":123456,"chars":"write"}"#,
++                        ),
++                        ev_function_call(
++                            "boundary-read",
++                            "read_only",
++                            &serde_json::json!({"path": source}).to_string(),
++                        ),
++                        ev_completed("boundary-1"),
++                    ]),
++                    sse(vec![
++                        ev_assistant_message("boundary-done", "checked"),
++                        ev_completed("boundary-2"),
++                    ]),
++                ],
++            )
++            .await;
++            let mut info = bundled_models_response()?
++                .models
++                .into_iter()
++                .find(|info| info.slug == "gpt-5.5")
++                .expect("bundled tool-capable model");
++            info.slug = model.to_string();
++            let mut builder = test_codex().with_model(model).with_config(move |config| {
++                config.model_catalog = Some(ModelsResponse { models: vec![info] });
++                config.agent_admission_hook = Some("required-admission".to_string());
++                config.features.enable(Feature::Collab).unwrap();
++                if v2 {
++                    config.features.enable(Feature::MultiAgentV2).unwrap();
++                } else {
++                    config.features.disable(Feature::MultiAgentV2).unwrap();
++                }
++            });
++            let test = builder.build(&server).await?;
++            test.submit_turn_with_permission_profile(
++                "verify native execution boundary",
++                PermissionProfile::Disabled,
++            )
++            .await?;
++            let requests = responses.requests();
++            assert_eq!(requests.len(), 2);
++            let shell = requests[1]
++                .function_call_output("boundary-shell")
++                .to_string();
++            let stdin = requests[1]
++                .function_call_output("boundary-stdin")
++                .to_string();
++            let patch_output = requests[1]
++                .custom_tool_call_output("boundary-patch")
++                .to_string();
++            let read = requests[1]
++                .function_call_output("boundary-read")
++                .to_string();
++            assert!(read.contains("bounded native reader evidence"), "{read}");
++            for output in [&shell, &stdin, &patch_output] {
++                assert_eq!(
++                    output.contains("Read-only agent execution boundary"),
++                    model == "gpt-6-astra",
++                    "{model}: {output}"
++                );
++            }
++            assert_eq!(marker.join(".git").is_dir(), model == "gpt-6.1-sol");
++            assert_eq!(patched.exists(), model == "gpt-6.1-sol");
++        }
++    }
++    Ok(())
++}
+diff --git a/codex-rs/core/tests/suite/code_mode.rs b/codex-rs/core/tests/suite/code_mode.rs
+index 3452a39..d013330 100644
+--- a/codex-rs/core/tests/suite/code_mode.rs
++++ b/codex-rs/core/tests/suite/code_mode.rs
+@@ -332,6 +332,40 @@ async fn run_unavailable_code_mode_turn(
+     Ok((response_mock.single_request().body_json(), warnings))
+ }
+
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn admission_host_code_mode_cannot_bypass_astra_execution_boundary() -> Result<()> {
++    skip_if_no_network!(Ok(()));
++    for v2 in [false, true] {
++        let server = responses::start_mock_server().await;
++        let fixture = tempfile::TempDir::new()?;
++        let marker = fixture.path().join("nested-shell-write");
++        let source = fixture.path().join("source.txt");
++        fs::write(&source, "native nested reader evidence\n")?;
++        let command = format!("git init --quiet \"{}\"", marker.display());
++        let code = format!(
++            "for (const [name,args] of [['exec_command',{{cmd:{}}}],['apply_patch','*** Begin Patch\\n*** Add File: forbidden.txt\\n+bad\\n*** End Patch'],['write_stdin',{{session_id:123456,chars:'write'}}]]) {{ try {{ text(await tools[name](args)); }} catch (e) {{ text(String(e)); }} }} text(await tools.read_only({{path:{}}}));",
++            serde_json::to_string(&command)?, serde_json::to_string(&source)?,
++        );
++        let mut info = bundled_models_response()?.models.into_iter()
++            .find(|info| info.slug == "gpt-5.5").expect("bundled tool-capable model");
++        info.slug = "gpt-6-astra".to_string();
++        let (_test, result) = run_code_mode_turn_with_model_and_config(
++            &server, "verify nested boundary", &code, "gpt-6-astra", move |config| {
++                config.model_catalog = Some(codex_protocol::openai_models::ModelsResponse { models: vec![info] });
++                config.agent_admission_hook = Some("required-admission".to_string());
++                config.features.enable(Feature::Collab).unwrap();
++                if v2 { config.features.enable(Feature::MultiAgentV2).unwrap(); }
++                else { config.features.disable(Feature::MultiAgentV2).unwrap(); }
++            },
++        ).await?;
++        let output = result.single_request().custom_tool_call_output("call-1").to_string();
++        assert_eq!(output.matches("Read-only agent execution boundary").count(), 3, "{output}");
++        assert!(output.contains("native nested reader evidence"), "{output}");
++        assert!(!marker.exists());
++    }
++    Ok(())
++}
++
+ #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+ async fn missing_process_host_falls_back_to_direct_tools_and_warns_once() -> Result<()> {
+     skip_if_no_network!(Ok(()));
+diff --git a/codex-rs/core/tests/suite/mod.rs b/codex-rs/core/tests/suite/mod.rs
+index a65fbf2..3fba5b1 100644
+--- a/codex-rs/core/tests/suite/mod.rs
++++ b/codex-rs/core/tests/suite/mod.rs
+@@ -40,6 +40,7 @@ mod abort_lifecycle;
+ #[cfg(not(target_os = "windows"))]
+ mod abort_tasks;
+ mod additional_context;
++mod admission_boundary;
+ #[path = "agent_control_tests.rs"]
+ mod agent_control;
+ mod agent_execution;
+diff --git a/codex-rs/core/tests/suite/pending_input.rs b/codex-rs/core/tests/suite/pending_input.rs
+index bc3ade0..e05782d 100644
+--- a/codex-rs/core/tests/suite/pending_input.rs
++++ b/codex-rs/core/tests/suite/pending_input.rs
+@@ -566,7 +566,10 @@ async fn queue_only_agent_mail_wakes_sleeping_root_with_previous_turn_context(
+         .await?;
+     wait_for_turn_complete(&test.codex).await;
+     // Automatic turns need not replace the model-context baseline on replay.
+-    let TurnInputSubmission::Started { turn_id } = test
++    let TurnInputSubmission::Started {
++        turn_id,
++        root_turn_id,
++    } = test
+         .codex
+         .start_or_steer_turn(
+             TurnInputRequest::user_input(Vec::new()).on_start(TurnStartOptions {
+@@ -581,6 +584,10 @@ async fn queue_only_agent_mail_wakes_sleeping_root_with_previous_turn_context(
+     else {
+         panic!("expected an automatic turn");
+     };
++    assert_eq!(
++        root_turn_id,
++        parent.map_or_else(|| turn_id.clone(), |_| "original-root".to_string())
++    );
+     wait_for_turn_complete(&test.codex).await;
+     if reload {
+         if let Some(url) = test.executor_environment().exec_server_url() {
 diff --git a/codex-rs/hooks/src/events/pre_tool_use.rs b/codex-rs/hooks/src/events/pre_tool_use.rs
 index e57b823..afd7735 100644
 --- a/codex-rs/hooks/src/events/pre_tool_use.rs
