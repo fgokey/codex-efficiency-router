@@ -4,7 +4,7 @@
 
 宿主工具说明现已写明子任务命名格式、派发与文件读取分开执行，以及工具检索只输出匹配名称。更新这些说明需要重建宿主并完整重启桌面应用；这不等于新增了宿主级输出拦截。
 
-更新后的可选宿主补丁还在原生统一工具入口限制 Astra/未知模型执行，覆盖代码模式内部调用和终端续写。用 `read_only` 读取有界文件页，用 `prepare_agent_task` 经必需的已信任 Hook 生成新的 Reader 凭证，再由 `admitted_agent_task` 派发执行者。上述模型不能直接运行任意 shell、补丁、构建、测试或第三方工具，父 Astra 的局部修复例外也不适用；Sol61 执行者保留正常工具。需要重建匹配宿主并重启；单改 Skill 或派发 Hook 不会启用这一边界。
+更新后的可选宿主补丁还在原生统一工具入口限制 Astra/未知模型执行，覆盖代码模式内部调用和终端续写。用 `read_only` 读取有界文件页，用 `prepare_agent_task` 经必需的已信任 Hook 生成新的 Reader 凭证，再由 `admitted_agent_task` 派发执行者。仅额外允许两个已审计的桌面动态只读工具：`read_thread` 必须明确指定 `turnLimit` 1..5 和 `maxOutputCharsPerItem` 0..8000；`wait_threads` 必须有 1..8 个目标并明确指定 `timeoutMs` 0..60000。参数字段、线程标识及字符串上限在 Hook 改写后仍会复查；MCP 同名工具或 `readOnlyHint` 不授予权限。上述模型仍不能直接运行任意 shell、补丁、构建、测试或其他第三方工具，父 Astra 的局部修复例外也不适用；Sol61 执行者保留正常工具。需要重建匹配宿主并重启；单改 Skill 或派发 Hook 不会启用这一边界。
 
 [English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
 

@@ -14,6 +14,13 @@ The configured native admission host always denies Astra local repair, shell, bu
 terminal continuation and unknown tools. The policy-only exception below is unavailable
 under that setting. Use native `read_only`, `prepare_agent_task` and admitted executors.
 
+The parent also retains two audited desktop dynamic-tool reads: `read_thread` with
+explicit `turnLimit` 1..5 and `maxOutputCharsPerItem` 0..8000, and `wait_threads`
+with 1..8 targets and explicit `timeoutMs` 0..60000. Unknown arguments and invalid
+thread identities are rejected before the dynamic request reaches the desktop,
+including after Hook rewrites. MCP same-name tools and read-only hints grant no
+authority. The separate optional strict write Hook can impose a narrower policy.
+
 1. Two qualified executor attempts failed on the same task/unit/failure signature for a
    classified implementation, capability or unexplained issue, or a handoff would
    materially lose reasoning context needed for the fix. Prerequisite, environment,

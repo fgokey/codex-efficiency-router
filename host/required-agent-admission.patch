@@ -1207,16 +1207,29 @@ index 0000000..8265643
 +    }
 +}
 diff --git a/codex-rs/core/src/tools/registry.rs b/codex-rs/core/src/tools/registry.rs
-index e0acae2..d9f8a29 100644
+index e0acae2..dadcd77 100644
 --- a/codex-rs/core/src/tools/registry.rs
 +++ b/codex-rs/core/src/tools/registry.rs
-@@ -578,6 +578,19 @@ impl ToolRegistry {
+@@ -84,6 +84,12 @@ pub(crate) trait CoreToolRuntime: ToolExecutor<ToolInvocation> {
+         false
+     }
+
++    /// A host-audited capability on a specific transport, with bounded arguments.
++    /// Tool names, descriptions and MCP readOnlyHint alone never grant this.
++    fn allows_bounded_parent_read(&self, _invocation: &ToolInvocation) -> bool {
++        false
++    }
++
+     /// Returns the owning server only for MCP-backed tool runtimes.
+     fn mcp_server_name(&self) -> Option<&str> {
+         None
+@@ -578,6 +584,19 @@ impl ToolRegistry {
              }
          };
          let telemetry_tags = tool.telemetry_tags(&invocation);
 +        if !admission_execution_allowed(&invocation, tool.as_ref()) {
 +            let err = FunctionCallError::RespondToModel(
-+                "Read-only agent execution boundary: Astra/unknown models cannot execute shell, patches, builds, tests, terminal continuations or third-party tools. Use read_only for bounded inspection, prepare_agent_task for a fresh Reader envelope, and admitted_agent_task for an authorized executor; keep the parent model.".to_string(),
++                "Read-only agent execution boundary: Astra/unknown models cannot execute shell, patches, builds, tests, terminal continuations or unaudited third-party tools. Desktop read_thread requires turnLimit 1..5 and maxOutputCharsPerItem 0..8000; wait_threads requires 1..8 targets and timeoutMs 0..60000. Use read_only for bounded file inspection, prepare_agent_task for a fresh Reader envelope, and admitted_agent_task for an authorized executor; keep the parent model.".to_string(),
 +            );
 +            dispatch_trace.record_failed(&err);
 +            notify_tool_finish_if_unclaimed(
@@ -1230,7 +1243,7 @@ index e0acae2..d9f8a29 100644
          let mut tool_result_tags = Vec::with_capacity(2 + telemetry_tags.len() + 1);
          let mut extra_trace_fields = Vec::new();
          sandbox_tags.append_metric_tags(&mut tool_result_tags);
-@@ -613,6 +626,7 @@ impl ToolRegistry {
+@@ -613,6 +632,7 @@ impl ToolRegistry {
                  invocation.call_id.clone(),
                  &pre_tool_use_payload.tool_name,
                  &pre_tool_use_payload.tool_input,
@@ -1238,7 +1251,27 @@ index e0acae2..d9f8a29 100644
              )
              .await
              {
-@@ -837,6 +851,72 @@ async fn handle_any_tool(
+@@ -635,6 +655,19 @@ impl ToolRegistry {
+                     updated_input: Some(updated_input),
+                 } => match tool.with_updated_hook_input(invocation.clone(), updated_input) {
+                     Ok(updated_invocation) => {
++                        if !admission_execution_allowed(&updated_invocation, tool.as_ref()) {
++                            let err = FunctionCallError::RespondToModel(
++                                "Read-only agent execution boundary: rewritten tool input is outside the audited read capability.".to_string(),
++                            );
++                            dispatch_trace.record_failed(&err);
++                            notify_tool_finish_if_unclaimed(
++                                &invocation,
++                                call_state.as_deref(),
++                                ToolCallOutcome::Blocked,
++                            )
++                            .await;
++                            return Err(err);
++                        }
+                         invocation = updated_invocation;
+                     }
+                     Err(err) => {
+@@ -837,6 +870,72 @@ async fn handle_any_tool(
      Ok(result)
  }
 
@@ -1260,7 +1293,7 @@ index e0acae2..d9f8a29 100644
 +        return true;
 +    }
 +    if tool.is_third_party_tool() {
-+        return false;
++        return tool.allows_bounded_parent_read(invocation);
 +    }
 +    let name = &invocation.tool_name;
 +    if name.is_default_namespace() {
@@ -1311,7 +1344,7 @@ index e0acae2..d9f8a29 100644
  fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
      if invocation.tool_name.name == "spawn_agent"
          && (invocation.tool_name.is_default_namespace()
-@@ -845,6 +925,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
+@@ -845,6 +944,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
          return HookToolName::spawn_agent();
      }
 
@@ -1328,7 +1361,7 @@ index e0acae2..d9f8a29 100644
  }
 
 diff --git a/codex-rs/core/src/tools/registry_tests.rs b/codex-rs/core/src/tools/registry_tests.rs
-index 895d8d4..4e1d389 100644
+index 895d8d4..6ddd44a 100644
 --- a/codex-rs/core/src/tools/registry_tests.rs
 +++ b/codex-rs/core/src/tools/registry_tests.rs
 @@ -576,6 +576,36 @@ async fn code_mode_wait_does_not_expose_default_hook_payloads() {
@@ -1368,7 +1401,7 @@ index 895d8d4..4e1d389 100644
  #[tokio::test]
  async fn write_stdin_does_not_expose_default_pre_tool_use_payload() {
      let (session, turn) = crate::session::tests::make_session_and_context().await;
-@@ -842,3 +872,148 @@ fn test_invocation(
+@@ -842,3 +872,244 @@ fn test_invocation(
          },
      }
  }
@@ -1494,6 +1527,102 @@ index 895d8d4..4e1d389 100644
 +}
 +
 +#[tokio::test]
++async fn admission_host_audited_desktop_thread_reads_are_bounded() {
++    use crate::tools::handlers::DynamicToolHandler;
++    use codex_protocol::dynamic_tools::DynamicToolFunctionSpec;
++    use serde_json::json;
++
++    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
++    Arc::make_mut(&mut turn.config).agent_admission_hook = Some("required".to_string());
++    let session = Arc::new(session);
++    let turn = Arc::new(turn);
++    let thread_id = "01a0952a-de45-7370-bd83-35cf2e3f40b5";
++    let cases = [
++        (
++            "read_thread",
++            json!({"threadId": thread_id, "turnLimit": 1, "maxOutputCharsPerItem": 4000}),
++            true,
++        ),
++        (
++            "wait_threads",
++            json!({"targets": [{"threadId": thread_id, "hostId": "local"}], "timeoutMs": 0}),
++            true,
++        ),
++        ("read_thread", json!({"threadId": thread_id}), false),
++        (
++            "read_thread",
++            json!({"threadId": thread_id, "turnLimit": 6, "maxOutputCharsPerItem": 4000}),
++            false,
++        ),
++        (
++            "read_thread",
++            json!({"threadId": thread_id, "turnLimit": 1, "maxOutputCharsPerItem": 8001}),
++            false,
++        ),
++        (
++            "read_thread",
++            json!({"threadId": thread_id, "turnLimit": 1, "maxOutputCharsPerItem": 4000, "command": "write"}),
++            false,
++        ),
++        (
++            "wait_threads",
++            json!({"targets": [], "timeoutMs": 0}),
++            false,
++        ),
++        (
++            "wait_threads",
++            json!({"targets": [{"threadId": thread_id}], "timeoutMs": 60001}),
++            false,
++        ),
++        (
++            "wait_threads",
++            json!({"targets": [{"threadId": "unknown"}], "timeoutMs": 0}),
++            false,
++        ),
++        (
++            "send_message_to_thread",
++            json!({"threadId": thread_id, "prompt": "continue"}),
++            false,
++        ),
++        ("unknown_read", json!({}), false),
++    ];
++    for (name, arguments, allowed) in cases {
++        let flat_name = format!("mcp__codex_app__{name}");
++        let handler = DynamicToolHandler::new(&DynamicToolFunctionSpec {
++            name: flat_name.clone(),
++            description: "Client supplied description does not grant authority".to_string(),
++            input_schema: json!({"type": "object"}),
++            defer_loading: false,
++        })
++        .unwrap();
++        let mut invocation = test_invocation(
++            Arc::clone(&session),
++            Arc::clone(&turn),
++            "desktop-read",
++            ToolName::plain(flat_name),
++        );
++        invocation.payload = ToolPayload::Function {
++            arguments: arguments.to_string(),
++        };
++        let step = Arc::get_mut(&mut invocation.step_context).unwrap();
++        Arc::make_mut(&mut Arc::make_mut(&mut step.settings).model_info).slug =
++            "gpt-6-astra".to_string();
++        assert_eq!(
++            admission_execution_allowed(&invocation, &handler),
++            allowed,
++            "{name} {arguments}"
++        );
++        // The same exact spelling on another third-party runtime is not this capability.
++        assert!(!admission_execution_allowed(
++            &invocation,
++            &ThirdPartyNamedSafeTool(TestHandler {
++                tool_name: invocation.tool_name.clone(),
++            })
++        ));
++    }
++}
++
++#[tokio::test]
 +async fn admission_host_preparation_cannot_succeed_without_required_hook() {
 +    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
 +    Arc::make_mut(&mut turn.config).agent_admission_hook = Some("missing-hook".to_string());
@@ -1602,10 +1731,10 @@ index 395cc95..e5e21ab 100644
      let v1 = probe(|turn| {
 diff --git a/codex-rs/core/tests/suite/admission_boundary.rs b/codex-rs/core/tests/suite/admission_boundary.rs
 new file mode 100644
-index 0000000..2f56d6f
+index 0000000..0184915
 --- /dev/null
 +++ b/codex-rs/core/tests/suite/admission_boundary.rs
-@@ -0,0 +1,431 @@
+@@ -0,0 +1,832 @@
 +use anyhow::Context;
 +use anyhow::Result;
 +use codex_features::Feature;
@@ -1618,6 +1747,7 @@ index 0000000..2f56d6f
 +use core_test_support::responses::ev_assistant_message;
 +use core_test_support::responses::ev_completed;
 +use core_test_support::responses::ev_function_call;
++use core_test_support::responses::ev_function_call_with_namespace;
 +use core_test_support::responses::ev_response_created;
 +use core_test_support::responses::mount_sse_sequence;
 +use core_test_support::responses::sse;
@@ -1627,6 +1757,172 @@ index 0000000..2f56d6f
 +use serde_json::Value;
 +use std::fs;
 +use tempfile::TempDir;
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn admission_host_desktop_reads_reach_dynamic_handler_direct_and_code_mode() -> Result<()> {
++    use codex_core::StartThreadOptions;
++    use codex_core::TurnInputRequest;
++    use codex_protocol::dynamic_tools::{
++        DynamicToolCallOutputContentItem, DynamicToolFunctionSpec, DynamicToolResponse,
++        DynamicToolSpec,
++    };
++    use codex_protocol::protocol::{EventMsg, Op};
++    use codex_protocol::user_input::UserInput;
++    use core_test_support::responses::ev_custom_tool_call;
++    use core_test_support::wait_for_event;
++    use serde_json::json;
++
++    skip_if_no_network!(Ok(()));
++    for code_mode in [false, true] {
++        for model in ["gpt-6-astra", "gpt-6.1-sol"] {
++            for rewrite in [false, true] {
++                let server = start_mock_server().await;
++                let thread_id = "01a0952a-de45-7370-bd83-35cf2e3f40b5";
++                let calls = [
++                    (
++                        "mcp__codex_app__read_thread",
++                        json!({"threadId": thread_id, "turnLimit": 1, "maxOutputCharsPerItem": 4000}),
++                    ),
++                    (
++                        "mcp__codex_app__wait_threads",
++                        json!({"targets": [{"threadId": thread_id}], "timeoutMs": 0}),
++                    ),
++                    (
++                        "mcp__codex_app__set_thread_title",
++                        json!({"threadId": thread_id, "title": "write"}),
++                    ),
++                    ("mcp__codex_app__unknown_read", json!({})),
++                ];
++                let mut events = vec![ev_response_created("desktop-1")];
++                if code_mode {
++                    let mut code = String::new();
++                    for (name, args) in &calls {
++                        code.push_str(&format!("try {{ text(await tools.{name}({args})); }} catch (e) {{ text(String(e)); }}\n"));
++                    }
++                    events.push(ev_custom_tool_call("desktop-exec", "exec", &code));
++                } else {
++                    for (i, (name, args)) in calls.iter().enumerate() {
++                        events.push(ev_function_call(
++                            &format!("desktop-{i}"),
++                            name,
++                            &args.to_string(),
++                        ));
++                    }
++                }
++                events.push(ev_completed("desktop-1"));
++                let responses = mount_sse_sequence(
++                    &server,
++                    vec![
++                        sse(events),
++                        sse(vec![
++                            ev_assistant_message("desktop-done", "checked"),
++                            ev_completed("desktop-2"),
++                        ]),
++                    ],
++                )
++                .await;
++                let mut info = bundled_models_response()?
++                    .models
++                    .into_iter()
++                    .find(|info| info.slug == "gpt-5.5")
++                    .expect("bundled tool-capable model");
++                info.slug = model.to_string();
++                let mut builder = test_codex().with_model(model).with_config(move |config| {
++                    config.model_catalog = Some(ModelsResponse { models: vec![info] });
++                    config.agent_admission_hook = Some("required-admission".to_string());
++                    if code_mode {
++                        config.features.enable(Feature::CodeMode).unwrap();
++                    }
++                });
++                if rewrite {
++                    builder = builder.with_pre_build_hook(move |home| {
++                    let script = home.join("rewrite_read.py");
++                    fs::write(&script, "import json,sys\np=json.load(sys.stdin)\na=p['tool_input']\na['turnLimit']=6\nprint(json.dumps({'hookSpecificOutput':{'hookEventName':'PreToolUse','permissionDecision':'allow','updatedInput':a}}))\n").unwrap();
++                    let python = std::env::var("CER_NATIVE_PYTHON").unwrap_or_else(|_| {
++                        if cfg!(windows) { "python".to_string() } else { "python3".to_string() }
++                    });
++                    let command = format!("{}'{}' -I -B '{}'", if cfg!(windows) { "& " } else { "" }, python, script.display());
++                    fs::write(home.join("hooks.json"), json!({"hooks":{"PreToolUse":[{
++                        "matcher":"mcp__codex_app__read_thread",
++                        "hooks":[{"type":"command", "command":command, "timeout":10}]
++                    }]}}).to_string()).unwrap();
++                }).with_config(trust_discovered_hooks);
++                }
++                let mut test = builder.build_with_auto_env(&server).await?;
++                let new_thread = test
++                    .thread_manager
++                    .start_thread(StartThreadOptions {
++                        dynamic_tools: calls
++                            .iter()
++                            .map(|(name, _)| {
++                                DynamicToolSpec::Function(DynamicToolFunctionSpec {
++                                    name: name.to_string(),
++                                    description: "Desktop fixture capability".to_string(),
++                                    input_schema: json!({"type": "object"}),
++                                    defer_loading: false,
++                                })
++                            })
++                            .collect(),
++                        ..StartThreadOptions::new(test.config.clone())
++                    })
++                    .await?;
++                test.codex = new_thread.thread;
++                test.session_configured = new_thread.session_configured;
++                test.codex
++                    .start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
++                        text: "verify bounded desktop reads".to_string(),
++                        text_elements: Vec::new(),
++                    }]))
++                    .await?;
++                let mut reached = Vec::new();
++                loop {
++                    match wait_for_event(&test.codex, |_| true).await {
++                        EventMsg::DynamicToolCallRequest(request) => {
++                            reached.push(request.tool.clone());
++                            test.codex
++                                .submit(Op::DynamicToolResponse {
++                                    id: request.call_id,
++                                    response: DynamicToolResponse {
++                                        content_items: vec![
++                                            DynamicToolCallOutputContentItem::InputText {
++                                                text: "audited-desktop-read-ok".to_string(),
++                                            },
++                                        ],
++                                        success: true,
++                                    },
++                                })
++                                .await?;
++                        }
++                        EventMsg::TurnComplete(completed) => {
++                            assert!(completed.error.is_none());
++                            break;
++                        }
++                        _ => {}
++                    }
++                }
++                let denied = if model == "gpt-6-astra" {
++                    if rewrite { 3 } else { 2 }
++                } else {
++                    0
++                };
++                assert_eq!(
++                    reached.len(),
++                    4 - denied,
++                    "{model} code_mode={code_mode} rewrite={rewrite}: {reached:?}"
++                );
++                let requests = responses.requests();
++                let output = requests[1].body_json().to_string();
++                assert!(output.contains("audited-desktop-read-ok"), "{output}");
++                assert_eq!(
++                    output.matches("Read-only agent execution boundary").count(),
++                    denied,
++                    "{output}"
++                );
++            }
++        }
++    }
++    Ok(())
++}
 +
 +#[tokio::test]
 +#[ignore = "requires CER_NATIVE_ROUTER_ROOT and CER_NATIVE_PYTHON for the real trusted Router hook"]
@@ -1664,6 +1960,29 @@ index 0000000..2f56d6f
 +        }
 +        anyhow::bail!("missing native result {call_id}")
 +    }
++    fn prepared_prefix(requests: &[wiremock::Request], unit: &str) -> Result<String> {
++        for request in requests.iter().rev() {
++            let body: Value = request.body_json()?;
++            for item in body["input"].as_array().into_iter().flatten().rev() {
++                for content in item["content"].as_array().into_iter().flatten() {
++                    if let Some(text) = content["text"].as_str()
++                        && let Some(start) = text.find("{\"status\":\"VERIFIED\"")
++                        && let Some(value) = serde_json::Deserializer::from_str(&text[start..])
++                            .into_iter::<Value>()
++                            .next()
++                    {
++                        let value = value?;
++                        if let Some(prefix) = value["prefix"].as_str()
++                            && prefix.contains(unit)
++                        {
++                            return Ok(prefix.to_string());
++                        }
++                    }
++                }
++            }
++        }
++        anyhow::bail!("missing fresh Reader prefix for {unit}")
++    }
 +    let router = std::path::PathBuf::from(
 +        std::env::var_os("CER_NATIVE_ROUTER_ROOT").context("CER_NATIVE_ROUTER_ROOT")?,
 +    );
@@ -1674,6 +1993,7 @@ index 0000000..2f56d6f
 +    for v2 in [false, true] {
 +        let server = start_mock_server().await;
 +        let parent_queue = Arc::new(Mutex::new(VecDeque::<String>::new()));
++        let parent_id = Arc::new(Mutex::new(String::new()));
 +        let child_queue = Arc::new(Mutex::new(VecDeque::<String>::from([sse(vec![
 +            ev_assistant_message(
 +                "identity",
@@ -1683,10 +2003,14 @@ index 0000000..2f56d6f
 +        ])])));
 +        let parent_responses = Arc::clone(&parent_queue);
 +        let child_responses = Arc::clone(&child_queue);
++        let parent_request_id = Arc::clone(&parent_id);
 +        Mock::given(wiremock::matchers::method("POST"))
 +            .respond_with(move |request: &wiremock::Request| {
-+                let body: Value = request.body_json().unwrap();
-+                let queue = if body["model"] == "gpt-6-astra" {
++                let queue = if request
++                    .headers
++                    .get("x-client-request-id")
++                    .is_some_and(|id| id == parent_request_id.lock().unwrap().as_str())
++                {
 +                    &parent_responses
 +                } else {
 +                    &child_responses
@@ -1787,6 +2111,7 @@ index 0000000..2f56d6f
 +                }
 +            });
 +        let test = builder.build(&server).await?;
++        *parent_id.lock().unwrap() = test.session_configured.session_id.to_string();
 +        fs::write(
 +            test.workspace_path("evidence.txt"),
 +            "owned native fixture\n",
@@ -1936,6 +2261,211 @@ index 0000000..2f56d6f
 +            output(&server.received_requests().await.unwrap(), "child-test")?
 +                .contains("FIXTURE_ASSERTION_PASS")
 +        );
++        assert_eq!(test.codex.config_snapshot().await.model, "gpt-6-astra");
++
++        // A completed Astra binding is not authority for a later work item.
++        let hold = "HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.";
++        let astra_signals = serde_json::json!({"spec_complete":true,"authority_ready":true,
++            "environment_ready":true,"observability_ready":true,"very_complex":true,
++            "reasoning_bound":true,"cheap_check_available":false,
++            "sol61_unsuitable_reason":"Fixture requires arbitration of conflicting causal evidence"});
++        turn(
++            &parent_queue,
++            "astra-prepare-hold",
++            "prepare_agent_task",
++            serde_json::json!({"request":{
++            "unit_id":"native-astra-hold","purpose":"new_unit","scope":"identity-only fixture",
++            "message":hold,"recipient":{"id":"unbound-spawn","model":"gpt-6-astra","effort":"high",
++                "evidence_ref":"explicit requested spawn pin; no actual host binding yet"},
++            "signals":astra_signals,"complexity_reason":"Several competing causal explanations need fixture arbitration"}}),
++        );
++        test.submit_turn("prepare fixture Astra identity").await?;
++        let astra_hold_prefix = prepared_prefix(
++            &server.received_requests().await.unwrap(),
++            "native-astra-hold",
++        )?;
++        child_queue.lock().unwrap().push_back(sse(vec![
++            ev_assistant_message("astra-identity", "HOLD identity"),
++            ev_completed("astra-held"),
++        ]));
++        turn(
++            &parent_queue,
++            "astra-spawn",
++            "admitted_agent_task",
++            serde_json::json!({
++            "operation":"spawn_hold","task_name":"fixture_astra","agent_type":"default",
++            "model":"gpt-6-astra","reasoning_effort":"high","body":format!("{astra_hold_prefix}{hold}")}),
++        );
++        test.submit_turn("spawn admitted fixture Astra HOLD")
++            .await?;
++        let astra_binding: Value = serde_json::from_str(&output(
++            &server.received_requests().await.unwrap(),
++            "astra-spawn",
++        )?)?;
++        assert_eq!(
++            astra_binding["binding"]["model"], "gpt-6-astra",
++            "{astra_binding}"
++        );
++        assert_eq!(astra_binding["binding"]["reasoning_effort"], "high");
++        assert_eq!(
++            astra_binding["binding"]["owner_thread_id"],
++            test.session_configured.session_id.to_string()
++        );
++        let astra_id = astra_binding["agent_id"]
++            .as_str()
++            .context("native Astra binding id")?;
++        let astra_child = test
++            .thread_manager
++            .get_thread(codex_protocol::ThreadId::from_string(astra_id)?)
++            .await?;
++        tokio::time::timeout(std::time::Duration::from_secs(20), async {
++            while !child_queue.lock().unwrap().is_empty()
++                || !matches!(
++                    astra_child.agent_status().await,
++                    codex_protocol::protocol::AgentStatus::Completed(_)
++                )
++            {
++                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++            }
++        })
++        .await?;
++        let astra_message = "RELEASE. Read-only arbitrate the fixture's competing causal explanations; report no writes.";
++        turn(
++            &parent_queue,
++            "astra-prepare-work",
++            "prepare_agent_task",
++            serde_json::json!({"request":{
++            "unit_id":"native-astra-review","purpose":"new_unit","scope":"read-only fixture arbitration",
++            "message":astra_message,"recipient":{"id":astra_id,"model":"gpt-6-astra","effort":"high",
++                "evidence_ref":"fresh host-observed loaded direct child binding above"},
++            "signals":astra_signals,"complexity_reason":"Several competing causal explanations need fixture arbitration"}}),
++        );
++        test.submit_turn("prepare new fixture Astra work").await?;
++        let astra_work_prefix = prepared_prefix(
++            &server.received_requests().await.unwrap(),
++            "native-astra-review",
++        )?;
++        child_queue.lock().unwrap().push_back(sse(vec![
++            ev_assistant_message("astra-review", "read-only fixture reviewed"),
++            ev_completed("astra-review-done"),
++        ]));
++        turn(
++            &parent_queue,
++            "astra-assign-work",
++            "admitted_agent_task",
++            serde_json::json!({
++                "operation":"assign","target":astra_id,"model":"gpt-6-astra","reasoning_effort":"high","body":format!("{astra_work_prefix}{astra_message}")}),
++        );
++        test.submit_turn("assign fresh fixture Astra work").await?;
++        assert!(
++            output(
++                &server.received_requests().await.unwrap(),
++                "astra-assign-work"
++            )?
++            .contains("submission_id")
++        );
++        tokio::time::timeout(std::time::Duration::from_secs(20), async {
++            while !child_queue.lock().unwrap().is_empty()
++                || !matches!(
++                    astra_child.agent_status().await,
++                    codex_protocol::protocol::AgentStatus::Completed(_)
++                )
++            {
++                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
++            }
++        })
++        .await?;
++        let (namespace, raw_tool) = if v2 {
++            (
++                test.config.multi_agent_v2.tool_namespace.as_deref(),
++                "followup_task",
++            )
++        } else {
++            (Some("multi_agent_v1"), "send_input")
++        };
++        let raw_args = serde_json::json!({"target":astra_id,"message":"continue"}).to_string();
++        let raw_call = match namespace {
++            Some(namespace) => ev_function_call_with_namespace(
++                "astra-raw-continue",
++                namespace,
++                raw_tool,
++                &raw_args,
++            ),
++            None => ev_function_call("astra-raw-continue", raw_tool, &raw_args),
++        };
++        parent_queue.lock().unwrap().extend([
++            sse(vec![
++                ev_response_created("astra-raw-continue"),
++                raw_call,
++                ev_completed("astra-raw-continue"),
++            ]),
++            sse(vec![
++                ev_assistant_message("astra-raw-done", "checked"),
++                ev_completed("astra-raw-end"),
++            ]),
++        ]);
++        test.submit_turn("reject raw loaded Astra continuation")
++            .await?;
++        let raw_result = output(
++            &server.received_requests().await.unwrap(),
++            "astra-raw-continue",
++        )?;
++        assert!(
++            raw_result.contains("requires admitted_agent_task"),
++            "{raw_result}"
++        );
++        for (call, tool, args, reason) in [
++            (
++                "astra-bare-continue",
++                "admitted_agent_task",
++                serde_json::json!({"operation":"assign","target":astra_id,"body":"continue"}),
++                "receipts/continue grant no exemption",
++            ),
++            (
++                "astra-changed-body",
++                "admitted_agent_task",
++                serde_json::json!({"operation":"assign","target":astra_id,
++                    "body":format!("{astra_work_prefix}{astra_message} Extra work.")}),
++                "assignment target/body/identity/policy mismatch",
++            ),
++        ] {
++            turn(&parent_queue, call, tool, args);
++            test.submit_turn("reject old fixture Astra continuation")
++                .await?;
++            let result = output(&server.received_requests().await.unwrap(), call)?;
++            assert!(result.contains(reason), "{result}");
++        }
++        let (header, readable_reasons) = astra_work_prefix
++            .split_once('\n')
++            .context("assignment header separator")?;
++        let header = header
++            .strip_prefix("CER assignment (caller evidence): ")
++            .context("assignment prefix")?;
++        let mut stale: Value = serde_json::from_str(header.trim())?;
++        stale["admission"]["purpose"] = Value::String("reuse".to_string());
++        turn(
++            &parent_queue,
++            "astra-stale-reuse",
++            "admitted_agent_task",
++            serde_json::json!({
++            "operation":"assign","target":astra_id,
++            "body":format!("CER assignment (caller evidence): {stale}\n{readable_reasons}{astra_message}")}),
++        );
++        test.submit_turn("reject stale fixture Astra admission")
++            .await?;
++        let stale_result = output(
++            &server.received_requests().await.unwrap(),
++            "astra-stale-reuse",
++        )?;
++        assert!(
++            stale_result.contains("fresh purpose=new_unit"),
++            "{stale_result}"
++        );
++        assert!(child_queue.lock().unwrap().is_empty());
++        assert!(matches!(
++            astra_child.agent_status().await,
++            codex_protocol::protocol::AgentStatus::Completed(_)
++        ));
 +        assert_eq!(test.codex.config_snapshot().await.model, "gpt-6-astra");
 +    }
 +    Ok(())
@@ -2319,3 +2849,108 @@ index e57b823..afd7735 100644
                  should_block: true,
                  block_reason: Some("blocked by policy".to_string()),
                  additional_contexts_for_model: Vec::new(),
+diff --git a/codex-rs/core/src/tools/handlers/dynamic.rs b/codex-rs/core/src/tools/handlers/dynamic.rs
+index f658d67..c1cefae 100644
+--- a/codex-rs/core/src/tools/handlers/dynamic.rs
++++ b/codex-rs/core/src/tools/handlers/dynamic.rs
+@@ -169,6 +169,100 @@ impl CoreToolRuntime for DynamicToolHandler {
+     fn is_third_party_tool(&self) -> bool {
+         true
+     }
++
++    fn allows_bounded_parent_read(&self, invocation: &ToolInvocation) -> bool {
++        // These exact desktop client capabilities use the native dynamic-tool transport.
++        // MCP runtimes, including same-name servers/tools, do not implement this grant.
++        let capability = match (
++            self.tool_name.namespace.as_deref(),
++            self.tool_name.name.as_str(),
++        ) {
++            (None | Some("functions"), "mcp__codex_app__read_thread")
++            | (Some("mcp__codex_app"), "read_thread") => "read_thread",
++            (None | Some("functions"), "mcp__codex_app__wait_threads")
++            | (Some("mcp__codex_app"), "wait_threads") => "wait_threads",
++            _ => return false,
++        };
++        if invocation.tool_name.clone().with_default_namespace()
++            != self.tool_name.clone().with_default_namespace()
++        {
++            return false;
++        }
++        let ToolPayload::Function { arguments } = &invocation.payload else {
++            return false;
++        };
++        if arguments.len() > 16_384 {
++            return false;
++        }
++        let Ok(Value::Object(args)) = serde_json::from_str::<Value>(arguments) else {
++            return false;
++        };
++        match capability {
++            "read_thread" => {
++                only_fields(
++                    &args,
++                    &[
++                        "threadId",
++                        "hostId",
++                        "cursor",
++                        "turnLimit",
++                        "includeOutputs",
++                        "maxOutputCharsPerItem",
++                    ],
++                ) && valid_thread(&args)
++                    && optional_text(&args, "cursor", 2048)
++                    && args
++                        .get("turnLimit")
++                        .and_then(Value::as_u64)
++                        .is_some_and(|n| (1..=5).contains(&n))
++                    && args
++                        .get("maxOutputCharsPerItem")
++                        .and_then(Value::as_u64)
++                        .is_some_and(|n| n <= 8000)
++                    && args.get("includeOutputs").is_none_or(Value::is_boolean)
++            }
++            "wait_threads" => {
++                only_fields(&args, &["targets", "timeoutMs"])
++                    && args
++                        .get("timeoutMs")
++                        .and_then(Value::as_u64)
++                        .is_some_and(|n| n <= 60_000)
++                    && args
++                        .get("targets")
++                        .and_then(Value::as_array)
++                        .is_some_and(|targets| {
++                            (1..=8).contains(&targets.len())
++                                && targets.iter().all(|target| {
++                                    target.as_object().is_some_and(|target| {
++                                        only_fields(target, &["threadId", "hostId", "afterCursor"])
++                                            && valid_thread(target)
++                                            && optional_text(target, "afterCursor", 2048)
++                                    })
++                                })
++                        })
++            }
++            _ => false,
++        }
++    }
++}
++
++fn only_fields(args: &serde_json::Map<String, Value>, fields: &[&str]) -> bool {
++    args.keys().all(|key| fields.contains(&key.as_str()))
++}
++
++fn optional_text(args: &serde_json::Map<String, Value>, key: &str, max: usize) -> bool {
++    args.get(key).is_none_or(|value| {
++        value.as_str().is_some_and(|text| {
++            !text.is_empty() && text.len() <= max && !text.chars().any(char::is_control)
++        })
++    })
++}
++
++fn valid_thread(args: &serde_json::Map<String, Value>) -> bool {
++    args.get("threadId")
++        .and_then(Value::as_str)
++        .is_some_and(|id| codex_protocol::ThreadId::from_string(id).is_ok())
++        && optional_text(args, "hostId", 128)
+ }
+
+ #[expect(
