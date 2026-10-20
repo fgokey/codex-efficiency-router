@@ -129,7 +129,7 @@ class DocumentedContractTests(unittest.TestCase):
                        'long commands/continuation', 'bounded saved evidence'):
             self.assertIn(phrase, dispatch)
 
-    def test_native_change_summary_is_preflighted_before_delegation(self):
+    def test_native_change_review_preserves_write_and_delivery_evidence(self):
         core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
         self.assertIn('Dispatch preflight: Reader `assignment` before task-bearing sends', core)
@@ -138,7 +138,7 @@ class DocumentedContractTests(unittest.TestCase):
                        'review/open-review', 'unstaged review',
                        'Compare roots before writes', 'native parent file-change attribution',
                        'model/review/open-review prove none',
-                       'Missing/unknown stops',
+                       'Missing/unknown blocks badge',
                        'never edit for attribution'):
             self.assertIn(phrase, dispatch)
         for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
@@ -146,6 +146,18 @@ class DocumentedContractTests(unittest.TestCase):
             for phrase in ('roots', 'exact paths/status/diff', 'owned/prior dirt',
                            'current evidence', 'never parent completion'):
                 self.assertIn(phrase, instructions)
+
+    def test_native_badge_support_is_separate_from_write_authority(self):
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        self.assertTrue('Missing/unknown stops.' not in dispatch,
+                        'Unknown UI attribution must not unconditionally stop authorized work')
+        for boundary in ('Requested native parent file-change attribution: verify/report',
+                         'Missing/unknown blocks badge; authorized work proceeds unless user requires it first',
+                         'No fake badge/ID',
+                         'parent checks current session host-observed model/effort/role/permission/owner',
+                         'explicitly releases unit for writes',
+                         'Dispatch preflight: Reader `assignment` before task-bearing sends'):
+            self.assertIn(boundary, dispatch)
 
     def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
         core = contract_text()

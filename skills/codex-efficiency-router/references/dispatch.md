@@ -10,7 +10,7 @@ Root Astra: configured native admission is read-only without repair exceptions. 
 
 Parent-assigned Ultra Sol/Astra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority/exact repo/ref/destination/checks; grants none. Deduct context/copy/handoff/review costs.
 
-Compare roots before writes; native parent file-change attribution needs support; model/review/open-review prove none. Missing/unknown stops.
+Compare roots before writes. Requested native parent file-change attribution: verify/report; model/review/open-review prove none. Missing/unknown blocks badge; authorized work proceeds unless user requires it first. No fake badge/ID.
 
 Return all roots/exact paths/status/owned/prior dirt. Parent checks all diffs/status, opens unstaged review; never edit for attribution.
 
