@@ -20,7 +20,7 @@ VERSION = '0.8.5'
 
 # Exact local read/orchestration tools only, never guess MCP semantics by its name.
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
-COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan'))
+COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan', 'completion_check'))
 EXECUTOR_FAMILIES = ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
 SPAWN_ROLES = {'luna_worker': ('gpt-6-luna', 'high'), 'terra_executor': ('gpt-5.6-terra', 'medium'),
                'sol_engineer': ('gpt-6-sol', 'medium'), 'sol61_engineer': ('gpt-6.1-sol', 'high'),

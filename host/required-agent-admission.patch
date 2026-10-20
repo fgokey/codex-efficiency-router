@@ -497,7 +497,7 @@ index 770a19d..badd250 100644
              && let Ok(mut log) = ops_log.lock()
              && let Some(captured_op) = capture_test_op(&op)
 diff --git a/codex-rs/core/src/tools/handlers/mod.rs b/codex-rs/core/src/tools/handlers/mod.rs
-index 710c089..58ae484 100644
+index 710c089..57a5168 100644
 --- a/codex-rs/core/src/tools/handlers/mod.rs
 +++ b/codex-rs/core/src/tools/handlers/mod.rs
 @@ -17,6 +17,7 @@ pub(crate) mod multi_agents_v2;
@@ -508,10 +508,12 @@ index 710c089..58ae484 100644
  pub(crate) mod plan_spec;
  mod request_permissions;
  mod request_plugin_install;
-@@ -67,6 +68,8 @@ pub use mcp_resource::ListMcpResourcesHandler;
+@@ -67,6 +68,10 @@ pub use mcp_resource::ListMcpResourcesHandler;
  pub use mcp_resource::ReadMcpResourceHandler;
  pub use new_context_window::NewContextWindowHandler;
  pub use plan::PlanHandler;
++pub use plan::CompletionCheckHandler;
++pub(crate) use plan::ParentWorkState;
 +pub use read_only::PrepareAgentTaskHandler;
 +pub use read_only::ReadOnlyHandler;
  pub(crate) use request_permissions::RequestPermissionsEnvironmentArgs;
@@ -1207,7 +1209,7 @@ index 0000000..8265643
 +    }
 +}
 diff --git a/codex-rs/core/src/tools/registry.rs b/codex-rs/core/src/tools/registry.rs
-index e0acae2..dadcd77 100644
+index e0acae2..20d819c 100644
 --- a/codex-rs/core/src/tools/registry.rs
 +++ b/codex-rs/core/src/tools/registry.rs
 @@ -84,6 +84,12 @@ pub(crate) trait CoreToolRuntime: ToolExecutor<ToolInvocation> {
@@ -1271,7 +1273,21 @@ index e0acae2..dadcd77 100644
                          invocation = updated_invocation;
                      }
                      Err(err) => {
-@@ -837,6 +870,72 @@ async fn handle_any_tool(
+@@ -660,6 +693,13 @@ impl ToolRegistry {
+             }
+         }
+
++        if let Err(reason) = invocation.session.parent_work_tool_started(&invocation, !tool.is_third_party_tool()).await {
++            let err = FunctionCallError::RespondToModel(reason);
++            dispatch_trace.record_failed(&err);
++            notify_tool_finish_if_unclaimed(&invocation, call_state.as_deref(),
++                ToolCallOutcome::Failed { handler_executed: false }).await;
++            return Err(err);
++        }
+         if tool.mcp_server_name().is_none() {
+             notify_tool_start(&invocation, /*mcp_tool*/ None).await;
+         }
+@@ -837,6 +877,73 @@ async fn handle_any_tool(
      Ok(result)
  }
 
@@ -1306,6 +1322,7 @@ index e0acae2..dadcd77 100644
 +                | "exec"
 +                | "wait"
 +                | "update_plan"
++                | "completion_check"
 +                | "get_context_remaining"
 +                | "tool_search"
 +                | "request_user_input"
@@ -1344,7 +1361,7 @@ index e0acae2..dadcd77 100644
  fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
      if invocation.tool_name.name == "spawn_agent"
          && (invocation.tool_name.is_default_namespace()
-@@ -845,6 +944,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
+@@ -845,6 +952,15 @@ fn function_hook_tool_name(invocation: &ToolInvocation) -> HookToolName {
          return HookToolName::spawn_agent();
      }
 
@@ -1647,10 +1664,48 @@ index 895d8d4..6ddd44a 100644
 +    );
 +}
 diff --git a/codex-rs/core/src/tools/spec_plan.rs b/codex-rs/core/src/tools/spec_plan.rs
-index 7e22134..d68057a 100644
+index 7e22134..c6b7ffa 100644
 --- a/codex-rs/core/src/tools/spec_plan.rs
 +++ b/codex-rs/core/src/tools/spec_plan.rs
-@@ -1373,7 +1373,19 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+@@ -107,6 +107,7 @@ const IMAGEGEN_TOOL_NAME: &str = "imagegen";
+
+ #[derive(Clone, Copy)]
+ struct CoreToolPlanContext<'a> {
++    parent_completion_active: bool,
+     tool_policy: &'a codex_extension_api::ToolPolicy,
+     turn_context: &'a TurnContext,
+     model_info: &'a ModelInfo,
+@@ -137,6 +138,9 @@ pub(crate) fn build_tool_router(
+         .thread_extension_data
+         .get::<crate::WaitForEnvironmentToolConfig>();
+     let context = CoreToolPlanContext {
++        // Tool availability is conservative if the state is busy; the Stop gate
++        // itself always compares the authoritative state under its mutex.
++        parent_completion_active: session.parent_completion_available(),
+         tool_policy: &session.tool_policy,
+         turn_context,
+         model_info,
+@@ -303,6 +307,7 @@ pub(crate) fn build_core_tool_registry(
+     let default_agent_type_description =
+         crate::agent::role::spawn_tool_spec::build(&std::collections::BTreeMap::new());
+     let context = CoreToolPlanContext {
++        parent_completion_active: false,
+         tool_policy: &Default::default(),
+         turn_context,
+         model_info,
+@@ -1228,6 +1233,11 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
+     if turn_context.config.update_plan_enabled {
+         registry.add(PlanHandler);
+     }
++    if (context.parent_completion_active || turn_context.config.agent_admission_hook.as_deref().is_some_and(|s| !s.is_empty()))
++        && !matches!(turn_context.session_source, codex_protocol::protocol::SessionSource::SubAgent(_) | codex_protocol::protocol::SessionSource::Internal(_))
++    {
++        registry.add(crate::tools::handlers::CompletionCheckHandler);
++    }
+
+     if features.enabled(Feature::DeferredExecutor) {
+         registry.add(
+@@ -1373,7 +1383,19 @@ fn add_core_utility_tools(context: &CoreToolPlanContext<'_>, registry: &mut Tool
  #[instrument(level = "trace", skip_all)]
  fn add_collaboration_tools(context: &CoreToolPlanContext<'_>, registry: &mut ToolRegistry) {
      let turn_context = context.turn_context;
@@ -1731,10 +1786,10 @@ index 395cc95..e5e21ab 100644
      let v1 = probe(|turn| {
 diff --git a/codex-rs/core/tests/suite/admission_boundary.rs b/codex-rs/core/tests/suite/admission_boundary.rs
 new file mode 100644
-index 0000000..f8dfc2c
+index 0000000..0f8e9c3
 --- /dev/null
 +++ b/codex-rs/core/tests/suite/admission_boundary.rs
-@@ -0,0 +1,1088 @@
+@@ -0,0 +1,1448 @@
 +use anyhow::Context;
 +use anyhow::Result;
 +use codex_features::Feature;
@@ -2201,6 +2256,15 @@ index 0000000..f8dfc2c
 +                ev_completed(&format!("{id}-end")),
 +            ]),
 +        ]);
++        if matches!(id, "assign" | "astra-assign-work") {
++            // Existing loaded child, no explicit parent begin/checkpoint. A successful
++            // assignment must activate native Stop before the partial final above.
++            let reconcile = r#"let s=JSON.parse(await tools.completion_check({operation:'inspect'})); if(!s.scope_bytes) { text(await tools.completion_check({operation:'begin',accepted_scope:'Finish the admitted fixture objective',required_work:[{id:'objective',requirement:'Reconcile original admitted work'}]})); s=JSON.parse(await tools.completion_check({operation:'inspect'})); } text(await tools.completion_check({operation:'check',task_revision:s.task_revision,event_version:s.event_version,work:Object.keys(s.required_work).map(id=>({id,status:'done',evidence:'Native fixture child work reconciled'}))}));"#;
++            queue.lock().unwrap().extend([
++                sse(vec![core_test_support::responses::ev_custom_tool_call(&format!("{id}-reconcile"), "exec", reconcile), ev_completed(&format!("{id}-receipt"))]),
++                sse(vec![ev_assistant_message(&format!("{id}-complete"), "Fixture work reconciled"), ev_completed(&format!("{id}-complete"))]),
++            ]);
++        }
 +    }
 +    fn output(requests: &[wiremock::Request], call_id: &str) -> Result<String> {
 +        for request in requests.iter().rev() {
@@ -2360,6 +2424,7 @@ index 0000000..f8dfc2c
 +                config.model_catalog = Some(ModelsResponse { models });
 +                config.model_reasoning_effort = Some(ReasoningEffort::High);
 +                config.features.enable(Feature::Collab).unwrap();
++                config.features.enable(Feature::CodeMode).unwrap();
 +                if v2 {
 +                    config.features.enable(Feature::MultiAgentV2).unwrap();
 +                } else {
@@ -2485,19 +2550,29 @@ index 0000000..f8dfc2c
 +            }).to_string()), ev_completed("child-test")]),
 +            sse(vec![ev_assistant_message("child-done", "fixture assertion passed"), ev_completed("child-done")]),
 +        ]);
-+        turn(
-+            &parent_queue,
-+            "assign",
-+            "admitted_agent_task",
-+            serde_json::json!({"operation":"assign", "target":child_id,"body":body}),
-+        );
++        let assignment_args = serde_json::json!({"operation":"assign", "target":child_id,"body":body});
++        let old_history = fs::read_to_string(test.session_configured.rollout_path.as_ref().context("fixture rollout")?)?;
++        assert!(!old_history.contains("\"parent_completion\""), "existing loaded child must precede any completion checkpoint");
++        turn(&parent_queue, "assign", "admitted_agent_task", assignment_args.clone());
++        if v2 {
++            parent_queue.lock().unwrap()[0] = sse(vec![
++                core_test_support::responses::ev_custom_tool_call("assign-nested", "exec",
++                    &format!("text(await tools.admitted_agent_task({assignment_args}));")),
++                ev_completed("assign-nested")]);
++        }
 +        test.submit_turn("assign exact admitted fixture task")
 +            .await?;
-+        let assignment_output = output(&server.received_requests().await.unwrap(), "assign")?;
++        let assignment_output = if v2 {
++            let requests = server.received_requests().await.unwrap();
++            requests.iter().rev().filter_map(|r| r.body_json::<Value>().ok())
++                .find_map(|body| body["input"].as_array().and_then(|items| items.iter().find(|item| item["type"] == "custom_tool_call_output" && item["call_id"] == "assign-nested"))
++                    .map(|item| item["output"].to_string())).context("nested assignment output")?
++        } else { output(&server.received_requests().await.unwrap(), "assign")? };
 +        assert!(
 +            assignment_output.contains("submission_id"),
 +            "{assignment_output}"
 +        );
++        assert!(parent_queue.lock().unwrap().is_empty(), "native Stop must consume reconciliation after premature final, direct and Code Mode");
 +        tokio::time::timeout(std::time::Duration::from_secs(20), async {
 +            while child_queue.lock().unwrap().len() > 0
 +                || !matches!(
@@ -2743,34 +2818,28 @@ index 0000000..f8dfc2c
 +                "*** Begin Patch\n*** Add File: {}\n+fixture written\n*** End Patch",
 +                patched.display()
 +            );
-+            let responses = mount_sse_sequence(
-+                &server,
-+                vec![
++            let mut final_events = vec![ev_assistant_message("boundary-done", "checked"), ev_completed("boundary-2")];
++            if model == "gpt-6.1-sol" {
++                final_events = vec![core_test_support::responses::ev_custom_tool_call("boundary-reconcile", "exec",
++                    r#"text(await tools.completion_check({operation:'begin',accepted_scope:'Verify the native execution boundary',required_work:[{id:'boundary',requirement:'Verify the allowed patch and denied parent operations'}]})); const s=JSON.parse(await tools.completion_check({operation:'inspect'})); text(await tools.completion_check({operation:'check',task_revision:s.task_revision,event_version:s.event_version,work:Object.keys(s.required_work).map(id=>({id,status:'done',evidence:'Native fixture outputs and file assertions'}))}));"#), ev_completed("boundary-receipt")];
++            }
++            let mut scripted = vec![
 +                    sse(vec![
 +                        ev_response_created("boundary-1"),
-+                        ev_function_call(
-+                            "boundary-shell",
-+                            "exec_command",
-+                            &serde_json::json!({"cmd": command}).to_string(),
-+                        ),
++                        ev_function_call("boundary-shell", "exec_command", &serde_json::json!({"cmd": command}).to_string()),
 +                        ev_apply_patch_custom_tool_call("boundary-patch", &patch),
-+                        ev_function_call(
-+                            "boundary-stdin",
-+                            "write_stdin",
-+                            r#"{"session_id":123456,"chars":"write"}"#,
-+                        ),
-+                        ev_function_call(
-+                            "boundary-read",
-+                            "read_only",
-+                            &serde_json::json!({"path": source}).to_string(),
-+                        ),
++                        ev_function_call("boundary-stdin", "write_stdin", r#"{"session_id":123456,"chars":"write"}"#),
++                        ev_function_call("boundary-read", "read_only", &serde_json::json!({"path": source}).to_string()),
 +                        ev_completed("boundary-1"),
 +                    ]),
-+                    sse(vec![
-+                        ev_assistant_message("boundary-done", "checked"),
-+                        ev_completed("boundary-2"),
-+                    ]),
-+                ],
++                    sse(final_events),
++            ];
++            if model == "gpt-6.1-sol" {
++                scripted.push(sse(vec![ev_assistant_message("boundary-done", "checked"), ev_completed("boundary-2")]));
++            }
++            let responses = mount_sse_sequence(
++                &server,
++                scripted,
 +            )
 +            .await;
 +            let mut info = bundled_models_response()?
@@ -2783,6 +2852,7 @@ index 0000000..f8dfc2c
 +                config.model_catalog = Some(ModelsResponse { models: vec![info] });
 +                config.agent_admission_hook = Some("required-admission".to_string());
 +                config.features.enable(Feature::Collab).unwrap();
++                if model == "gpt-6.1-sol" { config.features.enable(Feature::CodeMode).unwrap(); }
 +                if v2 {
 +                    config.features.enable(Feature::MultiAgentV2).unwrap();
 +                } else {
@@ -2796,7 +2866,7 @@ index 0000000..f8dfc2c
 +            )
 +            .await?;
 +            let requests = responses.requests();
-+            assert_eq!(requests.len(), 2);
++            assert_eq!(requests.len(), if model == "gpt-6.1-sol" { 3 } else { 2 });
 +            let shell = requests[1]
 +                .function_call_output("boundary-shell")
 +                .to_string();
@@ -2820,6 +2890,351 @@ index 0000000..f8dfc2c
 +            assert_eq!(marker.join(".git").is_dir(), model == "gpt-6.1-sol");
 +            assert_eq!(patched.exists(), model == "gpt-6.1-sol");
 +        }
++    }
++    Ok(())
++}
++
++// Drives native sampling -> finalization -> continuation with local response fixtures.
++// The receipt validates declared work; this fixture does not grade business semantics.
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_missing_receipt_continues_the_native_turn() -> Result<()> {
++    use codex_core::TurnInputRequest;
++    use codex_protocol::protocol::EventMsg;
++    use codex_protocol::user_input::UserInput;
++    use core_test_support::wait_for_event;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let responses = mount_sse_sequence(
++        &server,
++        vec![
++            sse(vec![
++                ev_response_created("parent-begin"),
++                ev_function_call("parent-scope", "completion_check", r#"{"operation":"begin","accepted_scope":"Resolve the original ownership issue","required_work":[{"id":"ownership","requirement":"Close retained object ownership"}]}"#),
++                ev_completed("parent-begin"),
++            ]),
++            sse(vec![
++                ev_assistant_message("parent-partial", "Local copy fixes pass; the ownership issue is still actionable."),
++                ev_completed("parent-partial"),
++            ]),
++            sse(vec![
++                core_test_support::responses::ev_custom_tool_call("parent-receipt", "exec", &parent_check_script("done")),
++                ev_completed("parent-receipt"),
++            ]),
++            sse(vec![
++                ev_assistant_message("parent-complete", "Required ownership work is complete."),
++                ev_completed("parent-complete"),
++            ]),
++        ],
++    ).await;
++    let marker_root = TempDir::new()?;
++    let marker = marker_root.path().join("stop-hook-called");
++    let command = if cfg!(windows) {
++        format!("powershell.exe -NoProfile -NonInteractive -Command \"[IO.File]::WriteAllText('{}','called'); @{{continue=([bool]0)}} | ConvertTo-Json -Compress\"", marker.display())
++    } else {
++        format!("printf called > '{}'; printf '%s' '{{\"continue\":false}}'", marker.display())
++    };
++    let mut builder = test_codex().with_pre_build_hook(move |home| {
++        fs::write(home.join("hooks.json"), serde_json::json!({"hooks":{"Stop":[{"hooks":[{
++            "type":"command","command":command,"timeout":10}]}]}}).to_string()).unwrap();
++    }).with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        trust_discovered_hooks(config);
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.codex.start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
++        text:"Resolve the ownership issue completely, including the remaining retained objects.".to_string(), text_elements:Vec::new()}])).await?;
++    let mut hook_results = Vec::new();
++    let mut native_errors = Vec::new();
++    loop {
++        match wait_for_event(&test.codex, |_| true).await {
++            EventMsg::HookCompleted(event) => { hook_results.push(format!("{event:?}").chars().take(1200).collect::<String>()); },
++            EventMsg::Error(error) => { native_errors.push(error.message); },
++            EventMsg::TurnComplete(_) => break,
++            _ => {},
++        }
++    }
++    assert_eq!(responses.requests().len(), 4, "an open parent objective must not end at the partial final");
++    assert!(native_errors.is_empty(), "native turn must complete successfully: {native_errors:?}");
++    let accepted = responses.requests()[3].custom_tool_call_output("parent-receipt").to_string();
++    assert!(accepted.contains("\\\"accepted\\\":true"), "fresh check must actually be accepted: {accepted}");
++    let config = test.codex.config().await;
++    let hooks_enabled = config.features.enabled(Feature::CodexHooks);
++    let configured_hooks = codex_hooks::list_hooks(codex_hooks::HooksConfig {
++        feature_enabled:hooks_enabled,config_layer_stack:Some(config.config_layer_stack.clone()),..Default::default()});
++    assert!(marker.exists(), "permissive Stop hook did not create the native fixture marker: enabled={hooks_enabled}, configured={:?}, results={hook_results:?}", configured_hooks.hooks);
++    assert_eq!(fs::read_to_string(marker)?.trim(), "called", "the permissive external Stop hook must actually execute after the native gate");
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_nested_begin_and_check_persist_and_later_result_invalidates() -> Result<()> {
++    use core_test_support::responses::ev_custom_tool_call;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let source = TempDir::new()?;
++    let path = source.path().join("evidence.txt");
++    fs::write(&path, "current evidence")?;
++    let read = format!("text(await tools.read_only({}));", serde_json::json!({"path":path}));
++    let begin = r#"text(await tools.completion_check({operation:'begin',accepted_scope:'Finish ownership',required_work:[{id:'ownership',requirement:'Close ownership'}]}));"#;
++    let check = r#"const s = JSON.parse(await tools.completion_check({operation:'inspect'})); text(await tools.completion_check({operation:'check',task_revision:s.task_revision,event_version:s.event_version,work:[{id:'ownership',status:'done',evidence:'Current fixture evidence'}]}));"#;
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_custom_tool_call("nested-begin", "exec", begin), ev_completed("nested-1")]),
++        sse(vec![ev_assistant_message("nested-partial", "Local work only"), ev_completed("nested-2")]),
++        sse(vec![ev_custom_tool_call("nested-check", "exec", check), ev_completed("nested-3")]),
++        sse(vec![ev_custom_tool_call("nested-read", "exec", &read), ev_completed("nested-4")]),
++        sse(vec![ev_assistant_message("nested-stale", "Attempt to reuse stale receipt"), ev_completed("nested-5")]),
++        sse(vec![ev_custom_tool_call("nested-recheck", "exec", check), ev_completed("nested-6")]),
++        sse(vec![ev_assistant_message("nested-done", "Complete after reconciliation"), ev_completed("nested-7")]),
++    ]).await;
++    let mut builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.submit_turn("Finish ownership").await?;
++    let requests = responses.requests();
++    assert_eq!(requests.len(), 7, "nested state must persist and actual read result must invalidate the receipt");
++    for index in [3, 6] {
++        assert!(requests[index].body_json().to_string().contains("\\\"accepted\\\":true"),
++            "nested check must mutate the actual session: {}", requests[index].body_json());
++    }
++    Ok(())
++}
++
++const PARENT_BEGIN: &str = r#"text(await tools.completion_check({operation:'begin',accepted_scope:'Finish ownership',required_work:[{id:'ownership',requirement:'Close ownership'}]}));"#;
++
++fn parent_check_script(status: &str) -> String {
++    format!(r#"const s=JSON.parse(await tools.completion_check({{operation:'inspect'}})); text(await tools.completion_check({{operation:'check',task_revision:s.task_revision,event_version:s.event_version,work:Object.keys(s.required_work).map(id=>({{id,status:{status:?},evidence:'Current fixture evidence',missing_resource:'User-owned capture access',affected_scope:'Runtime capture validation',external_action:'Provide the missing capture access'}}))}}));"#)
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_actionable_check_continues_and_standalone_question_stays_cheap() -> Result<()> {
++    use core_test_support::responses::ev_custom_tool_call;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_custom_tool_call("actionable-begin", "exec", PARENT_BEGIN), ev_completed("a1")]),
++        sse(vec![ev_custom_tool_call("actionable-check", "exec", &parent_check_script("actionable")), ev_completed("a2")]),
++        sse(vec![ev_assistant_message("actionable-final", "Partial result"), ev_completed("a3")]),
++        sse(vec![ev_custom_tool_call("actionable-done", "exec", &parent_check_script("done")), ev_completed("a4")]),
++        sse(vec![ev_assistant_message("actionable-complete", "Completed"), ev_completed("a5")]),
++        sse(vec![ev_assistant_message("question", "The answer is four."), ev_completed("q1")]),
++    ]).await;
++    let mut builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.submit_turn("Finish ownership").await?;
++    assert_eq!(responses.requests().len(), 5);
++    assert!(responses.requests()[2].body_json().to_string().contains("actionable"));
++    let resumed = builder.restart(&server, &test).await?;
++    resumed.submit_turn("What is two plus two?").await?;
++    assert_eq!(responses.requests().len(), 6, "completed work must not gate an unrelated standalone question");
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_block_survives_restart_and_midtask_status_is_not_scope_change() -> Result<()> {
++    use core_test_support::responses::ev_custom_tool_call;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_custom_tool_call("block-begin", "exec", PARENT_BEGIN), ev_completed("b1")]),
++        sse(vec![ev_custom_tool_call("block-check", "exec", &parent_check_script("external_block")), ev_completed("b2")]),
++        sse(vec![ev_assistant_message("blocked", "Missing user-owned capture access"), ev_completed("b3")]),
++        sse(vec![ev_custom_tool_call("restored-inventory", "exec", "text(await tools.completion_check({operation:'inspect'}));"), ev_completed("restored-inspect")]),
++        sse(vec![ev_assistant_message("status", "Local copy work passed"), ev_completed("b4")]),
++        sse(vec![ev_custom_tool_call("block-recheck", "exec", &parent_check_script("external_block")), ev_completed("b5")]),
++        sse(vec![ev_assistant_message("blocked-again", "Capture access remains missing"), ev_completed("b6")]),
++    ]).await;
++    let mut builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.submit_turn("Finish ownership").await?;
++    assert_eq!(responses.requests().len(), 3, "a structured genuine external block permits a final response");
++    let mut resume_builder = test_codex().with_config(|config| {
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let resumed = resume_builder.restart(&server, &test).await?;
++    resumed.submit_turn("Status? 继续").await?;
++    let requests = responses.requests();
++    let inventory = requests[4].custom_tool_call_output("restored-inventory");
++    assert!(inventory.to_string().contains("ownership"), "restored native inventory: {inventory}");
++    assert_eq!(requests.len(), 7, "a midtask question and restart must retain admitted work");
++    assert!(requests[5].body_json().to_string().contains("Parent engineering work is still open"));
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_denial_ceiling_emits_native_failure_instead_of_success() -> Result<()> {
++    use codex_core::TurnInputRequest;
++    use codex_protocol::protocol::EventMsg;
++    use codex_protocol::user_input::UserInput;
++    use core_test_support::responses::ev_custom_tool_call;
++    use core_test_support::wait_for_event;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let mut scripted = vec![sse(vec![ev_custom_tool_call("ceiling-begin", "exec", PARENT_BEGIN), ev_completed("c0")])];
++    for id in ["c1", "c2", "c3"] {
++        scripted.push(sse(vec![ev_assistant_message(id, "Premature final"), ev_completed(id)]));
++    }
++    scripted.extend([
++        sse(vec![ev_assistant_message("ceiling-after-restart", "Partial status"), ev_completed("c4")]),
++        sse(vec![ev_custom_tool_call("ceiling-reconcile", "exec", &parent_check_script("external_block")), ev_completed("c5")]),
++        sse(vec![ev_assistant_message("ceiling-blocked", "Current external resource is missing"), ev_completed("c6")]),
++    ]);
++    let responses = mount_sse_sequence(&server, scripted).await;
++    let mut builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.codex.start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
++        text:"Finish ownership".to_string(), text_elements:Vec::new()}])).await?;
++    let mut failed = false;
++    loop {
++        match wait_for_event(&test.codex, |_| true).await {
++            EventMsg::Error(error) => { failed |= error.message.contains("lifecycle failure"); },
++            EventMsg::TurnComplete(_) => break,
++            _ => {},
++        }
++    }
++    assert!(failed, "retry ceiling must produce the trusted native error path");
++    assert_eq!(responses.requests().len(), 4, "the gate must not create an infinite continuation loop");
++    let mut resume_builder = test_codex().with_config(|config| { config.features.enable(Feature::CodeMode).unwrap(); });
++    let resumed = resume_builder.restart(&server, &test).await?;
++    resumed.submit_turn("Status? 继续").await?;
++    assert_eq!(responses.requests().len(), 7, "failed native finalization must retain work durably");
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_tool_is_available_in_plan_mode() -> Result<()> {
++    use codex_core::TurnInputRequest;
++    use codex_protocol::config_types::{CollaborationMode, ModeKind, Settings};
++    use codex_protocol::protocol::{EventMsg, ThreadSettingsOverrides};
++    use codex_protocol::user_input::UserInput;
++    use core_test_support::wait_for_event;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_function_call("plan-scope", "completion_check", r#"{"operation":"begin","accepted_scope":"Finish the accepted plan","required_work":[{"id":"plan-work","requirement":"Reconcile the accepted plan"}]}"#), ev_completed("p1")]),
++        sse(vec![ev_function_call("plan-check", "completion_check", r#"{"operation":"check","task_revision":1,"event_version":1,"work":[{"id":"plan-work","status":"done","evidence":"Current native fixture evidence"}]}"#), ev_completed("p2")]),
++        sse(vec![ev_assistant_message("plan-done", "Plan reconciled"), ev_completed("p3")]),
++    ]).await;
++    let mut builder = test_codex().with_config(|config| { config.agent_admission_hook = Some("required-admission".to_string()); });
++    let test = builder.build(&server).await?;
++    test.codex.start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
++        text:"Finish the accepted plan".to_string(), text_elements:Vec::new()}])
++        .with_thread_settings(ThreadSettingsOverrides { collaboration_mode:Some(CollaborationMode {
++            mode:ModeKind::Plan,settings:Settings {model:test.session_configured.model.clone(),reasoning_effort:None,developer_instructions:None}}), ..Default::default() })).await?;
++    wait_for_event(&test.codex, |event| matches!(event, EventMsg::TurnComplete(_))).await;
++    assert_eq!(responses.requests().len(), 3);
++    let body = responses.requests()[0].body_json();
++    let control = body["tools"].as_array().unwrap().iter().find(|tool| tool["name"] == "completion_check").expect("Plan mode must advertise the native completion control");
++    eprintln!("PARENT_COMPLETION_TOOL_UTF8_BYTES={}", control.to_string().len());
++    let output = responses.requests()[2].function_call_output("plan-check");
++    assert!(output.to_string().contains("\\\"accepted\\\":true"), "Plan mode check must use actual native state: {output}");
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_rejects_excess_plan_steps_before_the_native_handler() -> Result<()> {
++    use core_test_support::responses::ev_custom_tool_call;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let excess = serde_json::json!({"explanation":"not part of retained work", "plan":(0..129)
++        .map(|index| serde_json::json!({"step":format!("required {index}"),"status":"pending"})).collect::<Vec<_>>()});
++    let check = format!("const inventory=JSON.parse(await tools.completion_check({{operation:'inspect'}})); if(inventory.total!==1) throw Error('rejected plan changed retained work'); {}", parent_check_script("done"));
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_custom_tool_call("plan-limit-begin", "exec", PARENT_BEGIN), ev_completed("l1")]),
++        sse(vec![ev_function_call("excess-plan", "update_plan", &excess.to_string()), ev_completed("l2")]),
++        sse(vec![ev_assistant_message("plan-limit-partial", "Plan not accepted yet"), ev_completed("l3")]),
++        sse(vec![ev_custom_tool_call("plan-limit-check", "exec", &check), ev_completed("l4")]),
++        sse(vec![ev_assistant_message("plan-limit-done", "Original fixture work reconciled"), ev_completed("l5")]),
++    ]).await;
++    let mut plan_builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++        config.update_plan_enabled = true;
++    });
++    let test = plan_builder.build(&server).await?;
++    test.submit_turn("Finish ownership").await?;
++    let requests = responses.requests();
++    assert_eq!(requests.len(), 5);
++    let rejected = requests[2].function_call_output("excess-plan").to_string();
++    assert!(rejected.contains("128 required steps"), "oversized input must fail explicitly: {rejected}");
++    assert!(!rejected.contains("Plan updated"));
++    let reconciled = requests[4].custom_tool_call_output("plan-limit-check").to_string();
++    assert!(reconciled.contains("\\\"accepted\\\":true"), "accepted work must remain reconcilable: {reconciled}");
++    Ok(())
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_trusted_interrupt_and_context_budget_keep_unfinished_work() -> Result<()> {
++    use codex_core::TurnInputRequest;
++    use codex_protocol::protocol::{EventMsg, Op};
++    use codex_protocol::user_input::UserInput;
++    use core_test_support::responses::{ev_custom_tool_call, sse_failed};
++    use core_test_support::wait_for_event;
++    skip_if_no_network!(Ok(()));
++    for interrupt in [false, true] {
++        let server = start_mock_server().await;
++        let boundary = if interrupt {
++            sse(vec![ev_custom_tool_call("interrupt-cell", "exec", "await new Promise(()=>{});"), ev_completed("interrupt-response")])
++        } else {
++            sse_failed("actual-budget-error", "context_length_exceeded", "Actual fixture provider context budget exhausted")
++        };
++        let mut scripted = vec![
++            sse(vec![ev_custom_tool_call("boundary-begin", "exec", PARENT_BEGIN), ev_completed("e1")]),
++            boundary,
++        ];
++        if interrupt { scripted.extend([
++            sse(vec![ev_custom_tool_call("retained-inventory", "exec", "text(await tools.completion_check({operation:'inspect'}));"), ev_completed("retained-inspect")]),
++            sse(vec![ev_assistant_message("after-boundary", "Still only local work"), ev_completed("e2")]),
++            sse(vec![ev_custom_tool_call("after-boundary-check", "exec", &parent_check_script("done")), ev_completed("e3")]),
++            sse(vec![ev_assistant_message("after-boundary-done", "Reconciled"), ev_completed("e4")]),
++        ]); }
++        let responses = mount_sse_sequence(&server, scripted).await;
++        let mut builder = test_codex().with_config(|config| {
++            config.agent_admission_hook = Some("required-admission".to_string());
++            config.features.enable(Feature::CodeMode).unwrap();
++        });
++        let test = builder.build(&server).await?;
++        test.codex.start_or_steer_turn(TurnInputRequest::user_input(vec![UserInput::Text {
++            text:"Finish ownership".to_string(), text_elements:Vec::new()}])).await?;
++        if interrupt {
++            tokio::time::timeout(std::time::Duration::from_secs(10), async {
++                while responses.requests().len() < 2 { tokio::time::sleep(std::time::Duration::from_millis(10)).await; }
++            }).await?;
++            test.codex.submit(Op::Interrupt).await?;
++            wait_for_event(&test.codex, |event| matches!(event, EventMsg::TurnAborted(_))).await;
++        } else {
++            let mut actual_error = false;
++            loop {
++                match wait_for_event(&test.codex, |_| true).await {
++                    EventMsg::Error(error) => { actual_error |= error.message.contains("context") || error.message.contains("budget"); },
++                    EventMsg::TurnComplete(_) => break,
++                    _ => {},
++                }
++            }
++            assert!(actual_error, "the actual provider budget failure must remain visible");
++        }
++        assert_eq!(responses.requests().len(), 2, "trusted stop/error must not trigger forced continuation");
++        if !interrupt {
++            // A context-window failure intentionally leaves the next request over
++            // budget. Do not pretend an ordinary follow-up is a fresh context.
++            continue;
++        }
++        test.submit_turn("继续").await?;
++        let requests = responses.requests();
++        let inventory = requests[3].custom_tool_call_output("retained-inventory");
++        assert!(inventory.to_string().contains("ownership"), "retained native inventory: {inventory}");
++        assert_eq!(requests.len(), 6, "a real stop/error must preserve the unfinished objective for a later user continuation");
 +    }
 +    Ok(())
 +}
@@ -3604,3 +4019,1248 @@ index 4cce550..9ff7dc1 100644
      fn mcp_server_name(&self) -> Option<&str> {
          Some(&self.tool_info.server_name)
      }
+diff --git a/codex-rs/core/src/session/mod.rs b/codex-rs/core/src/session/mod.rs
+index dd70a76..3d1e5bd 100644
+--- a/codex-rs/core/src/session/mod.rs
++++ b/codex-rs/core/src/session/mod.rs
+@@ -1607,6 +1607,27 @@ impl Session {
+             InitialHistory::Resumed(resumed_history) => {
+                 let turn_context = self.new_default_turn().await;
+                 let rollout_items = resumed_history.history;
++                if !matches!(turn_context.session_source, SessionSource::SubAgent(_) | SessionSource::Internal(_))
++                    && let Some(start) = rollout_items.iter().rposition(|item| matches!(item,
++                        RolloutItem::ResponseItem(envelope) if envelope.metadata.as_ref().is_some_and(|m| m.parent_completion.is_some())))
++                {
++                    let mut state = self.state.lock().await;
++                    for item in &rollout_items[start..] {
++                        match item {
++                            RolloutItem::ResponseItem(envelope) => {
++                                if let Some(snapshot) = envelope.metadata.as_ref().and_then(|m| m.parent_completion.clone()) {
++                                    state.parent_work.restore(snapshot);
++                                } else {
++                                    state.parent_work.observe(&envelope.item);
++                                }
++                            }
++                            RolloutItem::EventMsg(EventMsg::TurnComplete(event)) => {
++                                let _ = state.parent_work.finish(&event.turn_id);
++                            }
++                            _ => {}
++                        }
++                    }
++                }
+                 if matches!(
+                     rollout_items.iter().rev().find_map(|item| match item {
+                         RolloutItem::EventMsg(event) => agent_status_from_event(event),
+@@ -2325,6 +2346,73 @@ impl Session {
+
+     /// Persist the event to rollout and send it to clients.
+     pub(crate) async fn send_event(&self, turn_context: &TurnContext, msg: EventMsg) {
++        if matches!(
++            &msg,
++            EventMsg::CollabAgentSpawnEnd(_)
++                | EventMsg::CollabAgentInteractionEnd(_)
++                | EventMsg::CollabWaitingEnd(_)
++                | EventMsg::CollabCloseEnd(_)
++                | EventMsg::CollabResumeEnd(_)
++        ) {
++            self.state.lock().await.parent_work.changed();
++        }
++        if matches!(msg, EventMsg::TurnComplete(_) | EventMsg::TurnAborted(_)) {
++            let interrupted = matches!(msg, EventMsg::TurnAborted(_))
++                || turn_context.terminal_error.lock().await.is_some();
++            // Compare and commit under the same lock that observes new evidence.
++            // A late result must fail the lifecycle, never silently accept an old receipt.
++            let (was_active, completion) = {
++                let mut state = self.state.lock().await;
++                let active = state.parent_work.active();
++                let result = if interrupted {
++                    state.parent_work.changed();
++                    Ok(())
++                } else {
++                    state.parent_work.finish(&turn_context.sub_id)
++                };
++                if result.is_err() {
++                    state.parent_work.changed();
++                }
++                (active, result)
++            };
++            if let Err(reason) = completion {
++                let error = codex_protocol::protocol::ErrorEvent {
++                    message: reason,
++                    codex_error_info: Some(
++                        CodexErr::InvalidRequest("parent completion changed".to_string())
++                            .to_codex_protocol_error(),
++                    ),
++                    misalignment: None,
++                };
++                turn_context
++                    .terminal_error
++                    .lock()
++                    .await
++                    .replace(error.clone());
++                self.send_event_raw(Event {
++                    id: turn_context.sub_id.clone(),
++                    msg: EventMsg::Error(error),
++                })
++                .await;
++            }
++            if was_active {
++                // Error events are transient. Persist the final native checkpoint
++                // in existing history metadata before the terminal event, including
++                // interruption/failure and the fully cleared completion state.
++                let message = codex_protocol::items::build_hook_prompt_message(&[
++                    codex_protocol::items::HookPromptFragment::from_single_hook(
++                        "Native parent work checkpoint saved. Retained obligations remain authoritative; declared completion is not semantic proof.".to_string(),
++                        "native-parent-completion",
++                    ),
++                ]).expect("nonempty native checkpoint note");
++                Box::pin(self.record_conversation_items(
++                    turn_context,
++                    &turn_context.capture_current_model_info(),
++                    &[message],
++                ))
++                .await;
++            }
++        }
+         let legacy_source = msg.clone();
+         if let EventMsg::Error(error) = &legacy_source
+             && error
+@@ -3582,6 +3670,28 @@ impl Session {
+                 .extension_data
+                 .get::<retained_context::PendingAssistantMessageOrders>();
+             for envelope in &mut items {
++                if (state.parent_work.dirty
++                    || state.parent_work.active()
++                    || turn_context
++                        .config
++                        .agent_admission_hook
++                        .as_deref()
++                        .is_some_and(|s| !s.is_empty()))
++                    && !matches!(
++                        turn_context.session_source,
++                        SessionSource::SubAgent(_) | SessionSource::Internal(_)
++                    )
++                {
++                    state.parent_work.observe(&envelope.item);
++                    if state.parent_work.dirty
++                        || (state.parent_work.active()
++                            && crate::context_manager::is_user_turn_boundary(&envelope.item))
++                    {
++                        envelope.metadata.get_or_insert_default().parent_completion =
++                            Some(state.parent_work.checkpoint());
++                        state.parent_work.dirty = false;
++                    }
++                }
+                 if envelope
+                     .metadata
+                     .as_ref()
+@@ -4941,6 +5051,99 @@ impl Session {
+         }
+     }
+
++    pub(crate) fn parent_completion_available(&self) -> bool {
++        self.state
++            .try_lock()
++            .map_or(true, |state| state.parent_work.active())
++    }
++
++    pub(crate) async fn parent_completion_request(
++        &self,
++        args: &serde_json::Value,
++        turn_id: &str,
++    ) -> serde_json::Value {
++        self.state.lock().await.parent_work.request(args, turn_id)
++    }
++
++    pub(crate) async fn parent_work_tool_started(
++        &self,
++        invocation: &crate::tools::context::ToolInvocation,
++        native: bool,
++    ) -> Result<(), String> {
++        let turn = &invocation.turn;
++        if matches!(
++            turn.session_source,
++            SessionSource::SubAgent(_) | SessionSource::Internal(_)
++        ) {
++            return Ok(());
++        }
++        if turn
++            .config
++            .agent_admission_hook
++            .as_deref()
++            .is_none_or(str::is_empty)
++            && !self.state.lock().await.parent_work.active()
++        {
++            return Ok(());
++        }
++        let args = if native
++            && matches!(
++                invocation.tool_name.name.as_str(),
++                "admitted_agent_task" | "update_plan" | "wait"
++            ) {
++            match &invocation.payload {
++                crate::tools::context::ToolPayload::Function { arguments } => {
++                    crate::tools::handlers::ParentWorkState::tool_arguments(
++                        &invocation.tool_name.name,
++                        arguments,
++                    )?
++                }
++                _ => serde_json::Value::Null,
++            }
++        } else {
++            serde_json::Value::Null
++        };
++        let mut state = self.state.lock().await;
++        if state.parent_work.active()
++            || turn
++                .config
++                .agent_admission_hook
++                .as_deref()
++                .is_some_and(|s| !s.is_empty())
++        {
++            state.parent_work.tool_started(
++                &invocation.call_id,
++                &invocation.tool_name,
++                native,
++                args,
++            )?;
++        }
++        Ok(())
++    }
++
++    pub(crate) async fn parent_work_tool_finished(
++        &self,
++        turn: &TurnContext,
++        call_id: &str,
++        success: bool,
++    ) {
++        if !matches!(
++            turn.session_source,
++            SessionSource::SubAgent(_) | SessionSource::Internal(_)
++        ) {
++            let mut state = self.state.lock().await;
++            if state.parent_work.active()
++                || turn
++                    .config
++                    .agent_admission_hook
++                    .as_deref()
++                    .is_some_and(|s| !s.is_empty())
++            {
++                state.parent_work.tool_finished(call_id, success);
++            }
++        }
++    }
++
+     pub(crate) async fn record_user_prompt_and_emit_turn_item(
+         &self,
+         turn_context: &TurnContext,
+diff --git a/codex-rs/core/src/session/retained_context.rs b/codex-rs/core/src/session/retained_context.rs
+index 8c4203b..1a562b5 100644
+--- a/codex-rs/core/src/session/retained_context.rs
++++ b/codex-rs/core/src/session/retained_context.rs
+@@ -133,6 +133,7 @@ impl Session {
+             .unwrap_or_else(|_| unreachable!("communication boundary remains open"));
+         let (order, pending) = {
+             let mut state = self.state.lock().await;
++            state.parent_work.changed();
+             let order = state.history.reserve_input_order();
+             (order, self.pending_code_mode_message_recordings())
+         };
+diff --git a/codex-rs/core/src/session/retained_context_tests.rs b/codex-rs/core/src/session/retained_context_tests.rs
+index 6347e7d..33453c9 100644
+--- a/codex-rs/core/src/session/retained_context_tests.rs
++++ b/codex-rs/core/src/session/retained_context_tests.rs
+@@ -20,6 +20,68 @@ fn delivered_message() -> RetainedUserMessage {
+     }
+ }
+
++#[tokio::test]
++async fn parent_completion_user_acceptance_invalidates_before_history_recording() {
++    let (session, turn) = make_session_and_context().await;
++    {
++        let mut state = session.state.lock().await;
++        let begin = state.parent_work.request(&serde_json::json!({"operation":"begin",
++            "accepted_scope":"Finish ownership","required_work":[{"id":"ownership","requirement":"Close ownership"}]}), &turn.sub_id);
++        assert_eq!(begin["accepted"], true);
++        let check = state.parent_work.request(&serde_json::json!({"operation":"check",
++            "task_revision":1,"event_version":1,"work":[{"id":"ownership","status":"done","evidence":"current fixture"}]}), &turn.sub_id);
++        assert_eq!(check["accepted"], true);
++        assert!(state.parent_work.stop(&turn.sub_id).unwrap().is_none());
++    }
++    session.reserve_user_input_order().await;
++    assert!(
++        session
++            .state
++            .lock()
++            .await
++            .parent_work
++            .stop(&turn.sub_id)
++            .unwrap()
++            .is_some(),
++        "accepted steering must invalidate before deferred history delivery, under the native finalization mutex"
++    );
++}
++
++#[tokio::test]
++async fn parent_completion_native_child_cancel_callback_keeps_the_parent_obligation_open() {
++    use codex_protocol::protocol::{AgentStatus, CollabCloseEndEvent, EventMsg};
++    let (session, turn) = make_session_and_context().await;
++    {
++        let mut state = session.state.lock().await;
++        state.parent_work.request(&serde_json::json!({"operation":"begin",
++            "accepted_scope":"Finish ownership","required_work":[{"id":"ownership","requirement":"Close ownership"}]}), &turn.sub_id);
++        let check = state.parent_work.request(&serde_json::json!({"operation":"check",
++            "task_revision":1,"event_version":1,"work":[{"id":"ownership","status":"done","evidence":"current fixture"}]}), &turn.sub_id);
++        assert_eq!(check["accepted"], true);
++    }
++    session
++        .send_event(
++            &turn,
++            EventMsg::CollabCloseEnd(CollabCloseEndEvent {
++                call_id: "native-child-cancel".to_string(),
++                completed_at_ms: 0,
++                sender_thread_id: session.thread_id,
++                receiver_thread_id: codex_protocol::ThreadId::new(),
++                receiver_agent_nickname: None,
++                receiver_agent_role: None,
++                status: AgentStatus::Interrupted,
++            }),
++        )
++        .await;
++    let mut state = session.state.lock().await;
++    assert!(state.parent_work.active());
++    assert!(
++        state.parent_work.finish(&turn.sub_id).is_err(),
++        "child cancellation is not parent completion"
++    );
++    assert!(state.parent_work.stop(&turn.sub_id).unwrap().is_some());
++}
++
+ #[tokio::test]
+ async fn shutdown_retains_an_admitted_delivery_until_persistence_finishes() {
+     let (session, _) = make_session_and_context().await;
+diff --git a/codex-rs/core/src/session/turn.rs b/codex-rs/core/src/session/turn.rs
+index 0879533..f31b634 100644
+--- a/codex-rs/core/src/session/turn.rs
++++ b/codex-rs/core/src/session/turn.rs
+@@ -660,6 +660,30 @@ pub(crate) async fn run_turn(
+
+                 if !needs_follow_up {
+                     last_agent_message = sampling_request_last_agent_message;
++                    let parent_completion = sess
++                        .state
++                        .lock()
++                        .await
++                        .parent_work
++                        .stop(&turn_context.sub_id)
++                        .map_err(CodexErr::InvalidRequest)?;
++                    if let Some(reason) = parent_completion {
++                        let message = build_hook_prompt_message(&[
++                            codex_protocol::items::HookPromptFragment::from_single_hook(
++                                reason,
++                                "native-parent-completion",
++                            ),
++                        ])
++                        .expect("nonempty native completion feedback");
++                        sess.record_response_item_and_emit_turn_item(
++                            &turn_context,
++                            &step_context.settings.model_info,
++                            message,
++                        )
++                        .await;
++                        // This is independent of external hooks and stop_hook_active.
++                        continue;
++                    }
+                     let stop_outcome = run_turn_stop_hooks(
+                         &sess,
+                         &step_context,
+diff --git a/codex-rs/core/src/state/session.rs b/codex-rs/core/src/state/session.rs
+index 0f63dad..c0955c8 100644
+--- a/codex-rs/core/src/state/session.rs
++++ b/codex-rs/core/src/state/session.rs
+@@ -67,6 +67,7 @@ impl ReasoningEffortPin {
+
+ /// Persistent, session-scoped state previously stored directly on `Session`.
+ pub(crate) struct SessionState {
++    pub(crate) parent_work: crate::tools::handlers::ParentWorkState,
+     pub(crate) session_configuration: SessionConfiguration,
+     /// Plugin selection of the last admitted task; settings updates take effect on the next task.
+     pub(crate) active_disabled_plugin_ids: Vec<String>,
+@@ -123,6 +124,7 @@ impl SessionState {
+     ) -> Self {
+         Self {
+             active_disabled_plugin_ids: Vec::new(),
++            parent_work: crate::tools::handlers::ParentWorkState::default(),
+             session_configuration,
+             base_instructions_provenance: None,
+             history,
+diff --git a/codex-rs/core/src/tools/handlers/plan.rs b/codex-rs/core/src/tools/handlers/plan.rs
+index 3495656..1e589e3 100644
+--- a/codex-rs/core/src/tools/handlers/plan.rs
++++ b/codex-rs/core/src/tools/handlers/plan.rs
+@@ -13,10 +13,833 @@ use codex_protocol::plan_tool::UpdatePlanArgs;
+ use codex_protocol::protocol::EventMsg;
+ use codex_tools::ToolName;
+ use codex_tools::ToolSpec;
++use serde::{Deserialize, Serialize};
+ use serde_json::Value as JsonValue;
++use std::collections::BTreeMap;
++
++/// Admitted work survives turns; a completion receipt never survives new evidence.
++/// Stored in existing harness history metadata, never in the model's prompt or goal store.
++#[derive(Clone, Default, Serialize, Deserialize)]
++pub(crate) struct ParentWorkState {
++    scope: String,
++    required: BTreeMap<String, String>,
++    task_revision: u64,
++    event_version: u64,
++    pending: BTreeMap<String, (String, JsonValue)>,
++    receipt: Option<(String, u64, u64, bool)>,
++    recovery_error: Option<String>,
++    #[serde(skip)]
++    pub(crate) dirty: bool,
++    #[serde(skip)]
++    denied_turn: String,
++    #[serde(skip)]
++    denials: u8,
++}
++
++impl ParentWorkState {
++    pub(crate) fn tool_arguments(name: &str, arguments: &str) -> Result<JsonValue, String> {
++        if name == "update_plan" && arguments.len() > 131_072 {
++            return Err("update_plan input exceeds 131072 bytes; submit a bounded plan without dropping required work".to_string());
++        }
++        serde_json::from_str(arguments)
++            .map_err(|error| format!("invalid parent work tool arguments: {error}"))
++    }
++
++    pub(crate) fn active(&self) -> bool {
++        !self.required.is_empty() || self.recovery_error.is_some()
++    }
++
++    pub(crate) fn changed(&mut self) {
++        if self.active() {
++            self.event_version += 1;
++            self.receipt = None;
++            self.dirty = true;
++        }
++    }
++
++    pub(crate) fn tool_started(
++        &mut self,
++        id: &str,
++        name: &ToolName,
++        native: bool,
++        args: JsonValue,
++    ) -> Result<(), String> {
++        let native = native && name.is_default_namespace();
++        let control = native
++            && (name.name == "exec" || (name.name == "wait" && args.get("cell_id").is_some()));
++        let kind = if control {
++            "__wrapper"
++        } else if native {
++            name.name.as_str()
++        } else {
++            "__external"
++        };
++        if kind == "completion_check" {
++            self.receipt = None;
++            self.dirty = self.active();
++        } else if kind != "__wrapper" {
++            self.changed();
++        }
++        let captured = if matches!(kind, "admitted_agent_task" | "update_plan") {
++            if kind == "admitted_agent_task" {
++                serde_json::json!({"operation":args["operation"],"target":args["target"]})
++            } else {
++                let steps = args["plan"]
++                    .as_array()
++                    .ok_or("update_plan requires a plan array")?;
++                if steps.len() > 128 {
++                    return Err(
++                        "update_plan exceeds 128 required steps; no steps were accepted or dropped"
++                            .to_string(),
++                    );
++                }
++                for step in steps {
++                    if !step["step"]
++                        .as_str()
++                        .is_some_and(|text| !text.trim().is_empty() && text.len() <= 512)
++                    {
++                        return Err("each required plan step must contain 1..512 bytes; no steps were accepted or dropped".to_string());
++                    }
++                }
++                serde_json::json!({"plan":steps.iter().map(|step| serde_json::json!({"step":step["step"]})).collect::<Vec<_>>()})
++            }
++        } else {
++            JsonValue::Null
++        };
++        if self.pending.len() >= 128 || self.pending.contains_key(id) {
++            self.recovery_error = Some("too many concurrent parent tool calls".to_string());
++            self.dirty = true;
++            return Err(
++                "parent tool tracking limit or duplicate call id; existing work retained"
++                    .to_string(),
++            );
++        }
++        self.pending
++            .insert(id.to_string(), (kind.to_string(), captured));
++        Ok(())
++    }
++
++    pub(crate) fn tool_finished(&mut self, id: &str, success: bool) {
++        if let Some((name, args)) = self.pending.remove(id) {
++            if matches!(name.as_str(), "__wrapper" | "completion_check") {
++                return;
++            }
++            if success {
++                self.record_obligation(&name, &args);
++            }
++        }
++        self.changed();
++    }
++
++    fn record_obligation(&mut self, name: &str, args: &JsonValue) {
++        use sha2::{Digest, Sha256};
++        if name == "admitted_agent_task" && args["operation"] == "assign" {
++            self.require(
++                format!(
++                    "dispatch:{:x}",
++                    Sha256::digest(args["target"].to_string().as_bytes())
++                ),
++                format!("Reconcile admitted work for {}", args["target"]),
++            );
++        } else if name == "apply_patch" {
++            self.require(
++                "effect:engineering".to_string(),
++                "Reconcile the direct engineering changes and original objective".to_string(),
++            );
++        } else if name == "update_plan"
++            && let Some(steps) = args["plan"].as_array()
++        {
++            for step in steps {
++                if let Some(text) = step["step"].as_str() {
++                    self.require(
++                        format!("plan:{:x}", Sha256::digest(text.as_bytes())),
++                        text.to_string(),
++                    );
++                }
++            }
++        }
++    }
++
++    fn in_flight(&self) -> usize {
++        self.pending
++            .values()
++            .filter(|(name, _)| !matches!(name.as_str(), "__wrapper" | "completion_check"))
++            .count()
++    }
++
++    fn require(&mut self, id: String, requirement: String) {
++        if id.len() > 256 || (self.required.len() >= 128 && !self.required.contains_key(&id)) {
++            self.recovery_error = Some("parent work inventory exceeds 128 items".to_string());
++        } else if !self.required.contains_key(&id) {
++            self.required
++                .insert(id, requirement.chars().take(128).collect());
++            self.task_revision += 1;
++        }
++        self.changed();
++        self.dirty = true;
++    }
++
++    pub(crate) fn observe(&mut self, item: &codex_protocol::models::ResponseItem) {
++        // Tool execution is observed at the trusted runtime boundary, including Code Mode.
++        // History alone contains only its outer exec/wait wrapper and must not double count.
++        if let codex_protocol::models::ResponseItem::Message { role, .. } = item
++            && role == "user"
++        {
++            self.changed();
++        }
++    }
++
++    fn apply(&mut self, args: &JsonValue, turn_id: &str) -> Result<bool, String> {
++        let operation = args["operation"].as_str().unwrap_or("");
++        if matches!(operation, "begin" | "append") {
++            if operation == "begin" && self.active() && !self.scope.is_empty() {
++                return Err(
++                    "accepted scope already exists; reconcile it rather than replacing it"
++                        .to_string(),
++                );
++            }
++            let scope = if operation == "append" {
++                if self.scope.is_empty() {
++                    return Err("begin the original accepted scope first".to_string());
++                }
++                self.scope.as_str()
++            } else {
++                args["accepted_scope"]
++                    .as_str()
++                    .filter(|s| !s.trim().is_empty() && s.len() <= 4096)
++                    .ok_or("accepted_scope must contain the original accepted objective")?
++            };
++            let items = args["required_work"]
++                .as_array()
++                .filter(|v| !v.is_empty() && v.len() <= 128)
++                .ok_or("required_work must contain every required item (1..128)")?;
++            let mut work = BTreeMap::new();
++            for item in items {
++                let id = item["id"]
++                    .as_str()
++                    .filter(|s| !s.trim().is_empty() && s.len() <= 256)
++                    .ok_or("invalid work id")?;
++                let requirement = item["requirement"]
++                    .as_str()
++                    .filter(|s| !s.trim().is_empty() && s.len() <= 512)
++                    .ok_or("invalid requirement")?;
++                if work
++                    .insert(id.to_string(), requirement.to_string())
++                    .is_some()
++                {
++                    return Err("duplicate required work id".to_string());
++                }
++                if self
++                    .required
++                    .get(id)
++                    .is_some_and(|existing| existing != requirement)
++                {
++                    return Err(
++                        "an existing requirement cannot be replaced; append a new id".to_string(),
++                    );
++                }
++            }
++            if (self.required.len()
++                + work
++                    .keys()
++                    .filter(|id| !self.required.contains_key(*id))
++                    .count()
++                > 128)
++                || work.len() > 128
++            {
++                return Err("parent work inventory exceeds 128 items".to_string());
++            }
++            self.scope = scope.to_string();
++            self.required.extend(work);
++            self.task_revision += 1;
++            self.event_version += 1;
++            self.receipt = None;
++            self.dirty = true;
++            return Ok(false);
++        }
++        if operation != "check" {
++            return Err("operation must be inspect, begin, append or check; caller fields cannot replace or clear accepted work".to_string());
++        }
++        self.receipt = None;
++        self.dirty = true;
++        if self.in_flight() != 0 {
++            return Err(
++                "parent tools are still running; await their result/cancellation and reconcile it"
++                    .to_string(),
++            );
++        }
++        if self.recovery_error.is_some() || self.scope.is_empty() || !self.active() {
++            return Err(
++                "declare the original accepted scope and all required work with begin".to_string(),
++            );
++        }
++        if args["task_revision"].as_u64() != Some(self.task_revision)
++            || args["event_version"].as_u64() != Some(self.event_version)
++        {
++            return Err("stale completion check; inspect current task/event versions".to_string());
++        }
++        let work = args["work"]
++            .as_array()
++            .ok_or("work must reconcile every required id")?;
++        let mut seen = std::collections::BTreeSet::new();
++        let mut blocked = false;
++        for item in work {
++            let id = item["id"].as_str().ok_or("missing required id")?;
++            if !self.required.contains_key(id) || !seen.insert(id) {
++                return Err("unknown or duplicate required id".to_string());
++            }
++            if !item["evidence"]
++                .as_str()
++                .is_some_and(|s| !s.trim().is_empty() && s.len() <= 2048)
++            {
++                return Err("current evidence is required for every item".to_string());
++            }
++            match item["status"].as_str() {
++                Some("done") => {}
++                Some("external_block") => {
++                    for field in ["missing_resource", "affected_scope", "external_action"] {
++                        if !item[field]
++                            .as_str()
++                            .is_some_and(|s| !s.trim().is_empty() && s.len() <= 2048)
++                        {
++                            return Err(format!("external_block requires {field}"));
++                        }
++                    }
++                    blocked = true;
++                }
++                Some("actionable") => {
++                    return Err("authorized actionable work remains; continue it".to_string());
++                }
++                _ => return Err("status must be done, actionable or external_block".to_string()),
++            }
++        }
++        if seen.len() != self.required.len() {
++            return Err("required work omitted; inspect the retained inventory".to_string());
++        }
++        self.receipt = Some((
++            turn_id.to_string(),
++            self.task_revision,
++            self.event_version,
++            blocked,
++        ));
++        self.dirty = true;
++        Ok(!blocked)
++    }
++
++    pub(crate) fn receipt_current(&self, turn_id: &str) -> bool {
++        self.receipt.as_ref().is_some_and(|(turn, task, event, _)| {
++            turn == turn_id && *task == self.task_revision && *event == self.event_version
++        }) && self.recovery_error.is_none()
++            && self.in_flight() == 0
++    }
++
++    pub(crate) fn stop(&mut self, turn_id: &str) -> Result<Option<String>, String> {
++        if !self.active() || self.receipt_current(turn_id) {
++            return Ok(None);
++        }
++        if self.denied_turn != turn_id {
++            self.denied_turn = turn_id.to_string();
++            self.denials = 0;
++        }
++        self.denials += 1;
++        if self.denials > 2 {
++            return Err("Parent completion protocol failed twice; unresolved work retained. This is a lifecycle failure, not successful completion.".to_string());
++        }
++        Ok(Some("Parent engineering work is still open. Call completion_check inspect, reconcile the original accepted scope and every required item, then submit a fresh check. Continue any authorized actionable work. Local child PASS/tests do not close the objective. Never fabricate user cancellation, goals, external blocks or budget limits.".to_string()))
++    }
++
++    pub(crate) fn finish(&mut self, turn_id: &str) -> Result<(), String> {
++        if !self.active() {
++            return Ok(());
++        }
++        if !self.receipt_current(turn_id) {
++            return Err(
++                "Parent completion receipt changed before finalization; unresolved work retained"
++                    .to_string(),
++            );
++        }
++        if self.receipt.as_ref().is_some_and(|r| !r.3) {
++            self.scope.clear();
++            self.required.clear();
++            self.receipt = None;
++            self.dirty = true;
++        }
++        Ok(())
++    }
++
++    pub(crate) fn restore(&mut self, snapshot: JsonValue) {
++        let restored = (snapshot["format_version"] == 1)
++            .then(|| serde_json::from_value(snapshot["state"].clone()));
++        *self = restored.and_then(Result::ok).unwrap_or_else(|| Self {
++            recovery_error: Some(
++                "invalid parent work checkpoint; cannot declare completion".to_string(),
++            ),
++            ..Self::default()
++        });
++        // An old process cannot deliver these callbacks. Retain known work and
++        // require fresh reconciliation instead of leaving a permanent busy flag.
++        let interrupted = std::mem::take(&mut self.pending);
++        let had_pending = !interrupted.is_empty();
++        for (_, (name, args)) in interrupted {
++            self.record_obligation(&name, &args);
++        }
++        if had_pending {
++            self.changed();
++        }
++    }
++
++    pub(crate) fn checkpoint(&self) -> JsonValue {
++        serde_json::json!({"format_version":1,"state":self})
++    }
++
++    fn inspect(&self, args: &JsonValue) -> Result<JsonValue, String> {
++        use sha2::{Digest, Sha256};
++        let offset = match args.get("offset") {
++            None => 0,
++            Some(value) => value
++                .as_u64()
++                .and_then(|v| usize::try_from(v).ok())
++                .ok_or("offset must be a nonnegative integer")?,
++        };
++        if offset > self.required.len()
++            || (offset > 0
++                && (args["task_revision"].as_u64() != Some(self.task_revision)
++                    || args["event_version"].as_u64() != Some(self.event_version)))
++        {
++            return Err("stale/invalid inventory continuation; inspect from offset 0".to_string());
++        }
++        let mut page = serde_json::json!({"task_revision":self.task_revision,"event_version":self.event_version,
++            "accepted_scope_summary":self.scope.chars().take(128).collect::<String>(),
++            "scope_truncated":self.scope.chars().count()>128,"scope_bytes":self.scope.len(),
++            "scope_sha256":format!("{:x}",Sha256::digest(self.scope.as_bytes())),
++            "offset":offset,"total":self.required.len(),"next_offset":null,"complete":true,
++            "required_work":{},"in_flight":self.in_flight(),"recovery_error":self.recovery_error});
++        let mut count = 0;
++        for (id, requirement) in self.required.iter().skip(offset) {
++            page["required_work"][id] = JsonValue::String(requirement.clone());
++            if page.to_string().len() > 2500 {
++                page["required_work"]
++                    .as_object_mut()
++                    .expect("work object")
++                    .remove(id);
++                break;
++            }
++            count += 1;
++            if count == 8 {
++                break;
++            }
++        }
++        if offset + count < self.required.len() {
++            if count == 0 {
++                return Err("one required item exceeds the bounded inspection output".to_string());
++            }
++            page["next_offset"] = (offset + count).into();
++            page["complete"] = false.into();
++        }
++        Ok(page)
++    }
++
++    pub(crate) fn request(&mut self, args: &JsonValue, turn_id: &str) -> JsonValue {
++        if args["operation"] == "inspect" {
++            self.inspect(args)
++                .unwrap_or_else(|reason| serde_json::json!({"accepted":false,"reason":reason}))
++        } else {
++            match self.apply(args, turn_id) {
++                Ok(_) => {
++                    serde_json::json!({"native_parent_completion":1,"accepted":true,"turn_id":turn_id,
++                    "task_revision":self.task_revision,"event_version":self.event_version})
++                }
++                Err(reason) => {
++                    serde_json::json!({"native_parent_completion":1,"accepted":false,"reason":reason})
++                }
++            }
++        }
++    }
++}
++
++pub struct CompletionCheckHandler;
++
++impl ToolExecutor<ToolInvocation> for CompletionCheckHandler {
++    fn tool_name(&self) -> ToolName {
++        ToolName::plain("completion_check")
++    }
++
++    fn spec(&self) -> ToolSpec {
++        use codex_tools::{JsonSchema, ResponsesApiTool};
++        let properties = ["operation", "accepted_scope"]
++            .into_iter()
++            .map(|name| (name.to_string(), JsonSchema::string(None)))
++            .chain(
++                ["task_revision", "event_version", "offset"]
++                    .into_iter()
++                    .map(|name| (name.to_string(), JsonSchema::number(None))),
++            )
++            .chain(["required_work", "work"].into_iter().map(|name| {
++                (
++                    name.to_string(),
++                    JsonSchema::array(
++                        JsonSchema::object(BTreeMap::new(), None, Some(true.into())),
++                        None,
++                    ),
++                )
++            }))
++            .collect();
++        ToolSpec::Function(ResponsesApiTool {
++            name: "completion_check".to_string(),
++            description: "Native parent finalization check, not a goal or proof of business correctness. Invoke alone. inspect returns bounded retained work and task/event versions; follow next_offset with those versions until complete. begin records accepted_scope and required_work [{id,requirement}]; append adds requirements without replacing scope/items. check requires current task_revision/event_version and every work [{id,status:done|actionable|external_block,evidence}]; external_block also needs missing_resource,affected_scope,external_action, with unaffected work finished. New tool results/user input invalidate a receipt. No caller operation can clear/shrink existing work or claim cancellation/budget exemption; native lifecycle owns those exits.".to_string(),
++            strict: false, defer_loading: None,
++            parameters: JsonSchema::object(properties, Some(vec!["operation".to_string()]), Some(false.into())),
++            output_schema: None,
++        })
++    }
++
++    fn handle<'a>(&'a self, invocation: ToolInvocation) -> codex_tools::ToolExecutorFuture<'a>
++    where
++        ToolInvocation: 'a,
++    {
++        Box::pin(async move {
++            let ToolPayload::Function { arguments } = invocation.payload else {
++                return Err(FunctionCallError::RespondToModel(
++                    "completion_check requires function arguments".to_string(),
++                ));
++            };
++            if arguments.len() > 32768 {
++                return Err(FunctionCallError::RespondToModel(
++                    "completion check exceeds 32768 bytes".to_string(),
++                ));
++            }
++            let args: JsonValue = crate::tools::handlers::parse_arguments(&arguments)?;
++            let result = invocation
++                .session
++                .parent_completion_request(&args, &invocation.turn.sub_id)
++                .await;
++            Ok(boxed_tool_output(
++                crate::tools::context::FunctionToolOutput::from_text(
++                    result.to_string(),
++                    Some(true),
++                ),
++            ))
++        })
++    }
++}
++
++impl CoreToolRuntime for CompletionCheckHandler {
++    fn is_builtin_control_tool(&self) -> bool {
++        true
++    }
++}
+
+ pub struct PlanHandler;
+
++#[cfg(test)]
++mod parent_completion_tests {
++    use super::*;
++    use serde_json::json;
++
++    fn open() -> ParentWorkState {
++        let mut state = ParentWorkState::default();
++        state
++            .apply(
++                &json!({"operation":"begin","accepted_scope":"Finish the ownership work",
++            "required_work":[{"id":"ownership","requirement":"Resolve retained ownership"}]}),
++                "turn-1",
++            )
++            .unwrap();
++        state
++    }
++
++    fn check(state: &mut ParentWorkState, turn: &str, status: &str) -> Result<bool, String> {
++        state.apply(&json!({"operation":"check","task_revision":state.task_revision,
++            "event_version":state.event_version,"work":[{"id":"ownership","status":status,
++            "evidence":"current fixture evidence","missing_resource":"capture access",
++            "affected_scope":"runtime measurement","external_action":"grant the capture permission"}]}), turn)
++    }
++
++    #[test]
++    fn actionable_or_stale_check_cannot_reuse_an_old_receipt() {
++        let mut state = open();
++        check(&mut state, "turn-1", "done").unwrap();
++        assert!(state.receipt_current("turn-1"));
++        assert!(
++            check(&mut state, "turn-1", "actionable")
++                .unwrap_err()
++                .contains("actionable")
++        );
++        assert!(!state.receipt_current("turn-1"));
++        assert!(state.stop("turn-1").unwrap().is_some());
++        check(&mut state, "turn-1", "done").unwrap();
++        assert!(
++            state
++                .apply(
++                    &json!({"operation":"check","task_revision":0,"event_version":0,"work":[]}),
++                    "turn-1"
++                )
++                .is_err()
++        );
++        assert!(!state.receipt_current("turn-1"));
++    }
++
++    #[test]
++    fn completion_block_and_checkpoint_have_distinct_lifetimes() {
++        let mut state = open();
++        check(&mut state, "turn-1", "external_block").unwrap();
++        state.finish("turn-1").unwrap();
++        assert!(state.active(), "blocked work must survive a final response");
++        let mut restored = ParentWorkState::default();
++        restored.restore(state.checkpoint());
++        assert_eq!(restored.required, state.required);
++        assert!(
++            restored.stop("turn-2").unwrap().is_some(),
++            "old-turn receipt is not current"
++        );
++        check(&mut restored, "turn-2", "done").unwrap();
++        restored.finish("turn-2").unwrap();
++        assert!(!restored.active());
++        assert!(restored.stop("standalone-question").unwrap().is_none());
++    }
++
++    #[test]
++    fn ordinary_user_input_cannot_shrink_or_clear_required_work() {
++        let mut state = open();
++        let change = json!({"operation":"scope_change","accepted_scope":"User ended this objective",
++            "required_work":[],"user_instruction":"继续"});
++        assert!(state.apply(&change, "turn-2").is_err());
++        let child: codex_protocol::models::ResponseItem = serde_json::from_value(json!({
++            "type":"message","role":"user","content":[{"type":"input_text","text":"继续"}]}))
++        .unwrap();
++        state.observe(&child);
++        assert!(state.apply(&change, "turn-2").is_err());
++        assert!(state.active());
++        assert_eq!(state.required.len(), 1);
++        let original_scope = state.scope.clone();
++        assert!(
++            state
++                .apply(
++                    &json!({"operation":"append","accepted_scope":"weaker scope",
++            "required_work":[{"id":"ownership","requirement":"just local copies"}]}),
++                    "turn-2"
++                )
++                .is_err()
++        );
++        state.apply(&json!({"operation":"append","accepted_scope":"ignored replacement",
++            "required_work":[{"id":"new-item","requirement":"Also verify cancellation ownership"}]}), "turn-2").unwrap();
++        assert_eq!(state.scope, original_scope);
++        assert_eq!(state.required.len(), 2);
++        let mut corrupt = ParentWorkState::default();
++        corrupt.restore(json!({"format_version":999}));
++        assert!(corrupt.apply(&change, "turn-2").is_err());
++        assert!(
++            corrupt
++                .apply(
++                    &json!({"operation":"begin","accepted_scope":"clear",
++            "required_work":[]}),
++                    "turn-2"
++                )
++                .is_err()
++        );
++        assert!(corrupt.recovery_error.is_some());
++        assert!(corrupt.active());
++    }
++
++    #[test]
++    fn new_evidence_and_atomic_final_compare_do_not_silently_accept_a_race() {
++        let mut state = open();
++        check(&mut state, "turn-1", "done").unwrap();
++        assert!(state.stop("turn-1").unwrap().is_none());
++        state.changed(); // Same invalidation used for a tool result / child notification.
++        assert!(state.finish("turn-1").is_err());
++        assert!(state.active());
++        assert!(state.stop("turn-1").unwrap().is_some());
++        assert!(state.stop("turn-1").unwrap().is_some());
++        assert!(
++            state
++                .stop("turn-1")
++                .unwrap_err()
++                .contains("lifecycle failure")
++        );
++        assert!(state.active());
++    }
++
++    #[test]
++    fn corrupt_checkpoint_and_caller_cancel_budget_flags_never_close_work() {
++        let mut state = open();
++        assert!(
++            state
++                .apply(
++                    &json!({"operation":"check","cancelled":true,"budget_exhausted":true}),
++                    "turn-1"
++                )
++                .is_err()
++        );
++        assert!(state.active());
++        state.restore(json!({"format_version":99,"state":{}}));
++        assert!(state.active());
++        assert!(state.stop("turn-2").unwrap().is_some());
++        assert!(state.finish("turn-2").is_err());
++    }
++
++    #[test]
++    fn plan_capture_does_not_persist_nonessential_explanation() {
++        let mut state = open();
++        state.tool_started("bounded-plan", &ToolName::plain("update_plan"), true,
++            json!({"explanation":"unused explanation".repeat(2048), "unrelated":"omit me",
++                "plan":[{"step":"Verify ownership","status":"in_progress","unrelated":"omit this too"}]})).unwrap();
++        let checkpoint = state.checkpoint().to_string();
++        assert!(
++            !checkpoint.contains("explanation"),
++            "nonessential plan text must not enter host checkpoints"
++        );
++        assert!(checkpoint.len() < 2048);
++        assert!(!checkpoint.contains("omit me"));
++        assert!(!checkpoint.contains("omit this too"));
++        let required = state.required.clone();
++        let excess = json!({"plan":(0..129).map(|i| json!({"step":format!("required {i}")})).collect::<Vec<_>>()});
++        assert!(
++            state
++                .tool_started("excess-plan", &ToolName::plain("update_plan"), true, excess)
++                .unwrap_err()
++                .contains("128")
++        );
++        assert!(!state.pending.contains_key("excess-plan"));
++        assert_eq!(
++            state.required, required,
++            "reject the whole excess plan without truncating or replacing accepted work"
++        );
++        let long_step = json!({"plan":[{"step":"x".repeat(513)}]});
++        assert!(
++            state
++                .tool_started(
++                    "long-step",
++                    &ToolName::plain("update_plan"),
++                    true,
++                    long_step
++                )
++                .is_err()
++        );
++        let excess_bytes = json!({"plan":[],"explanation":"x".repeat(131072)}).to_string();
++        assert!(
++            ParentWorkState::tool_arguments("update_plan", &excess_bytes)
++                .unwrap_err()
++                .contains("131072")
++        );
++    }
++
++    #[test]
++    fn repeated_work_invalidates_receipts_without_growing_the_inventory() {
++        let mut state = open();
++        for i in 0..160 {
++            state
++                .tool_started(
++                    &format!("assign-{i}"),
++                    &ToolName::plain("admitted_agent_task"),
++                    true,
++                    json!({"operation":"assign","target":"same-owned-child"}),
++                )
++                .unwrap();
++            state.tool_finished(&format!("assign-{i}"), true);
++            state
++                .tool_started(
++                    &format!("patch-{i}"),
++                    &ToolName::plain("apply_patch"),
++                    true,
++                    JsonValue::Null,
++                )
++                .unwrap();
++            state.tool_finished(&format!("patch-{i}"), true);
++        }
++        assert!(state.recovery_error.is_none());
++        assert_eq!(
++            state.required.len(),
++            3,
++            "one explicit requirement, one child unit and one engineering effect bucket"
++        );
++        let args = json!({"operation":"check","task_revision":state.task_revision,"event_version":state.event_version,
++            "work":state.required.keys().map(|id| json!({"id":id,"status":"done","evidence":"current evidence"})).collect::<Vec<_>>()});
++        assert!(args.to_string().len() < 1024);
++        eprintln!(
++            "PARENT_WORK_BOUND operations=320 inventory={} check_utf8_bytes={} event_version={}",
++            state.required.len(),
++            args.to_string().len(),
++            state.event_version
++        );
++        state.apply(&args, "turn-1").unwrap();
++        state
++            .tool_started("read", &ToolName::plain("read_only"), true, JsonValue::Null)
++            .unwrap();
++        assert!(!state.receipt_current("turn-1"));
++        state.tool_finished("read", true);
++        assert!(state.event_version > 600);
++    }
++
++    #[test]
++    fn recovery_reconciles_interrupted_calls_without_an_unfinishable_inflight_flag() {
++        let mut state = open();
++        state
++            .tool_started(
++                "unfinished",
++                &ToolName::plain("admitted_agent_task"),
++                true,
++                json!({"operation":"assign","target":"existing-child"}),
++            )
++            .unwrap();
++        let mut restored = ParentWorkState::default();
++        restored.restore(state.checkpoint());
++        assert_eq!(
++            restored.in_flight(),
++            0,
++            "an old process cannot finish this tool callback"
++        );
++        assert_eq!(
++            restored.required.len(),
++            2,
++            "interrupted admitted work remains an explicit obligation"
++        );
++        assert!(restored.active());
++        assert!(restored.receipt.is_none());
++        assert!(restored.stop("turn-2").unwrap().is_some());
++    }
++
++    #[test]
++    fn bounded_inspection_continues_exact_inventory_and_rejects_changes() {
++        let mut state = open();
++        for i in 0..100 {
++            state.require(format!("unit:{i:03}"), "證據🙂".repeat(100));
++        }
++        let mut offset = 0;
++        let mut seen = BTreeMap::new();
++        loop {
++            let page = state
++                .inspect(&json!({"offset":offset,"task_revision":state.task_revision,
++                "event_version":state.event_version}))
++                .unwrap();
++            assert!(page.to_string().len() + 2 < 3072);
++            for (id, value) in page["required_work"].as_object().unwrap() {
++                assert!(
++                    seen.insert(id.clone(), value.as_str().unwrap().to_string())
++                        .is_none()
++                );
++            }
++            if let Some(next) = page["next_offset"].as_u64() {
++                assert!(next > offset);
++                offset = next;
++            } else {
++                assert_eq!(page["complete"], true);
++                break;
++            }
++        }
++        assert_eq!(seen, state.required);
++        let old = state.event_version;
++        state.changed();
++        assert!(
++            state
++                .inspect(
++                    &json!({"offset":1,"task_revision":state.task_revision,"event_version":old})
++                )
++                .is_err()
++        );
++    }
++}
++
+ pub struct PlanToolOutput;
+
+ const PLAN_UPDATED_MESSAGE: &str = "Plan updated";
+diff --git a/codex-rs/core/src/tools/lifecycle.rs b/codex-rs/core/src/tools/lifecycle.rs
+index e26d83d..b7b88fb 100644
+--- a/codex-rs/core/src/tools/lifecycle.rs
++++ b/codex-rs/core/src/tools/lifecycle.rs
+@@ -145,6 +145,13 @@ async fn notify_tool_finish_parts(
+     source: ToolCallSource,
+     outcome: ToolCallOutcome,
+ ) {
++    session
++        .parent_work_tool_finished(
++            turn,
++            call_id,
++            matches!(outcome, ToolCallOutcome::Completed { success: true }),
++        )
++        .await;
+     for contributor in session.services.extensions.tool_lifecycle_contributors() {
+         contributor
+             .on_tool_finish(ToolFinishInput {
+diff --git a/codex-rs/history/src/lib.rs b/codex-rs/history/src/lib.rs
+index 41b99f9..a7c8c65 100644
+--- a/codex-rs/history/src/lib.rs
++++ b/codex-rs/history/src/lib.rs
+@@ -62,6 +62,9 @@ pub struct ResponseItemEnvelope {
+ ///
+ #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
+ pub struct CodexHarnessMetadata {
++    /// Host-owned admitted work checkpoint, invisible to model input and separate from goals.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub parent_completion: Option<serde_json::Value>,
+     /// Complete retained records actually delivered by this Guardian message. Host-only.
+     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+     pub guardian_sources: Vec<RetainedSource>,

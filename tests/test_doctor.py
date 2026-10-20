@@ -3,6 +3,7 @@ import tempfile
 from unittest.mock import patch
 import json
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -15,6 +16,21 @@ from package import EXPECTED, PROJECT
 
 
 class DoctorTests(unittest.TestCase):
+    def test_real_cli_does_not_present_policy_pass_as_parent_completion_enforcement(self):
+        # Diagnostic regression only: this does not replay model finalization.
+        command = [sys.executable, '-B', str(ROOT / 'scripts/doctor.py'),
+                   '--source-tree', str(ROOT)]
+        structured = subprocess.run(command + ['--json'], capture_output=True, text=True)
+        self.assertEqual(structured.returncode, 0, structured.stderr)
+        report = json.loads(structured.stdout)
+        self.assertEqual(report['policy'], 'PASS')
+        self.assertEqual(report['parent_completion'], {
+            'router_policy': 'INSTRUCTION_ONLY', 'native_gate': 'UNKNOWN'})
+        plain = subprocess.run(command, capture_output=True, text=True)
+        self.assertEqual(plain.returncode, 0, plain.stderr)
+        self.assertIn('parent completion: Router instruction policy; native gate: UNKNOWN',
+                      plain.stdout)
+
     def catalog(self):
         return {"result": {"data": [
             {"model": model, "supportedReasoningEfforts": [{"reasoningEffort": effort}]}

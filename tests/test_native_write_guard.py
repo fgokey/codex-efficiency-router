@@ -594,7 +594,7 @@ class NativeGuardTests(unittest.TestCase):
         self.assertTrue(self.denied(self.hook(data={'model':'gpt-5.6-sol','agent_type':'terra_executor'})))
 
     def test_astra_reasoning_tools_and_orchestration_remain_available(self):
-        for tool in ('send_input','wait','close_agent','update_plan','read_file'):
+        for tool in ('send_input','wait','close_agent','update_plan','completion_check','read_file'):
             self.assertEqual(self.hook(tool),{})
 
     def test_native_resume_is_denied_before_executor_or_claimed_model_allowance(self):

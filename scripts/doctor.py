@@ -264,7 +264,8 @@ def preflight(root: Path) -> dict:
     profiles = source_profiles(root)
     tests = target_tests(root)
     report = {"policy": "PASS" if tests["success"] else "FAIL",
-              "profiles": profiles, "target_tests": tests, "enforcement": "NOT_VERIFIED"}
+              "profiles": profiles, "target_tests": tests, "enforcement": "NOT_VERIFIED",
+              "parent_completion": {"router_policy": "INSTRUCTION_ONLY", "native_gate": "UNKNOWN"}}
     while len(json.dumps(report, ensure_ascii=False).encode("utf-8")) + 2 > 3072 and tests["details"]:
         tests["details"].pop()
         tests["omitted_details"] += 1
@@ -337,12 +338,15 @@ def main() -> int:
                               "profile": profile.mode, "automatic_low": profile.allow_low,
                               "source_identity": identity, "guard": guard, "dispatch_guard": dispatch_guard,
                               "enforcement": "NOT_VERIFIED", "runtime_loaded_version": "UNKNOWN",
+                              "parent_completion": {"router_policy": "INSTRUCTION_ONLY", "native_gate": "UNKNOWN"},
                               "catalog": "EXPORTED_ONLY" if args.catalog else "NOT_CHECKED"}, indent=2))
             return int(bool(errors))
         for error in errors:
             print(f"- {error}")
         print(f"profile: {profile.mode}; automatic low: {profile.allow_low}")
         print("doctor: STATIC FAIL" if errors else "doctor: STATIC PASS")
+        # A policy/test pass does not register a Stop handler or assess an open objective.
+        print("parent completion: Router instruction policy; native gate: UNKNOWN")
         print("live Codex discovery/model execution: NOT VERIFIED")
         if guard:
             print(f"guard registration: {guard['registration']}; trust: UNKNOWN; enforcement: NOT VERIFIED")
