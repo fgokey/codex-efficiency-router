@@ -1731,10 +1731,10 @@ index 395cc95..e5e21ab 100644
      let v1 = probe(|turn| {
 diff --git a/codex-rs/core/tests/suite/admission_boundary.rs b/codex-rs/core/tests/suite/admission_boundary.rs
 new file mode 100644
-index 0000000..0184915
+index 0000000..f8dfc2c
 --- /dev/null
 +++ b/codex-rs/core/tests/suite/admission_boundary.rs
-@@ -0,0 +1,832 @@
+@@ -0,0 +1,1088 @@
 +use anyhow::Context;
 +use anyhow::Result;
 +use codex_features::Feature;
@@ -1757,6 +1757,262 @@ index 0000000..0184915
 +use serde_json::Value;
 +use std::fs;
 +use tempfile::TempDir;
++
++// Opt-in native acceptance: local response fixtures drive tool calls; no model is contacted.
++// The provider is the installed bundled MCP, copied into a temporary native plugin store.
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++#[ignore = "requires the desktop broker and explicit CER_NATIVE_DESKTOP_{MCP_ROOT,CALLER_ID,TURN_ID,READ_TARGET_ID,WAIT_TARGET_ID}"]
++async fn admission_bundled_desktop_mcp_backend_direct_and_code_mode() -> Result<()> {
++    use codex_core_plugins::store::PluginStore;
++    use codex_plugin::PluginId;
++    use codex_utils_absolute_path::AbsolutePathBuf;
++    use core_test_support::responses::ev_custom_tool_call;
++    use serde_json::json;
++
++    fn decoded_objects(value: &Value, out: &mut Vec<Value>) {
++        match value {
++            Value::Object(map) => {
++                out.push(value.clone());
++                for item in map.values() {
++                    decoded_objects(item, out);
++                }
++            }
++            Value::Array(items) => {
++                for item in items {
++                    decoded_objects(item, out);
++                }
++            }
++            Value::String(text) => {
++                let text = text
++                    .split_once("Output:\n")
++                    .map_or(text.as_str(), |(_, body)| body);
++                if let Ok(parsed) = serde_json::from_str::<Value>(text.trim()) {
++                    decoded_objects(&parsed, out);
++                } else {
++                    for line in text.lines() {
++                        if let Ok(parsed) = serde_json::from_str::<Value>(line) {
++                            decoded_objects(&parsed, out);
++                        }
++                    }
++                }
++            }
++            _ => {}
++        }
++    }
++
++    let provider = AbsolutePathBuf::try_from(std::path::PathBuf::from(std::env::var(
++        "CER_NATIVE_DESKTOP_MCP_ROOT",
++    )?))?;
++    let desktop_turn = std::env::var("CER_NATIVE_DESKTOP_TURN_ID")?;
++    let caller = std::env::var("CER_NATIVE_DESKTOP_CALLER_ID")?;
++    let target = std::env::var("CER_NATIVE_DESKTOP_READ_TARGET_ID")?;
++    let wait_target = std::env::var("CER_NATIVE_DESKTOP_WAIT_TARGET_ID")?;
++    for id in [&desktop_turn, &caller, &target, &wait_target] {
++        codex_protocol::ThreadId::from_string(id)?;
++    }
++    assert!(std::env::var_os("CODEX_APP_TOOLS_PIPE_PATH").is_some());
++    for code_mode in [false, true] {
++        for rewrite in [false, true] {
++            let server = start_mock_server().await;
++            let call_prefix = format!("desktop-mcp-{}", uuid::Uuid::new_v4());
++            let exec_call_id = format!("{call_prefix}-exec");
++            let calls = [
++                (
++                    "read_thread",
++                    json!({"threadId":target,"hostId":"local","turnLimit":1,"includeOutputs":false,"maxOutputCharsPerItem":0}),
++                ),
++                (
++                    "wait_threads",
++                    json!({"targets":[{"threadId":wait_target,"hostId":"local"}],"timeoutMs":0}),
++                ),
++                (
++                    "set_thread_title",
++                    json!({"threadId":"not-a-thread","title":"must-never-reach-provider"}),
++                ),
++            ];
++            let mut events = vec![ev_response_created("desktop-mcp-1")];
++            if code_mode {
++                // Inspect each genuine result before emitting only bounded verification
++                // fields; printing full thread summaries would truncate the JSON stream.
++                let mut code = String::from(
++                    r#"
++function objects(v, out = []) {
++  if (typeof v === 'string') { try { objects(JSON.parse(v), out); } catch (_) {} }
++  else if (Array.isArray(v)) { for (const x of v) objects(x, out); }
++  else if (v && typeof v === 'object') { out.push(v); for (const x of Object.values(v)) objects(x, out); }
++  return out;
++}
++function summarize(name, result) {
++  const encoded = JSON.stringify(result);
++  if (encoded.includes('Read-only agent execution boundary')) return { denial: 'Read-only agent execution boundary' };
++  const all = objects(result);
++  const p = all.find(x => name === 'read_thread' ? 'schemaVersion' in x && 'turns' in x : 'timedOut' in x && 'polls' in x);
++  const isError = all.some(x => x.isError === true || x.is_error === true || ('content' in x && x.success === false));
++  const backend = !p ? null : name === 'read_thread'
++    ? { schemaVersion: p.schemaVersion, thread: { id: p.thread?.id }, turns: Array.isArray(p.turns) ? [] : null }
++    : { timedOut: p.timedOut, wake: p.wake, polls: Array.isArray(p.polls) ? p.polls.map(x => ({ thread: { id: x.thread?.id }, error: x.error })) : null, errors: p.errors };
++  return { isError, backend, errorPreview: p ? '' : encoded.slice(0, 180) };
++}
++"#,
++                );
++                for (name, args) in &calls {
++                    code.push_str(&format!("try {{ text(JSON.stringify({{name:'{name}',result:summarize('{name}',await tools.mcp__codex_app__{name}({args}))}})); }} catch (e) {{ text(JSON.stringify({{name:'{name}',error:String(e).slice(0,180)}})); }}\n"));
++                }
++                events.push(ev_custom_tool_call(&exec_call_id, "exec", &code));
++            } else {
++                for (i, (name, args)) in calls.iter().enumerate() {
++                    events.push(ev_function_call_with_namespace(
++                        &format!("{call_prefix}-{i}"),
++                        "mcp__codex_app",
++                        name,
++                        &args.to_string(),
++                    ));
++                }
++            }
++            events.push(ev_completed("desktop-mcp-1"));
++            let responses = mount_sse_sequence(
++                &server,
++                vec![
++                    sse(events),
++                    sse(vec![
++                        ev_assistant_message("desktop-mcp-done", "checked"),
++                        ev_completed("desktop-mcp-2"),
++                    ]),
++                ],
++            )
++            .await;
++            let provider = provider.clone();
++            let desktop_turn = desktop_turn.clone();
++            let caller = caller.clone();
++            let mut info = bundled_models_response()?
++                .models
++                .into_iter()
++                .find(|info| info.slug == "gpt-5.5")
++                .unwrap();
++            info.slug = "gpt-6-astra".into();
++            let test = test_codex().with_model("gpt-6-astra")
++                .with_pre_build_hook(move |home| {
++                    let store = PluginStore::new(home.to_path_buf());
++                    let id = PluginId::parse("codex-app-tools@openai-bundled").unwrap();
++                    store.install_with_version(provider, id.clone(), "0.1.6".into()).unwrap();
++                    let root = store.plugin_root(&id, "0.1.6");
++                    let manifest_path = root.join(".mcp.json");
++                    let mut manifest: Value = serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
++                    manifest["mcpServers"]["codex_app"]["cwd"] = json!(root);
++                    manifest["mcpServers"]["codex_app"]["enabled"] = json!(true);
++                    fs::write(manifest_path, serde_json::to_vec(&manifest).unwrap()).unwrap();
++                    // Only this isolated copy maps the fixture's synthetic origin to the
++                    // authorized live caller. The real backend and native gate are unchanged.
++                    let server_path = root.join("server.mjs");
++                    let server_source = fs::read_to_string(&server_path).unwrap();
++                    let metadata_line = "const metadata = request.params._meta ?? {};";
++                    assert_eq!(server_source.matches(metadata_line).count(), 1);
++                    let mapped_metadata = format!("const metadata = {{ ...(request.params._meta ?? {{}}), 'openai/threadId': {thread}, 'openai/turnId': {turn} }};", thread=json!(caller), turn=json!(desktop_turn));
++                    fs::write(server_path, server_source.replace(metadata_line, &mapped_metadata)).unwrap();
++                    fs::write(home.join("config.toml"), "[features]\nplugins = true\n[plugins.\"codex-app-tools@openai-bundled\"]\nenabled = true\n").unwrap();
++                    if rewrite {
++                        let script = home.join("rewrite_read.py");
++                        fs::write(&script, "import json,sys\np=json.load(sys.stdin)\na=p['tool_input']\na['turnLimit']=6\nprint(json.dumps({'hookSpecificOutput':{'hookEventName':'PreToolUse','permissionDecision':'allow','updatedInput':a}}))\n").unwrap();
++                        let python = std::env::var("CER_NATIVE_PYTHON").unwrap_or_else(|_| if cfg!(windows) { "python".into() } else { "python3".into() });
++                        let command = format!("{}'{}' -I -B '{}'", if cfg!(windows) { "& " } else { "" }, python, script.display());
++                        fs::write(home.join("hooks.json"), json!({"hooks":{"PreToolUse":[{"matcher":"mcp__codex_app__read_thread","hooks":[{"type":"command","command":command,"timeout":10}]}]}}).to_string()).unwrap();
++                    }
++                })
++                .with_config(move |config| {
++                    config.model_catalog = Some(ModelsResponse { models: vec![info] });
++                    config.agent_admission_hook = Some("required-admission".into());
++                    if code_mode { config.features.enable(Feature::CodeMode).unwrap(); }
++                    if rewrite { trust_discovered_hooks(config); }
++                })
++                .build_with_auto_env(&server).await?;
++            test.submit_turn("verify the native bundled desktop read boundary")
++                .await?;
++            let requests = responses.requests();
++            let request = &requests[1];
++            let mut emitted = Vec::new();
++            if code_mode {
++                decoded_objects(
++                    &request.custom_tool_call_output(&exec_call_id)["output"],
++                    &mut emitted,
++                );
++            }
++            for (i, (name, _)) in calls.iter().enumerate() {
++                let output = if code_mode {
++                    let item = emitted.iter().find(|item| item["name"].as_str() == Some(*name) && (item.get("result").is_some() || item.get("error").is_some()))
++                        .unwrap_or_else(|| panic!("missing emitted result: mode={code_mode} rewrite={rewrite} tool={name}; exec_preview={}", request.custom_tool_call_output(&exec_call_id)["output"].to_string().chars().take(400).collect::<String>()));
++                    item.get("result")
++                        .or_else(|| item.get("error"))
++                        .unwrap()
++                        .clone()
++                } else {
++                    request.function_call_output(&format!("{call_prefix}-{i}"))["output"].clone()
++                };
++                let mut objects = Vec::new();
++                decoded_objects(&output, &mut objects);
++                let payload = objects.iter().find(|item| {
++                    if *name == "read_thread" {
++                        item.get("schemaVersion").is_some() && item.get("turns").is_some()
++                    } else {
++                        item.get("timedOut").is_some() && item.get("polls").is_some()
++                    }
++                });
++                let denied = output
++                    .to_string()
++                    .contains("Read-only agent execution boundary");
++                let should_deny =
++                    *name == "set_thread_title" || (rewrite && *name == "read_thread");
++                let diagnostic = json!({"code_mode":code_mode,"rewrite":rewrite,"tool":name,"denied":denied,"payload_keys":payload.and_then(Value::as_object).map(|v|v.keys().collect::<Vec<_>>()),"error_preview":if payload.is_none(){output.to_string().chars().take(180).collect::<String>()}else{String::new()}});
++                assert_eq!(denied, should_deny, "{diagnostic}");
++                if should_deny {
++                    assert!(
++                        payload.is_none(),
++                        "denied call reached backend: {diagnostic}"
++                    );
++                    continue;
++                }
++                assert!(
++                    !objects.iter().any(|item| item["isError"] == true
++                        || item["is_error"] == true
++                        || (item.get("content").is_some() && item["success"] == false)),
++                    "backend failure: {diagnostic}"
++                );
++                let payload =
++                    payload.unwrap_or_else(|| panic!("missing backend JSON: {diagnostic}"));
++                if *name == "read_thread" {
++                    assert!(
++                        payload["thread"]["id"].as_str() == Some(target.as_str())
++                            && payload["turns"].is_array(),
++                        "invalid read response: {diagnostic}"
++                    );
++                } else {
++                    assert!(
++                        payload["timedOut"].is_boolean()
++                            && payload.get("wake").is_some()
++                            && payload["polls"].is_array(),
++                        "invalid wait response: {diagnostic}"
++                    );
++                    let target_poll = payload["polls"]
++                        .as_array()
++                        .unwrap()
++                        .iter()
++                        .find(|item| item["thread"]["id"].as_str() == Some(wait_target.as_str()))
++                        .unwrap_or_else(|| panic!("missing requested wait target: {diagnostic}"));
++                    assert!(
++                        target_poll.get("error").is_none_or(Value::is_null),
++                        "wait target failed: {diagnostic}"
++                    );
++                    assert!(
++                        payload.get("errors").is_none_or(|errors| errors.is_null()
++                            || errors.as_array().is_some_and(Vec::is_empty)),
++                        "wait returned target errors: {diagnostic}"
++                    );
++                }
++                eprintln!("desktop MCP accepted: {diagnostic}");
++            }
++        }
++    }
++    Ok(())
++}
 +
 +#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 +async fn admission_host_desktop_reads_reach_dynamic_handler_direct_and_code_mode() -> Result<()> {
@@ -2850,17 +3106,16 @@ index e57b823..afd7735 100644
                  block_reason: Some("blocked by policy".to_string()),
                  additional_contexts_for_model: Vec::new(),
 diff --git a/codex-rs/core/src/tools/handlers/dynamic.rs b/codex-rs/core/src/tools/handlers/dynamic.rs
-index f658d67..c1cefae 100644
+index f658d67..600968d 100644
 --- a/codex-rs/core/src/tools/handlers/dynamic.rs
 +++ b/codex-rs/core/src/tools/handlers/dynamic.rs
-@@ -169,6 +169,100 @@ impl CoreToolRuntime for DynamicToolHandler {
+@@ -169,6 +169,104 @@ impl CoreToolRuntime for DynamicToolHandler {
      fn is_third_party_tool(&self) -> bool {
          true
      }
 +
 +    fn allows_bounded_parent_read(&self, invocation: &ToolInvocation) -> bool {
-+        // These exact desktop client capabilities use the native dynamic-tool transport.
-+        // MCP runtimes, including same-name servers/tools, do not implement this grant.
++        // Native client-supplied capabilities retain their transport-specific identity check.
 +        let capability = match (
 +            self.tool_name.namespace.as_deref(),
 +            self.tool_name.name.as_str(),
@@ -2876,61 +3131,66 @@ index f658d67..c1cefae 100644
 +        {
 +            return false;
 +        }
-+        let ToolPayload::Function { arguments } = &invocation.payload else {
-+            return false;
-+        };
-+        if arguments.len() > 16_384 {
-+            return false;
++        bounded_desktop_read_allowed(capability, &invocation.payload)
++    }
++}
++
++// Shared with the host-attested desktop MCP runtime; this validates arguments, not provenance.
++pub(super) fn bounded_desktop_read_allowed(capability: &str, payload: &ToolPayload) -> bool {
++    let ToolPayload::Function { arguments } = payload else {
++        return false;
++    };
++    if arguments.len() > 16_384 {
++        return false;
++    }
++    let Ok(Value::Object(args)) = serde_json::from_str::<Value>(arguments) else {
++        return false;
++    };
++    match capability {
++        "read_thread" => {
++            only_fields(
++                &args,
++                &[
++                    "threadId",
++                    "hostId",
++                    "cursor",
++                    "turnLimit",
++                    "includeOutputs",
++                    "maxOutputCharsPerItem",
++                ],
++            ) && valid_thread(&args)
++                && optional_text(&args, "cursor", 2048)
++                && args
++                    .get("turnLimit")
++                    .and_then(Value::as_u64)
++                    .is_some_and(|n| (1..=5).contains(&n))
++                && args
++                    .get("maxOutputCharsPerItem")
++                    .and_then(Value::as_u64)
++                    .is_some_and(|n| n <= 8000)
++                && args.get("includeOutputs").is_none_or(Value::is_boolean)
 +        }
-+        let Ok(Value::Object(args)) = serde_json::from_str::<Value>(arguments) else {
-+            return false;
-+        };
-+        match capability {
-+            "read_thread" => {
-+                only_fields(
-+                    &args,
-+                    &[
-+                        "threadId",
-+                        "hostId",
-+                        "cursor",
-+                        "turnLimit",
-+                        "includeOutputs",
-+                        "maxOutputCharsPerItem",
-+                    ],
-+                ) && valid_thread(&args)
-+                    && optional_text(&args, "cursor", 2048)
-+                    && args
-+                        .get("turnLimit")
-+                        .and_then(Value::as_u64)
-+                        .is_some_and(|n| (1..=5).contains(&n))
-+                    && args
-+                        .get("maxOutputCharsPerItem")
-+                        .and_then(Value::as_u64)
-+                        .is_some_and(|n| n <= 8000)
-+                    && args.get("includeOutputs").is_none_or(Value::is_boolean)
-+            }
-+            "wait_threads" => {
-+                only_fields(&args, &["targets", "timeoutMs"])
-+                    && args
-+                        .get("timeoutMs")
-+                        .and_then(Value::as_u64)
-+                        .is_some_and(|n| n <= 60_000)
-+                    && args
-+                        .get("targets")
-+                        .and_then(Value::as_array)
-+                        .is_some_and(|targets| {
-+                            (1..=8).contains(&targets.len())
-+                                && targets.iter().all(|target| {
-+                                    target.as_object().is_some_and(|target| {
-+                                        only_fields(target, &["threadId", "hostId", "afterCursor"])
-+                                            && valid_thread(target)
-+                                            && optional_text(target, "afterCursor", 2048)
-+                                    })
++        "wait_threads" => {
++            only_fields(&args, &["targets", "timeoutMs"])
++                && args
++                    .get("timeoutMs")
++                    .and_then(Value::as_u64)
++                    .is_some_and(|n| n <= 60_000)
++                && args
++                    .get("targets")
++                    .and_then(Value::as_array)
++                    .is_some_and(|targets| {
++                        (1..=8).contains(&targets.len())
++                            && targets.iter().all(|target| {
++                                target.as_object().is_some_and(|target| {
++                                    only_fields(target, &["threadId", "hostId", "afterCursor"])
++                                        && valid_thread(target)
++                                        && optional_text(target, "afterCursor", 2048)
 +                                })
-+                        })
-+            }
-+            _ => false,
++                            })
++                    })
 +        }
++        _ => false,
 +    }
 +}
 +
@@ -2954,3 +3214,393 @@ index f658d67..c1cefae 100644
  }
 
  #[expect(
+diff --git a/codex-rs/core/src/mcp_tool_exposure.rs b/codex-rs/core/src/mcp_tool_exposure.rs
+index fa9b6eb..56d246b 100644
+--- a/codex-rs/core/src/mcp_tool_exposure.rs
++++ b/codex-rs/core/src/mcp_tool_exposure.rs
+@@ -1,6 +1,7 @@
+ use std::collections::HashMap;
+ use std::collections::HashSet;
+ use std::num::NonZeroUsize;
++use std::path::Path;
+ use std::sync::Arc;
+ use std::sync::Mutex;
+
+@@ -30,6 +31,7 @@ pub(crate) struct McpHandlerCache {
+ struct CachedMcpHandler {
+     tool_info: McpToolInfo,
+     agent_plugin: bool,
++    bounded_desktop_reads: bool,
+     schema_max_bytes: Option<NonZeroUsize>,
+     handler: Arc<McpHandler>,
+ }
+@@ -60,6 +62,119 @@ impl McpHandlerCache {
+     }
+ }
+
++fn host_bundled_desktop_reads(
++    config: &Config,
++    server_name: &str,
++    server: Option<&codex_mcp::ResolvedMcpServer>,
++) -> bool {
++    let Some(server) = server.filter(|_| server_name == "codex_app") else {
++        return false;
++    };
++    let codex_mcp::McpServerSource::Plugin(plugin) = server.source() else {
++        return false;
++    };
++    if plugin.plugin_id() != "codex-app-tools@openai-bundled"
++        || plugin.is_agent_plugin()
++        || !server.config().is_local_environment()
++    {
++        return false;
++    }
++    let Some(root) = plugin
++        .host_root()
++        .and_then(|root| root.to_path_buf().canonicalize().ok())
++    else {
++        return false;
++    };
++    // Use the same canonical form as host_root, including Windows verbatim prefixes.
++    let Ok(home) = std::fs::canonicalize(config.codex_home.as_path()) else {
++        return false;
++    };
++    let cache = home.join("plugins/cache/openai-bundled/codex-app-tools");
++    // The source and root are captured by native plugin discovery, never by the MCP server.
++    // Do not grant a selected package, a same-name manual registration, or a redirected cache root.
++    if cache.canonicalize().ok().as_ref() != Some(&cache) || root.parent() != Some(cache.as_path())
++    {
++        return false;
++    }
++    let codex_config::McpServerTransportConfig::Stdio {
++        command,
++        args,
++        env,
++        env_vars,
++        cwd,
++    } = &server.config().transport
++    else {
++        return false;
++    };
++    let mut inherited = HashSet::new();
++    let mut pipe_count = 0;
++    for var in env_vars {
++        let name = var.name();
++        let key = if cfg!(windows) {
++            name.to_ascii_lowercase()
++        } else {
++            name.to_string()
++        };
++        if var.is_remote_source() || !inherited.insert(key) {
++            return false;
++        }
++        if name.eq_ignore_ascii_case("CODEX_APP_TOOLS_PIPE_PATH") {
++            if name != "CODEX_APP_TOOLS_PIPE_PATH" {
++                return false;
++            }
++            pipe_count += 1;
++        }
++    }
++    if cwd
++        .as_ref()
++        .and_then(|cwd| Path::new(cwd.as_str()).canonicalize().ok())
++        .as_ref()
++        != Some(&root)
++        || pipe_count != 1
++        || env.as_ref().is_some_and(|env| {
++            env.iter().any(|(key, value)| {
++                key != "CODEX_APP_TOOLS_DEFERRED" || !matches!(value.as_str(), "0" | "1")
++            })
++        })
++    {
++        return false;
++    }
++    let launcher = if cfg!(windows) {
++        "launch_codex_app_tools_mcp.cmd"
++    } else {
++        "launch_codex_app_tools_mcp"
++    };
++    let script = root.join("server.mjs");
++    let launcher_path = root.join("scripts").join(launcher);
++    if !script.is_file()
++        || !launcher_path.is_file()
++        || script.canonicalize().ok().as_ref() != Some(&script)
++        || launcher_path.canonicalize().ok().as_ref() != Some(&launcher_path)
++    {
++        return false;
++    }
++    if cfg!(windows) {
++        command.eq_ignore_ascii_case("cmd.exe")
++            && args
++                == &[
++                    "/d",
++                    "/s",
++                    "/c",
++                    "call",
++                    "./scripts/launch_codex_app_tools_mcp.cmd",
++                    "./server.mjs",
++                ]
++    } else {
++        let command = Path::new(command);
++        let command = if command.is_absolute() {
++            command.to_path_buf()
++        } else {
++            root.join(command)
++        };
++        command.canonicalize().ok() == Some(launcher_path) && args == &["./server.mjs"]
++    }
++}
++
+ #[instrument(level = "trace", skip_all)]
+ fn append_mcp_tools(
+     all_mcp_tools: &[McpToolInfo],
+@@ -93,6 +208,7 @@ fn append_mcp_tools(
+         let tool_name = tool.canonical_tool_name();
+         let server = mcp_server_catalog.server(&tool.server_name);
+         let agent_plugin = server.is_some_and(|server| server.source().is_agent_plugin());
++        let bounded_desktop_reads = host_bundled_desktop_reads(config, &tool.server_name, server);
+         let tool_input_schema_max_bytes =
+             server.and_then(|server| server.config().tool_input_schema_max_bytes);
+         // Handlers contain immutable tool metadata, not a connection or authorization snapshot.
+@@ -100,6 +216,7 @@ fn append_mcp_tools(
+         let handler = if let Some(cached) = handlers.get(&tool_name).filter(|cached| {
+             cached.tool_info == *tool
+                 && cached.agent_plugin == agent_plugin
++                && cached.bounded_desktop_reads == bounded_desktop_reads
+                 && cached.schema_max_bytes == tool_input_schema_max_bytes
+         }) {
+             Arc::clone(&cached.handler)
+@@ -114,7 +231,7 @@ fn append_mcp_tools(
+             };
+
+             let handler = match handler {
+-                Ok(handler) => Arc::new(handler),
++                Ok(handler) => Arc::new(handler.with_bounded_desktop_reads(bounded_desktop_reads)),
+                 Err(err) => {
+                     warn!("Skipping MCP tool `{tool_name}`: failed to build tool spec: {err}");
+                     continue;
+@@ -125,6 +242,7 @@ fn append_mcp_tools(
+                 CachedMcpHandler {
+                     tool_info: tool.clone(),
+                     agent_plugin,
++                    bounded_desktop_reads,
+                     schema_max_bytes: tool_input_schema_max_bytes,
+                     handler: Arc::clone(&handler),
+                 },
+diff --git a/codex-rs/core/src/mcp_tool_exposure_test.rs b/codex-rs/core/src/mcp_tool_exposure_test.rs
+index c94be8c..de2c5de 100644
+--- a/codex-rs/core/src/mcp_tool_exposure_test.rs
++++ b/codex-rs/core/src/mcp_tool_exposure_test.rs
+@@ -20,6 +20,163 @@ use crate::config::ConfigBuilder;
+ use crate::config::test_config;
+ use tempfile::tempdir;
+
++#[tokio::test]
++async fn bundled_desktop_mcp_reads_require_host_installation_provenance() {
++    use crate::session::step_context::StepContext;
++    use crate::tools::context::{ToolCallSource, ToolInvocation, ToolPayload};
++    use codex_utils_path_uri::PathUri;
++    use serde_json::json;
++
++    let home = tempdir().unwrap();
++    let root = home
++        .path()
++        .join("plugins/cache/openai-bundled/codex-app-tools/0.1.6");
++    std::fs::create_dir_all(root.join("scripts")).unwrap();
++    let launcher = if cfg!(windows) {
++        "launch_codex_app_tools_mcp.cmd"
++    } else {
++        "launch_codex_app_tools_mcp"
++    };
++    std::fs::write(root.join("scripts").join(launcher), "fixture launcher").unwrap();
++    std::fs::write(root.join("server.mjs"), "fixture provider").unwrap();
++    let (session, mut turn) = crate::session::tests::make_session_and_context().await;
++    Arc::make_mut(&mut turn.config).codex_home =
++        codex_utils_absolute_path::AbsolutePathBuf::try_from(home.path().to_path_buf()).unwrap();
++    let session = Arc::new(session);
++    let turn = Arc::new(turn);
++    let transport: codex_config::McpServerConfig = serde_json::from_value(json!({
++        "command": if cfg!(windows) { "cmd.exe".to_string() } else { root.join("scripts").join(launcher).to_string_lossy().into_owned() },
++        "args": if cfg!(windows) { vec!["/d", "/s", "/c", "call", "./scripts/launch_codex_app_tools_mcp.cmd", "./server.mjs"] } else { vec!["./server.mjs"] },
++        "cwd": root,
++        "env_vars": ["CODEX_APP_TOOLS_PIPE_PATH"]
++    })).unwrap();
++    let mut handlers = HashMap::new();
++    // Reuse the cache across source changes: a prior grant must never survive a replacement.
++    for source in [
++        "bundled",
++        "config",
++        "other-plugin",
++        "external-root",
++        "other-command",
++        "pipe-override",
++        "pipe-duplicate",
++        "pipe-remote",
++        "pipe-case",
++        "bundled",
++    ] {
++        let mut catalog = ResolvedMcpCatalog::builder();
++        let mut server_config = transport.clone();
++        if let codex_config::McpServerTransportConfig::Stdio {
++            command,
++            env,
++            env_vars,
++            ..
++        } = &mut server_config.transport
++        {
++            if source == "other-command" {
++                *command = "untrusted-provider".into();
++            }
++            if source == "pipe-override" {
++                *env = Some(HashMap::from([(
++                    "CODEX_APP_TOOLS_PIPE_PATH".into(),
++                    "replacement".into(),
++                )]));
++            }
++            if source == "pipe-duplicate" {
++                env_vars.push("CODEX_APP_TOOLS_PIPE_PATH".into());
++            }
++            if source == "pipe-remote" {
++                env_vars.push(codex_config::McpServerEnvVar::Config {
++                    name: "CODEX_APP_TOOLS_PIPE_PATH".into(),
++                    source: Some("remote".into()),
++                });
++            }
++            if source == "pipe-case" {
++                env_vars.push("codex_app_tools_pipe_path".into());
++            }
++        }
++        let registration = if source == "config" {
++            McpServerRegistration::from_config("codex_app".into(), server_config)
++        } else {
++            let plugin_id = if source == "other-plugin" {
++                "other@openai-bundled"
++            } else {
++                "codex-app-tools@openai-bundled"
++            };
++            let plugin_root = if source == "external-root" {
++                home.path()
++            } else {
++                root.as_path()
++            };
++            McpServerRegistration::from_plugin(
++                "codex_app".into(),
++                McpPluginAttribution::new(plugin_id.into(), "Desktop".into())
++                    .with_host_root(PathUri::from_host_native_path(plugin_root).unwrap()),
++                0,
++                server_config,
++            )
++        };
++        catalog.register(registration);
++        let catalog = catalog.build();
++        let tools = ["wait_threads", "read_thread", "set_thread_title"]
++            .map(|name| make_mcp_tool("codex_app", name, "mcp__codex_app", name, None, None));
++        let mut registry = ToolRegistry::empty_for_test();
++        append_mcp_tools(
++            &tools,
++            &turn.config,
++            false,
++            &catalog,
++            false,
++            &mut handlers,
++            &mut registry,
++        );
++        for (name, arguments, bounded) in [
++            (
++                "wait_threads",
++                json!({"targets":[{"threadId":"01a0952a-de45-7370-bd83-35cf2e3f40b5","hostId":"local"}],"timeoutMs":0}),
++                true,
++            ),
++            (
++                "read_thread",
++                json!({"threadId":"01a0952a-de45-7370-bd83-35cf2e3f40b5","turnLimit":1,"maxOutputCharsPerItem":4000}),
++                true,
++            ),
++            ("wait_threads", json!({"targets":[],"timeoutMs":0}), false),
++            (
++                "read_thread",
++                json!({"threadId":"01a0952a-de45-7370-bd83-35cf2e3f40b5","turnLimit":6,"maxOutputCharsPerItem":4000}),
++                false,
++            ),
++            ("set_thread_title", json!({"title":"write"}), false),
++        ] {
++            let tool_name = ToolName::namespaced("mcp__codex_app", name);
++            let invocation = ToolInvocation {
++                session: Arc::clone(&session),
++                step_context: StepContext::for_test(Arc::clone(&turn)),
++                turn: Arc::clone(&turn),
++                cancellation_token: tokio_util::sync::CancellationToken::new(),
++                tracker: Arc::new(tokio::sync::Mutex::new(
++                    crate::turn_diff_tracker::TurnDiffTracker::new(),
++                )),
++                call_id: "desktop-mcp-read".into(),
++                tool_name: tool_name.clone(),
++                source: ToolCallSource::Direct,
++                payload: ToolPayload::Function {
++                    arguments: arguments.to_string(),
++                },
++            };
++            assert_eq!(
++                registry
++                    .tool(&tool_name)
++                    .unwrap()
++                    .allows_bounded_parent_read(&invocation),
++                source == "bundled" && bounded,
++                "{source}: {name}"
++            );
++        }
++    }
++}
++
+ fn make_mcp_tool(
+     server_name: &str,
+     tool_name: &str,
+diff --git a/codex-rs/core/src/tools/handlers/mcp.rs b/codex-rs/core/src/tools/handlers/mcp.rs
+index 4cce550..9ff7dc1 100644
+--- a/codex-rs/core/src/tools/handlers/mcp.rs
++++ b/codex-rs/core/src/tools/handlers/mcp.rs
+@@ -50,6 +50,7 @@ const MAX_MCP_NAMESPACE_DESCRIPTION_BYTES: usize = 512 * 1024;
+
+ pub struct McpHandler {
+     tool_info: ToolInfo,
++    bounded_desktop_reads: bool,
+     spec: Arc<ToolSpec>,
+     code_mode_tool_definitions: OnceLock<(Option<usize>, Vec<codex_code_mode::ToolDefinition>)>,
+ }
+@@ -103,6 +104,7 @@ impl McpHandler {
+         )?);
+         Ok(Self {
+             tool_info,
++            bounded_desktop_reads: false,
+             spec,
+             code_mode_tool_definitions: OnceLock::new(),
+         })
+@@ -112,6 +114,11 @@ impl McpHandler {
+         serde_json::to_vec(&self.spec).map(|spec| spec.len())
+     }
+
++    pub(crate) fn with_bounded_desktop_reads(mut self, allowed: bool) -> Self {
++        self.bounded_desktop_reads = allowed;
++        self
++    }
++
+     fn hook_tool_name(&self) -> HookToolName {
+         HookToolName::new(ensure_mcp_prefix(&join_tool_name(&self.tool_name())))
+     }
+@@ -312,6 +319,16 @@ impl CoreToolRuntime for McpHandler {
+         true
+     }
+
++    fn allows_bounded_parent_read(&self, invocation: &ToolInvocation) -> bool {
++        self.bounded_desktop_reads
++            && invocation.tool_name.clone().with_default_namespace()
++                == self.tool_name().with_default_namespace()
++            && super::dynamic::bounded_desktop_read_allowed(
++                self.tool_info.tool.name.as_ref(),
++                &invocation.payload,
++            )
++    }
++
+     fn mcp_server_name(&self) -> Option<&str> {
+         Some(&self.tool_info.server_name)
+     }
