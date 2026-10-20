@@ -35,12 +35,16 @@ PAGE_BYTES = 4096
 EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
   batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N
-    Independent requests; full preflight, one complete JSON results envelope or nonzero exit.
-    Total JSON+CRLF+explicit outer framing <=max-bytes; member caps are not aggregate caps.
+    Independent requests; full path/schema preflight before capture, one JSON results envelope.
+    Total JSON+CRLF+explicit outer framing <=max-bytes; shares budget within member upper caps.
+    Per-item ERROR retains other results; PARTIAL means errors, incomplete evidence or cursors.
+    ERROR request_index is 1-based; path_omitted/error_truncated explicitly mark reductions.
     Preserve each continuation separately. Legacy encoded batches retain text/restrictions.
-    Example: batch --root ABS --requests '[{"op":"page","path":"a.txt","max_bytes":1024},{"op":"page","path":"b.txt","max_bytes":1024}]' --max-bytes 3072 --framing-bytes 256
+    Example: batch --root ABS --requests '[{"op":"page","path":"a.txt"},{"op":"page","path":"b.txt"}]' --max-bytes 3072 --framing-bytes 256
     Declare actual host framing; the example's 256 is not a host measurement.
-    On overflow narrow members/caps; reuse retained results. Do not repeat the unchanged batch.
+    Budget too small for member metadata: narrow batch. Retry only failed/pending items.
+    Shell JSON quoting: existing ROOT BASE64_URLSAFE_JSON form accepts the same batch object.
+    Use physical roots/paths; symlink and reparse checks remain strict.
   read|search|list|diff|status --root ABS --path PATH [--cursor TOKEN] [--max-bytes N]
     Pages retain selected-request semantics; read/search keep line numbers. search needs --query.
     Git capture <=128 KiB; PARTIAL means narrow scope. Encoded small legacy results stay text;
@@ -808,24 +812,53 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
     checked = preflight(root, request)  # ALL invalid paths fail before any read/git.
     root = root.resolve(strict=True)
     results = []
-    size = 0
     remaining = [READ_LIMIT]
     structured = request['op'] == 'batch' and 'framing_bytes' in request
+    if structured:
+        cap = request['max_bytes'] - request['framing_bytes']
+        def packed():
+            return {'op':'batch','results':results,'status':'COMPLETE'}
+        overhead = len(envelope(packed(), cap).encode('utf-8')) + 2
+        if (cap - overhead - len(checked) + 1) // len(checked) + 2 < 256:
+            raise ValueError('batch budget cannot reserve 256 bytes per request; narrow batch')
+        for index, (item, path) in enumerate(checked):
+            count = len(checked) - index
+            used = len(envelope(packed(), cap).encode('utf-8')) + 2
+            commas = count if results else count - 1
+            member = {**item, 'max_bytes':min(item.get('max_bytes', PAGE_BYTES),
+                                             (cap - used - commas) // count + 2)}
+            try:
+                result = one(root, member, path, remaining)
+                if item['op'] in LEGACY_OPS:
+                    result = legacy_page(root, member, result, True)
+                value = json.loads(result)
+            except (ValueError, OSError) as error:
+                value = {'op':item['op'],'path':item.get('path','.'),
+                         'request_index':index + 1,'status':'ERROR','error':str(error)}
+                while True:
+                    try:
+                        envelope(value, member['max_bytes'])
+                        break
+                    except ValueError:
+                        if 'path' in value:
+                            del value['path']; value['path_omitted'] = True
+                        elif value['error']:
+                            value['error_truncated'] = True
+                            value['error'] = value['error'][:len(value['error']) // 2]
+                        else:
+                            raise
+            results.append(value)
+            envelope(packed(), cap)  # Capture and budget every member before emitting anything.
+        value = packed()
+        if any(row.get('next_cursor') is not None or row.get('complete') is False
+               or row.get('status') in ('PARTIAL', 'ERROR') for row in results):
+            value['status'] = 'PARTIAL'
+        return envelope(value, cap)
+    size = 0
     for index, (item, path) in enumerate(checked):
         result = one(root, item, path, remaining)
         if request['op'] != 'batch':
             return legacy_page(root, item, result, json_output) if item['op'] in LEGACY_OPS else result
-        if structured:
-            if item['op'] in LEGACY_OPS:
-                if not result[2]: raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
-                result = legacy_page(root, item, result, True)
-            value = json.loads(result)
-            if value.get('complete') is False or value.get('status') == 'PARTIAL':
-                raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
-            results.append(value)
-            envelope({'op':'batch','results':results,'status':'COMPLETE'},
-                     request['max_bytes'] - request['framing_bytes'])
-            continue
         text, _, complete = result
         if not complete: raise ValueError('batch capture is PARTIAL; narrow scope and read separately')
         if request['op'] == 'batch':
@@ -835,8 +868,7 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
             # No partial batch output is emitted. All operations are read-only.
             raise ValueError('aggregate output exceeds 4 KiB including frames/CRLF; split batch')
         results.append(text)
-    return (envelope({'op':'batch','results':results,'status':'COMPLETE'},
-                     request['max_bytes'] - request['framing_bytes']) if structured else '\n'.join(results))
+    return '\n'.join(results)
 
 
 def cli_request(args: list[str]) -> tuple[Path, dict]:

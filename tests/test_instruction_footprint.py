@@ -89,13 +89,12 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_actionable_incomplete_parent_work_requires_continuation(self):
         text = contract_text()
         for phrase in ('CONTINUE while useful authorized diagnosis, delegation or implementation remains',
-                       'Missing measurements or an unresolved design decision alone',
-                       'never establish completion/blockage',
-                       'Do not require the user to type continue'):
+                       'Missing measurement/design alone proves neither done nor blocked',
+                       'Continue without a user nudge'):
             self.assertTrue(phrase in text, phrase)
 
     def test_partial_child_and_green_local_checks_do_not_end_parent_work(self):
-        self.assertTrue('Child PASS/PARTIAL or local checks/reviews never complete the parent'
+        self.assertTrue('Unit PASS/PARTIAL/checks/reviews != parent completion'
                         in contract_text())
 
     def test_parent_complete_requires_all_required_items_and_current_evidence(self):
@@ -104,23 +103,23 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_external_blocker_requires_specific_evidence_and_unaffected_work(self):
         text = contract_text()
-        for phrase in ('BLOCKED only for an actual external barrier',
+        for phrase in ('BLOCKED: actual external barrier',
                        'exact missing access/input/resource, evidence, affected scope',
                        'required user/external action', 'finish unaffected authorized work'):
             self.assertTrue(phrase in text, phrase)
 
     def test_standalone_status_ends_but_mid_task_status_preserves_objective(self):
         text = contract_text()
-        self.assertTrue('STATUS/Q&A ends only a standalone question task' in text)
-        self.assertTrue('During active work answer briefly then continue the original objective '
+        self.assertTrue('Only standalone STATUS/Q&A ends after answering' in text)
+        self.assertTrue('mid-task questions: answer briefly, continue the original objective '
                         'unless stopped/changed' in text)
 
     def test_stop_and_scope_limits_bound_parent_continuation(self):
         text = contract_text()
         for phrase in ('STOP on explicit stop/pause/cancel, accepted scope change',
                        'actual tool/system budget ceiling; report remaining work',
-                       'Continue within existing authority/scope',
-                       'no automatic monitoring, risky measurement/deploy, new authority, '
+                       'Existing authority/scope only',
+                       'no automatic monitoring, risky measurement/deploy, '
                        'infinite retry or extra model probes'):
             self.assertTrue(phrase in text, phrase)
 
@@ -137,6 +136,20 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertEqual(set(chain), {'SKILL.md', 'references/dispatch.md', 'references/effort.md',
                                      'references/quality.md', 'references/routing.md'})
 
+    def test_evidence_efficiency_guidance_preserves_complete_reads_and_unit_ownership(self):
+        # Static instructions only; executable batch behavior is checked against the Reader CLI.
+        core = SKILL.read_text(encoding='utf-8')
+        text = contract_text()
+        for phrase in ('Reuse loaded unchanged rules', 'fully read required new/changed rules',
+                       'Batch independent small/targeted reads', 'full pages for long required rules',
+                       'Use physical paths; keep link checks', 'inspect every result/status/error/cursor',
+                       'same admitted executor continues through diagnosis/fix', 'retain successful results',
+                       'Workers: compact waits; details at actionable change/completion/error',
+                       'Run required checks once after final changes stabilize'):
+            self.assertTrue(phrase in text, phrase)
+        self.assertNotIn('one page per tool call', core)
+        self.assertNotIn('no joined pages/queries', core)
+
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = contract_text()
         self.assertIn('No doc/hook preload or child router copy', text)
@@ -147,21 +160,20 @@ class InstructionFootprintTests(unittest.TestCase):
         text = contract_text()
         core = SKILL.read_text(encoding='utf-8')
         description = next(line for line in core.splitlines() if line.startswith('description:'))
-        self.assertIn('Read SKILL alone, one page per tool call', description)
+        self.assertIn('All delegation/reuse/review', description)
         self.assertLess(core.index('Check exit before JSON'), core.index('Read [effort.md]'))
-        for phrase in ('Read SKILL alone, one page per tool call',
-                       'Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
+        for phrase in ('Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
                        'handoff both', '`page --root ABS --path PATH`',
                        'current located lines: `excerpt --start N --lines N` (count 1..200)',
-                       'unknown: `locate --query Q`', 'Files/rules: `page`',
-                       'same root/path `--cursor TOKEN` to null', 'Output+framing <=4KiB',
+                       'Code: `locate --query Q`', 'Files/rules: `page --root ABS --path PATH`',
+                       'same root/path `--cursor TOKEN` to null',
                        'Check exit before JSON', 'Fix limits/page/locate errors',
-                       'no full-file slicing/merging pages/files',
+                       'No full-file slicing/merging pages/files',
                        'JSON+CRLF+framing <=4KiB',
                        'capture/select/serialize/count before emit',
                        'one results JSON', 'keep each cursor', 'no early member output',
-                       'batch --requests JSON_ARRAY --max-bytes N --framing-bytes N',
-                       'Resume gaps', 'disclose omissions'):
+                       'batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N',
+                       'retain successful results', 'disclose gaps'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
@@ -175,13 +187,13 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_reader_call_and_dispatch_checklist_boundaries_are_explicit(self):
         core = SKILL.read_text(encoding='utf-8')
         description = next(line for line in core.splitlines() if line.startswith('description:'))
-        self.assertIn('Read SKILL alone, one page per tool call', description)
-        self.assertIn('One Reader invocation/tool call', core)
-        self.assertIn('no joined pages/queries or mixed Get-Content', core)
+        self.assertIn('All delegation/reuse/review', description)
+        self.assertIn('Batch independent small/targeted reads', core)
+        self.assertIn('full pages for long required rules', core)
 
     def test_dispatch_preflight_is_installed_reader_and_scripts_are_verified(self):
         dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
-        self.assertIn('Dispatch preflight: Reader `assignment` before task-bearing sends', dispatch)
+        self.assertIn('Preflight: Reader `assignment` before task-bearing sends', dispatch)
         self.assertIn('assignment --help', dispatch)
         self.assertIn('Verify script paths before use', dispatch)
         self.assertNotIn('Run dispatch preflight.', dispatch)

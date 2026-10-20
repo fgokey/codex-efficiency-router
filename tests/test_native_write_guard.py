@@ -349,6 +349,118 @@ class NativeGuardTests(unittest.TestCase):
         self.assertEqual(p.returncode,0,p.stderr)
         return json.loads(p.stdout) if p.stdout.strip() else {}
 
+    def test_structured_batch_default_caps_share_budget_without_losing_evidence(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        contents={'sentinel.txt':'A界\\"\r\n'*500,'second.txt':'B🙂\\"\r\n'*500}
+        for name,body in contents.items(): (self.root/name).write_text(body,encoding='utf-8',newline='')
+        requests=[{'op':'page','path':name} for name in contents]
+        request={'op':'batch','requests':requests,'max_bytes':3072,'framing_bytes':400}
+        p=subprocess.run([sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),'batch',
+                          '--root',str(self.root),'--requests',json.dumps(requests),
+                          '--max-bytes','3072','--framing-bytes','400'],capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        parts={name:[] for name in contents}; result=json.loads(p.stdout)
+        for attempt in range(30):
+            self.assertLessEqual(len(json.dumps(result,ensure_ascii=False,separators=(',',':')).encode())+2+400,3072)
+            self.assertEqual(len(result['results']),len(request['requests']))
+            pending=[]
+            for item,page in zip(request['requests'],result['results']):
+                self.assertTrue(page['data']); parts[item['path']].append(page['data'])
+                if page['next_cursor']: pending.append({**item,'cursor':page['next_cursor']})
+            self.assertEqual(result['status'],'PARTIAL' if pending else 'COMPLETE')
+            if not pending: break
+            request={**request,'requests':pending}; result=json.loads(reader['run'](self.root,request))
+        else: self.fail('batch continuations failed to finish')
+        self.assertEqual({name:''.join(body) for name,body in parts.items()},contents)
+
+    def test_structured_batch_item_error_retains_other_evidence_and_recovers(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        self.file.write_bytes(b'\xff'); (self.root/'second.txt').write_text('kept',encoding='utf-8')
+        request={'op':'batch','requests':[{'op':'page','path':name} for name in ('sentinel.txt','second.txt')],
+                 'max_bytes':3072,'framing_bytes':400}
+        result=json.loads(reader['run'](self.root,request))
+        self.assertEqual(result['status'],'PARTIAL'); self.assertEqual(len(result['results']),2)
+        bad,good=result['results']; self.assertEqual(bad['status'],'ERROR')
+        self.assertEqual(bad['path'],'sentinel.txt'); self.assertNotIn('data',bad)
+        self.assertIn('decode',bad['error']); self.assertEqual(good['data'],'kept')
+        self.file.write_text('recovered',encoding='utf-8')
+        recovered=json.loads(reader['run'](self.root,{**request,'requests':request['requests'][:1]}))
+        self.assertEqual(recovered['status'],'COMPLETE')
+        self.assertEqual(recovered['results'][0]['data'],'recovered')
+
+    def test_structured_batch_long_safe_error_keeps_earlier_success(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        long_path=self.root/('safe_'+'x'*160)/'target.txt'
+        long_path.parent.mkdir(); long_path.write_text('content'*1000,encoding='utf-8')
+        self.assertGreater(len(str(long_path).encode()),160)
+        request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','max_bytes':1024},
+                                          {'op':'read','path':str(long_path),'max_bytes':256}],
+                 'max_bytes':3072,'framing_bytes':400}
+        raw=reader['run'](self.root,request); result=json.loads(raw)
+        self.assertLessEqual(len(raw.encode())+2+400,3072)
+        self.assertEqual(result['status'],'PARTIAL'); self.assertEqual(len(result['results']),2)
+        self.assertEqual(result['results'][0]['data'],'before')
+        error=result['results'][1]; self.assertEqual(error['status'],'ERROR')
+        self.assertEqual(error['request_index'],2); self.assertTrue(error['path_omitted'])
+        self.assertNotIn('path',error); self.assertNotIn('data',error)
+        self.assertTrue(error['error'])
+
+    def test_structured_batch_stale_cursor_returns_no_stale_data(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        self.file.write_text('original'*1000,encoding='utf-8')
+        first=json.loads(reader['run'](self.root,{'op':'page','path':'sentinel.txt','max_bytes':1024}))
+        self.file.write_text('changed'*1000,encoding='utf-8')
+        (self.root/'second.txt').write_text('current',encoding='utf-8')
+        request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','cursor':first['next_cursor']},
+                                          {'op':'page','path':'second.txt'}],
+                 'max_bytes':3072,'framing_bytes':400}
+        result=json.loads(reader['run'](self.root,request))
+        self.assertEqual(result['status'],'PARTIAL'); self.assertEqual(len(result['results']),2)
+        bad,good=result['results']; self.assertEqual(bad['status'],'ERROR')
+        self.assertNotIn('data',bad); self.assertRegex(bad['error'],'changed|stale')
+        self.assertEqual(good['data'],'current')
+
+    def test_structured_batch_large_os_error_is_explicitly_bounded(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        (self.root/'second.txt').write_text('content',encoding='utf-8')
+        original=reader['run'].__globals__['one']; message='界\\"'*10000
+        def failing(root,item,path,remaining):
+            if path.name=='second.txt': raise OSError(message)
+            return original(root,item,path,remaining)
+        request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','max_bytes':1024},
+                                          {'op':'page','path':'second.txt','max_bytes':256}],
+                 'max_bytes':3072,'framing_bytes':400}
+        with mock.patch.dict(reader['run'].__globals__,one=failing): raw=reader['run'](self.root,request)
+        result=json.loads(raw); self.assertEqual(result['status'],'PARTIAL')
+        self.assertLessEqual(len(raw.encode())+2+400,3072)
+        self.assertEqual(result['results'][0]['data'],'before')
+        error=result['results'][1]; self.assertEqual(error['request_index'],2)
+        self.assertTrue(error['path_omitted']); self.assertTrue(error['error_truncated'])
+        self.assertTrue(error['error']); self.assertTrue(message.startswith(error['error']))
+        self.assertNotIn('data',error)
+
+    def test_structured_batch_partial_locate_is_explicit_and_keeps_other_results(self):
+        if not shutil.which('rg'): self.skipTest('rg unavailable')
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        self.file.write_text('needle\n'*300,encoding='utf-8')
+        (self.root/'second.txt').write_text('kept',encoding='utf-8')
+        request={'op':'batch','requests':[{'op':'locate','path':'sentinel.txt','query':'needle'},
+                                          {'op':'page','path':'second.txt'}],
+                 'max_bytes':3072,'framing_bytes':400}
+        result=json.loads(reader['run'](self.root,request))
+        self.assertEqual(result['status'],'PARTIAL'); self.assertEqual(len(result['results']),2)
+        found,good=result['results']; self.assertFalse(found['complete'])
+        self.assertEqual(found['status'],'PARTIAL'); self.assertTrue(found['candidates'])
+        self.assertIn('narrow',found['hint']); self.assertEqual(good['data'],'kept')
+
+    def test_structured_batch_insufficient_budget_fails_before_capture(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        for index in range(16): (self.root/str(index)).write_text('small',encoding='utf-8')
+        request={'op':'batch','requests':[{'op':'page','path':str(index)} for index in range(16)],
+                 'max_bytes':512,'framing_bytes':128}
+        with mock.patch.dict(reader['run'].__globals__,one=mock.Mock(side_effect=AssertionError('capture before budget preflight'))):
+            with self.assertRaisesRegex(ValueError,'budget'): reader['run'](self.root,request)
+
     def test_structured_batch_cli_counts_complete_json_and_framing(self):
         self.file.write_text('界\\"\r\n'*30,encoding='utf-8',newline='')
         (self.root/'other.json').write_text('{"nested":{"x":"界"}}',encoding='utf-8')
@@ -394,9 +506,14 @@ class NativeGuardTests(unittest.TestCase):
             self.assertEqual(after['data'],contents[name][offset:offset+len(after['data'])])
             self.assertNotEqual(after['next_cursor'],before['next_cursor'])
         self.file.write_text('changed',encoding='utf-8')
-        with self.assertRaisesRegex(ValueError,'changed|stale'): reader['run'](self.root,request)
+        changed=json.loads(reader['run'](self.root,request))
+        self.assertEqual(changed['status'],'PARTIAL')
+        self.assertEqual(changed['results'][0]['status'],'ERROR')
+        self.assertRegex(changed['results'][0]['error'],'changed|stale')
+        self.assertNotIn('data',changed['results'][0])
+        self.assertEqual(changed['results'][1],second[1])
 
-    def test_structured_batch_preflights_and_never_emits_partial_members(self):
+    def test_structured_batch_preflights_and_emits_one_complete_envelope(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         request={'op':'batch','requests':[{'op':'page','path':'sentinel.txt','max_bytes':1024}],
                  'max_bytes':3072,'framing_bytes':400}
@@ -416,17 +533,25 @@ class NativeGuardTests(unittest.TestCase):
         args=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),'batch','--root',str(self.root),
               '--requests',json.dumps(requests),'--max-bytes','2048','--framing-bytes','256']
         p=subprocess.run(args,capture_output=True,timeout=10)
-        self.assertNotEqual(p.returncode,0); self.assertEqual(p.stdout,b'')
-        self.assertIn(b'envelope',p.stderr)
-        self.assertLessEqual(len(p.stderr)+1+256,2048)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertLessEqual(len(p.stdout)+1+256,2048)
+        result=json.loads(p.stdout)
+        self.assertEqual(result['status'],'PARTIAL'); self.assertEqual(len(result['results']),2)
+        for page in result['results']:
+            self.assertTrue(page['data']); self.assertIsInstance(page['next_cursor'],str)
         args[-5]=json.dumps([requests[0],{'op':'page','path':'../outside'}])
         p=subprocess.run(args,capture_output=True,timeout=10)
         self.assertNotEqual(p.returncode,0); self.assertEqual(p.stdout,b'')
         self.assertLessEqual(len(p.stderr)+1+256,2048)
         with mock.patch.dict(reader['run'].__globals__,one=lambda *unused: ('git exit=1\nerror',{},False)):
-            with self.assertRaises(ValueError): reader['run'](self.root,{**request,'requests':[{'op':'status','path':'.'}]})
+            partial=json.loads(reader['run'](self.root,{**request,'requests':[{'op':'status','path':'.'}]}))
+            self.assertEqual(partial['status'],'PARTIAL')
+            self.assertEqual(partial['results'][0]['status'],'PARTIAL')
+            self.assertIn('incomplete',partial['results'][0]['hint'])
         with mock.patch.dict(reader['run'].__globals__,one=lambda *unused: json.dumps({'op':'locate','complete':False,'status':'PARTIAL'})):
-            with self.assertRaises(ValueError): reader['run'](self.root,request)
+            partial=json.loads(reader['run'](self.root,request))
+            self.assertEqual(partial['status'],'PARTIAL')
+            self.assertFalse(partial['results'][0]['complete'])
 
     @staticmethod
     def denied(output):

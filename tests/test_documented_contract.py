@@ -104,8 +104,8 @@ class DocumentedContractTests(unittest.TestCase):
     def test_core_safety_contract_survives_compression(self):
         # Wording sentinels prevent accidental deletion, not semantic-quality proof.
         core = contract_text()
-        for phrase in ('UNKNOWN, not PASS', 'read-only', 'no-subagent/no-escalation',
-                       'Do not weaken assertions', 'contrary evidence', 'revision/dirt',
+        for phrase in ('Unrun: UNKNOWN', 'required gaps: PARTIAL/BLOCKED', 'read-only', 'no-subagent/no-escalation',
+                       'Never weaken assertions', 'contrary evidence', 'revision/dirt',
                        'same-model needs contextual value AND net benefit',
                        'authority/ownership/capacity gaps BLOCK/defer',
                        'no classifier', 'no agent per file',
@@ -115,7 +115,7 @@ class DocumentedContractTests(unittest.TestCase):
     def test_semantic_loss_and_review_evidence_are_required(self):
         core = contract_text()
         quality = (ROOT / 'skills' / PROJECT / 'references/quality.md').read_text()
-        for phrase in ('Check semantic invariants', 'Loss/eviction/coalescing',
+        for phrase in ('Validate semantics/platforms/macros/consumers', 'Loss/eviction/coalescing',
                        'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
             self.assertIn(phrase, core)
         for phrase in ('Findings cite before/after or requirement violation', 'label hypotheses',
@@ -132,7 +132,7 @@ class DocumentedContractTests(unittest.TestCase):
     def test_native_change_review_preserves_write_and_delivery_evidence(self):
         core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        self.assertIn('Dispatch preflight: Reader `assignment` before task-bearing sends', core)
+        self.assertIn('Preflight: Reader `assignment` before task-bearing sends', core)
         for phrase in ('all roots', 'exact paths/status',
                        'owned/prior dirt', 'Parent checks all diffs/status',
                        'review/open-review', 'unstaged review',
@@ -156,7 +156,7 @@ class DocumentedContractTests(unittest.TestCase):
                          'No fake badge/ID',
                          'parent checks current session host-observed model/effort/role/permission/owner',
                          'explicitly releases unit for writes',
-                         'Dispatch preflight: Reader `assignment` before task-bearing sends'):
+                         'Preflight: Reader `assignment` before task-bearing sends'):
             self.assertIn(boundary, dispatch)
 
     def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
@@ -172,7 +172,8 @@ class DocumentedContractTests(unittest.TestCase):
     def test_native_root_astra_boundary_has_no_repair_exception(self):
         core = contract_text()
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('read-only without repair exceptions', '`read_only`', '`prepare_agent_task`',
+        for phrase in ('Root Astra defaults read-only', 'native admission has no repair exceptions',
+                       '`read_only`', '`prepare_agent_task`',
                        'Capacity never grants writes'):
             self.assertIn(phrase, core)
         self.assertNotIn('one bounded local repair unit', dispatch)
@@ -194,7 +195,8 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('Policy denial', 'equivalent replay/repackaging',
                        'approval=never', 'no manual boundary'):
             self.assertIn(phrase, dispatch)
-        self.assertIn('Read dispatch before writes/delegation', core)
+        self.assertIn('Read dispatch before writes', core)
+        self.assertIn('before delegation, binding or delivery review', core)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.

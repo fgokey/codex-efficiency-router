@@ -1,6 +1,6 @@
 ---
 name: codex-efficiency-router
-description: All delegation/reuse/review. Read SKILL alone, one page per tool call.
+description: All delegation/reuse/review.
 ---
 
 # Codex Efficiency Router
@@ -9,7 +9,7 @@ description: All delegation/reuse/review. Read SKILL alone, one page per tool ca
 
 Installation: fixed; automatic low: disabled.
 
-One Reader invocation/tool call; no joined pages/queries or mixed Get-Content. Verified Python `-I -B <Skill>/scripts/readonly_reader.py`: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Check exit before JSON; no full-file slicing/merging pages/files. Output+framing <=4KiB; unknown framing: gap; handoff both.
+Reuse loaded unchanged rules; fully read required new/changed rules. Use physical paths; keep link checks. Verified Python `-I -B <Skill>/scripts/readonly_reader.py`. Batch independent small/targeted reads; full pages for long required rules. Check exit before JSON; inspect every result/status/error/cursor. No full-file slicing/merging pages/files. JSON+CRLF+framing <=4KiB; unknown framing: gap; handoff both.
 
 Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/hidden config edits.
 
@@ -23,7 +23,7 @@ Requirements win. Read [quality.md](references/quality.md) before an active engi
 
 Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
 
-New engineering/readonly review (send_input/followup_task/send_message): default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
+New engineering/readonly review: default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
 
 ## Delegate
 

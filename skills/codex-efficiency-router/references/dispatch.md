@@ -1,12 +1,12 @@
 # Dispatch/guard
 
-authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Read dispatch before writes/delegation. Dispatch preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
+authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Read dispatch before writes. Preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
 
 Reader `assignment --help`: schema. Receipt is not proof. Wait exempt. Spawn: explicit role/effort, HOLD then binding.
 
 When exposed, use `admitted_agent_task`: `spawn_hold`, bind, `assign` fresh envelope in `body`; no raw dispatch.
 
-Root Astra: configured native admission is read-only without repair exceptions. Use `read_only` for files; `prepare_agent_task` for fresh Reader envelopes. Capacity never grants writes.
+Root Astra: `read_only` for files; `prepare_agent_task` for fresh Reader envelopes. Capacity never grants writes.
 
 Parent-assigned Ultra Sol/Astra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: authority/exact repo/ref/destination/checks; grants none. Deduct context/copy/handoff/review costs.
 
@@ -20,7 +20,7 @@ Current evidence/checks/gaps. Parent reviews fixes/checks, closes blockers, acce
 
 Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release: same admitted unit continue/status/stop; new work needs core admission. contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
 
-Unit: source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: reconcile separate bounds.
+Unit: same admitted executor continues through diagnosis/fix/source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: reconcile separate bounds.
 
 Policy denial stops equivalent replay/repackaging until supported permission change; `approval=never`: no manual boundary.
 
