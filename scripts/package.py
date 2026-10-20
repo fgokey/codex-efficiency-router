@@ -9,7 +9,7 @@ MANIFEST = ".cer-install.json"
 # Project-specific source budgets, not platform limits or billed-token estimates.
 INSTRUCTION_BUDGETS = {
     "core_skill_bytes": 5200,
-    "full_skill_bytes": 9600,
+    "full_skill_bytes": 10800,
     "discovery_description_characters": 180,
     "role_developer_instruction_bytes": 950,
 }

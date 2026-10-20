@@ -15,6 +15,10 @@ Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/
 
 Cheap local Q&A/status/low-risk: no children/references. Delegation always routes. Honor repo rules, current permissions/read-only roles. Unknown identity/effects grant no writes.
 
+## Completion
+
+Requirements win. Read [quality.md](references/quality.md) before an active engineering parent final and for large evidence, semantic/lifecycle changes, failure or disputed validation.
+
 ## Routing
 
 Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
@@ -27,11 +31,11 @@ Read [dispatch.md](references/dispatch.md) before delegation, binding or deliver
 
 ## Handoff
 
-Owned scope; requirements win; dispatch acceptance.
+Owned scope; dispatch acceptance.
 
 ## Recovery
 
-Read [quality.md](references/quality.md) for large evidence, semantic/lifecycle changes, failure or disputed validation.
+Use quality recovery.
 
 ## Context and reporting
 

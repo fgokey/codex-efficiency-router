@@ -54,9 +54,9 @@ class DoctorTests(unittest.TestCase):
         profiles = doctor.source_profiles(ROOT)
         self.assertEqual([row['mode'] for row in profiles], ['fixed', 'auto', 'adaptive'])
         for row in profiles:
-            self.assertLessEqual(row['full_bytes'], 9600)
+            self.assertLessEqual(row['full_bytes'], 10800)
         with patch('manage.source_files', return_value={}), patch('profiles.render_payload') as render:
-            render.side_effect = lambda payload, profile: {'skill/SKILL.md': b'x' * (9601 if profile.mode == 'adaptive' else 1)}
+            render.side_effect = lambda payload, profile: {'skill/SKILL.md': b'x' * (10801 if profile.mode == 'adaptive' else 1)}
             with self.assertRaisesRegex(ValueError, 'adaptive'):
                 doctor.source_profiles(ROOT)
         with patch.object(doctor, 'source_profiles', side_effect=ValueError('bad profile')), \

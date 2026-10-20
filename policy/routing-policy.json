@@ -140,7 +140,7 @@
     "discovery_description_characters": 180,
     "default_parallel_children": 2,
     "notes": "Project policy, not official platform limits; no fixed assumed startup latency.",
-    "full_skill_bytes": 9600,
+    "full_skill_bytes": 10800,
     "role_developer_instruction_bytes": 950
   },
   "same_lane_reasons": [

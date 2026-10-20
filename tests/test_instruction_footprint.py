@@ -21,9 +21,9 @@ def contract_text():
 
 class InstructionFootprintTests(unittest.TestCase):
     def test_tightened_source_budgets(self):
-        # These limits are smaller than rc.1, not raised to make compression pass.
+        # Full budget includes the explicit parent completion decision; other limits stay fixed.
         self.assertLessEqual(INSTRUCTION_BUDGETS['core_skill_bytes'], 5200)
-        self.assertLessEqual(INSTRUCTION_BUDGETS['full_skill_bytes'], 9600)
+        self.assertLessEqual(INSTRUCTION_BUDGETS['full_skill_bytes'], 10800)
         self.assertLessEqual(INSTRUCTION_BUDGETS['discovery_description_characters'], 180)
         self.assertLessEqual(INSTRUCTION_BUDGETS['role_developer_instruction_bytes'], 950)
         self.assertEqual(doctor.validate_tree(SKILL, ROOT / 'agents'), [])
@@ -74,6 +74,55 @@ class InstructionFootprintTests(unittest.TestCase):
                        'before delegation, binding or delivery review',
                        'for large evidence, semantic/lifecycle changes, failure or disputed validation'):
             self.assertIn(phrase, text)
+
+    def test_parent_final_requires_objective_and_remaining_work_reconciliation(self):
+        # Source-contract regression for the observed premature final, not live behavior proof.
+        core = SKILL.read_text(encoding='utf-8')
+        self.assertTrue('## Completion' in core, 'Missing prominent parent completion decision')
+        self.assertLess(core.index('## Completion'), core.index('## Routing'))
+        self.assertTrue('before an active engineering parent final' in core)
+        text = contract_text()
+        for phrase in ('original user objective', 'accepted scope',
+                       'every remaining required item', 'current authority'):
+            self.assertTrue(phrase in text, phrase)
+
+    def test_actionable_incomplete_parent_work_requires_continuation(self):
+        text = contract_text()
+        for phrase in ('CONTINUE while useful authorized diagnosis, delegation or implementation remains',
+                       'Missing measurements or an unresolved design decision alone',
+                       'never establish completion/blockage',
+                       'Do not require the user to type continue'):
+            self.assertTrue(phrase in text, phrase)
+
+    def test_partial_child_and_green_local_checks_do_not_end_parent_work(self):
+        self.assertTrue('Child PASS/PARTIAL or local checks/reviews never complete the parent'
+                        in contract_text())
+
+    def test_parent_complete_requires_all_required_items_and_current_evidence(self):
+        self.assertTrue('COMPLETE only when every required item is satisfied by current evidence'
+                        in contract_text())
+
+    def test_external_blocker_requires_specific_evidence_and_unaffected_work(self):
+        text = contract_text()
+        for phrase in ('BLOCKED only for an actual external barrier',
+                       'exact missing access/input/resource, evidence, affected scope',
+                       'required user/external action', 'finish unaffected authorized work'):
+            self.assertTrue(phrase in text, phrase)
+
+    def test_standalone_status_ends_but_mid_task_status_preserves_objective(self):
+        text = contract_text()
+        self.assertTrue('STATUS/Q&A ends only a standalone question task' in text)
+        self.assertTrue('During active work answer briefly then continue the original objective '
+                        'unless stopped/changed' in text)
+
+    def test_stop_and_scope_limits_bound_parent_continuation(self):
+        text = contract_text()
+        for phrase in ('STOP on explicit stop/pause/cancel, accepted scope change',
+                       'actual tool/system budget ceiling; report remaining work',
+                       'Continue within existing authority/scope',
+                       'no automatic monitoring, risky measurement/deploy, new authority, '
+                       'infinite retry or extra model probes'):
+            self.assertTrue(phrase in text, phrase)
 
     def test_entry_is_cheap_but_does_not_grant_authority(self):
         text = SKILL.read_text()
@@ -147,7 +196,7 @@ class InstructionFootprintTests(unittest.TestCase):
         text = contract_text()
         for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
                        'no repeat tails/polls/nudges until change',
-                       'Status/check: one-shot; explicit watch',
+                       'Standalone status/check: one-shot; explicit watch',
                        'heartbeat: defer schedule or pause, never skipped wakeups',
                        'compact state/cadence; stop on cancel'):
             self.assertIn(phrase, text)
