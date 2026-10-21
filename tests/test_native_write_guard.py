@@ -147,7 +147,7 @@ class NativeDispatchTests(unittest.TestCase):
         snapshots.extend((failed, repeated_failure, new_failure, recovered, new_turn, error, final, native_error, schema_error))
         script = r'''
 const fs=require('fs'), input=JSON.parse(fs.readFileSync(0,'utf8'));
-const run=new (Object.getPrototypeOf(async function(){}).constructor)('tools','targets','framingBytes','store','load','text',input.code);
+const run=new (Object.getPrototypeOf(async function(){}).constructor)('tools','targets','framingBytes','store','load','text','parentReady',input.code);
 const pageRun=new (Object.getPrototypeOf(async function(){}).constructor)('framingBytes','store','load','text',input.page);
 (async()=>{
 const memory=new Map(), store=(k,v)=>memory.set(k,v), load=k=>memory.get(k), results=[];
@@ -157,11 +157,11 @@ for(const snapshot of input.snapshots){
  const text=p=>{const bytes=Buffer.byteLength(JSON.stringify(p))+2+64; if(bytes>4096)throw Error('outer overflow');maxBytes=Math.max(maxBytes,bytes);totalBytes+=bytes;pages.push(p);last=p;pageCount++;};
  const original=snapshot.toolError ? {isError:true,content:[{type:'text',text:snapshot.toolError}]} : {content:[{type:'text',text:JSON.stringify(snapshot.schemaError||snapshot)}]};
  const tools={mcp__codex_app__wait_threads:async args=>{calls++;if(args.timeoutMs!==50000)throw Error('wait bound');if(calls>1&&!args.targets[0].afterCursor)throw Error('cursor missing');return original;}};
- await run(tools,targets,64,store,load,text);
+ await run(tools,targets,64,store,load,text,true);
  const summary=last;let recovered=load('cerRaw');
  if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('original result lost');
  if(last.status==='PARTIAL'){
-  try{await run(tools,targets,64,store,load,text);throw Error('pending overwritten');}catch(e){if(e.message!=='pending page')throw e;pendingRejected++;}
+  try{await run(tools,targets,64,store,load,text,true);throw Error('pending overwritten');}catch(e){if(e.message!=='pending page')throw e;pendingRejected++;}
   pages=[];do{await pageRun(64,store,load,text);}while(last.next!==null);
   let raw='',offset=0;for(const page of pages){if(page.offset!==offset)throw Error('page gap');raw+=page.data;offset+=page.data.length;}
   recovered=JSON.parse(raw);if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('page evidence lost');
@@ -202,10 +202,68 @@ process.stdout.write(JSON.stringify({results,calls,maxBytes,totalBytes,pageCount
         self.assertTrue(recovered[12]['isError'])
         self.assertEqual(recovered[12]['content'][0]['text'], native_error['toolError'])
         self.assertEqual(recovered[13], schema_error['schemaError'])
-        self.assertEqual([row[9] for row in rows[:5]], ['progress'] * 5)
+        self.assertEqual([row[9] for row in rows[:5]], [None] * 5)
         print('COORDINATION_OFFLINE ' + json.dumps({key: observed[key] for key in (
             'calls', 'maxBytes', 'totalBytes', 'pageCount')}, separators=(',', ':')))
 
+    def test_coordination_readiness_merged_waits_adaptive_backoff_and_target_errors(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable for offline functions.exec replay')
+        script = r'''
+const input=JSON.parse(require('fs').readFileSync(0,'utf8')),Async=Object.getPrototypeOf(async function(){}).constructor;
+(async()=>{
+const memory=new Map(),store=(k,v)=>memory.set(k,v),load=k=>memory.get(k);let calls=[],last,snapshot,serial=0;
+const check=(v,m)=>{if(!v)throw Error(m);};
+const row=(id,turn='t1',status='inProgress')=>({thread:{id,status:{type:'active'}},cursor:'c'+(++serial),
+ latestTurn:{id:turn,status,error:null},latestAssistantMessage:{id:'m'+serial,phase:status==='completed'?'final_answer':'commentary',text:'progress '+serial},
+ latestToolMarker:{id:'exec'+serial,turnId:turn,status:'completed'}});
+let targets=[{threadId:'a'},{threadId:'b'}],framing=64;
+const tools={mcp__codex_app__wait_threads:async args=>{calls.push(args);return {content:[{type:'text',text:JSON.stringify(snapshot)}]};}};
+const text=v=>{check(Buffer.byteLength(JSON.stringify(v))+2+framing<=4096,'framed overflow');last=v;};
+const run=async(ready=true)=>new Async('tools','targets','framingBytes','store','load','text','parentReady',input.adaptive)(tools,targets,framing,store,load,text,ready);
+await run(false);check(last.action==='WORK'&&calls.length===0,'available parent work waited');
+for(let n=0;n<5;n++){
+ snapshot={timedOut:true,wake:null,polls:[row('a'),row('b')]};await run();
+ check(load('cerRaw').content[0].text===JSON.stringify(snapshot),'raw snapshot lost');
+ if(n)check(last.unchanged===2&&last.polls.length===0,'commentary/tools caused duplicate detail');
+}
+check(JSON.stringify(calls.map(c=>c.timeoutMs))==='[50000,50000,50000,60000,60000]','quiet backoff');
+check(calls.every(c=>c.targets.length===2),'separate child waits');
+check(calls.slice(1).every(c=>c.targets.every(t=>t.afterCursor)),'automatic cursors missing');
+targets[0].afterCursor='explicit-current';
+snapshot={timedOut:false,wake:{type:'completed'},polls:[row('a','t2','completed'),row('b')]};await run();
+check(calls.at(-1).targets[0].afterCursor==='explicit-current','explicit cursor replaced by stale cache');
+check(last.polls[0][3]==='t2'&&last.polls[0][7]&&last.polls[0][9]===snapshot.polls[0].latestAssistantMessage.text,'new turn/final lost');
+let before=calls.length;await run(false);check(calls.length===before,'unreviewed result waited');
+// Caller reviews this exact completion and retires a; readiness is not native proof.
+targets=[{threadId:'b'}];snapshot={timedOut:true,wake:null,polls:[row('b')]};await run();
+check(calls.at(-1).timeoutMs===50000&&calls.at(-1).targets[0].threadId==='b','real change reset/retirement');
+snapshot={timedOut:false,wake:null,polls:[],errors:[{threadId:'b',error:'not found'}]};await run();
+check(last.errors[0].threadId==='b','target error missing');before=calls.length;await run(false);check(calls.length===before,'unreviewed target error waited');
+// Exact error review removes b from the authoritative live list, without a ledger.
+targets=[{threadId:'c'}];snapshot={timedOut:true,wake:null,polls:[row('c')]};await run();
+check(calls.at(-1).targets.length===1&&calls.at(-1).targets[0].threadId==='c','inaccessible target retained');
+// Eight maximum-width IDs and only 496B available: cold pages contain all data;
+// there is no generated review map/token that could become unrecoverable.
+framing=3600;targets=Array.from({length:8},(_,n)=>({threadId:String(n)+'x'.repeat(127)}));
+snapshot={timedOut:false,wake:null,polls:[],errors:targets.map(t=>({threadId:t.threadId,error:'not found'}))};await run();
+check(last.status==='PARTIAL'&&load('cerPending'),'overflow not recoverable');
+let rejected=false;try{await run();}catch(e){rejected=String(e).includes('pending page');}check(rejected,'pending overwritten');
+let raw='',offset=0;do{await new Async('framingBytes','store','load','text',input.page)(framing,store,load,text);
+ check(last.offset===offset,'page gap');raw+=last.data;offset+=last.data.length;}while(last.next!==null);
+check(JSON.parse(JSON.parse(raw).content[0].text).errors.length===8,'error evidence lost');
+await run(false);check(last.action==='WORK','review gate unusable after pages');
+process.stdout.write(JSON.stringify({calls:calls.length,timeouts:calls.map(c=>c.timeoutMs)}));
+})().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
+'''
+        result = subprocess.run([node, '-e', script], input=json.dumps({
+            'adaptive': self.reader['COORDINATION_ADAPTIVE_JS'], 'page': self.reader['COORDINATION_PAGE_JS']}),
+            capture_output=True, text=True, encoding='utf-8', timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['calls'], 10)
     def test_paired_coordination_counts_generated_caller_and_complete_results(self):
         import shutil
         import subprocess
@@ -234,44 +292,116 @@ process.stdout.write(JSON.stringify({results,calls,maxBytes,totalBytes,pageCount
                     'latestToolMarker': {'id': 'failure' if failed else f'exec-{worker}', 'turnId': f'turn-{worker}',
                         'type': 'commandExecution', 'name': 'commandExecution', 'status': 'failed' if failed else 'completed'}})
             snapshots.append({'timedOut': index < 5, 'wake': None, 'polls': polls})
-        # Prior caller structure: V6 rollout line 131231 (2026-10-21 UTC).
-        # Same targets/snapshots/framing; source bytes include every generated caller,
-        # including on-demand paging, not just returned payloads. No token/billing claim.
+        # Frozen d0504cf transport, unchanged dense six-snapshot fixture.
+        compact_baseline = '\nif(!Number.isInteger(framingBytes)||framingBytes<0||framingBytes>3900)throw Error("unknown framing");\nif(load("cerPending"))throw Error("pending page");\nconst r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});store("cerRaw",r);store("cerPending",true);\nlet s;try{s=JSON.parse(r.content.find(c=>c.type==="text").text);let old=load("cerWait")||{};\ns.polls=s.polls.map(p=>{\nlet t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;\nlet a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,m?.phase==="final_answer"?m.id:null];\nlet k=JSON.stringify(a),changed=old[p.thread.id]!==k;old[p.thread.id]=k;\nreturn [p.thread.id,p.cursor,...a,changed,m?.text];\n});store("cerWait",old);}catch{s=null;}\nif(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096){store("cerPending",false);text(s);}\nelse text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});\n'
         script = r'''
 const input=JSON.parse(require('fs').readFileSync(0,'utf8')),Async=Object.getPrototypeOf(async function(){}).constructor;
 (async()=>{let all=[];
-for(const mode of ['prior','current']){let memory=new Map(),calls=0,codeBytes=0,returnedBytes=0,emits=0,targets=input.ids.map(threadId=>({threadId})),steps=[];
+for(const mode of ['prior','compact_baseline','current']){let memory=new Map(),calls=0,codeBytes=0,returnedBytes=0,requestBytes=0,emits=0,targets=input.ids.map(threadId=>({threadId})),steps=[];
 for(const snapshot of input.snapshots){let chunks=[],last,before=codeBytes+returnedBytes;
 const text=v=>{returnedBytes+=Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v))+66;emits++;chunks.push(v);last=v;};
 const original={content:[{type:'text',text:JSON.stringify(snapshot)}]};
 const tools={mcp__codex_app__wait_threads:async()=>{calls++;return original;}},store=(k,v)=>memory.set(k,v),load=k=>memory.get(k);
-let code=mode==='prior'?'let r=await tools.mcp__codex_app__wait_threads({targets:'+JSON.stringify(targets)+',timeoutMs:50000});for(let c of r.content||[])if(c.type==="text")text(c.text);\n':'const targets='+JSON.stringify(targets)+';const framingBytes=64;\n'+input.hot;
-codeBytes+=Buffer.byteLength(code);await new Async('tools','store','load','text',code)(tools,store,load,text);
+let code=mode==='prior'?'let r=await tools.mcp__codex_app__wait_threads({targets:'+JSON.stringify(targets)+',timeoutMs:50000});for(let c of r.content||[])if(c.type==="text")text(c.text);\n':'const targets='+JSON.stringify(targets)+';const framingBytes=64;\n'+(mode==='current'?'const parentReady=true;\n'+input.hot:input.compact);
+codeBytes+=Buffer.byteLength(code);requestBytes+=Buffer.byteLength(JSON.stringify({code}))+66;await new Async('tools','store','load','text',code)(tools,store,load,text);
 let got=mode==='prior'?JSON.parse(last):last,raw=false;
-if(mode==='current'&&last.status==='PARTIAL'){chunks=[];do{code='const framingBytes=64;\n'+input.page;codeBytes+=Buffer.byteLength(code);await new Async('tools','store','load','text',code)(tools,store,load,text);}while(last.next!==null);got=JSON.parse(JSON.parse(chunks.map(p=>p.data).join('')).content[0].text);raw=true;}
-if(mode==='current'&&JSON.stringify(load('cerRaw'))!==JSON.stringify(original))throw Error('original result lost');
+if(mode!=='prior'&&last.status==='PARTIAL'){chunks=[];do{code='const framingBytes=64;\n'+input.page;codeBytes+=Buffer.byteLength(code);requestBytes+=Buffer.byteLength(JSON.stringify({code}))+66;await new Async('tools','store','load','text',code)(tools,store,load,text);}while(last.next!==null);got=JSON.parse(JSON.parse(chunks.map(p=>p.data).join('')).content[0].text);raw=true;}
+if(mode!=='prior'&&JSON.stringify(load('cerRaw'))!==JSON.stringify(original))throw Error('original result lost');
 if(got.polls.length!==snapshot.polls.length)throw Error('worker lost');
-for(let j=0;j<got.polls.length;j++){let p=got.polls[j],q=snapshot.polls[j];if((mode==='current'&&!raw?p[1]:p.cursor)!==q.cursor)throw Error('cursor lost');
-if(mode==='current'&&!raw){if(p[4]!==q.latestTurn.status||p[3]!==q.latestTurn.id||JSON.stringify(p[5])!==JSON.stringify(q.latestTurn.error))throw Error('state/error lost');
-if(p[9]!==q.latestAssistantMessage.text)throw Error('message/final evidence lost');
+for(let j=0;j<got.polls.length;j++){let p=got.polls[j],q=snapshot.polls[j];if((mode!=='prior'&&!raw?p[1]:p.cursor)!==q.cursor)throw Error('cursor lost');
+if(mode!=='prior'&&!raw){if(p[4]!==q.latestTurn.status||p[3]!==q.latestTurn.id||JSON.stringify(p[5])!==JSON.stringify(q.latestTurn.error))throw Error('state/error lost');
+if((mode==='compact_baseline'||q.latestAssistantMessage.phase==='final_answer')&&p[9]!==q.latestAssistantMessage.text)throw Error('message/final evidence lost');
 if(q.latestAssistantMessage.phase==='final_answer'&&p[7]!==q.latestAssistantMessage.id)throw Error('final identity lost');
 if(q.latestToolMarker.status==='failed'&&JSON.stringify(p[6])!==JSON.stringify(q.latestToolMarker))throw Error('failed marker lost');}}
 targets=snapshot.polls.map(p=>({threadId:p.thread.id,afterCursor:p.cursor}));steps.push(codeBytes+returnedBytes-before);}
-all.push({mode,calls,codeBytes,returnedBytes,emits,totalBytes:codeBytes+returnedBytes,waitingTotalBytes:steps.slice(0,-1).reduce((a,b)=>a+b,0),finalTotalBytes:steps.at(-1)});}
+all.push({mode,calls,codeBytes,returnedBytes,requestBytes,wireBytes:requestBytes+returnedBytes,emits,totalBytes:codeBytes+returnedBytes,waitingTotalBytes:steps.slice(0,-1).reduce((a,b)=>a+b,0),finalTotalBytes:steps.at(-1)});}
 process.stdout.write(JSON.stringify(all));})().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
 '''
         result = subprocess.run([node, '-e', script], input=json.dumps({'ids': ids, 'snapshots': snapshots,
-            'hot': self.reader['COORDINATION_JS'], 'page': self.reader['COORDINATION_PAGE_JS']}),
+            'hot': self.reader['COORDINATION_JS'], 'compact': compact_baseline,
+            'page': self.reader['COORDINATION_PAGE_JS']}),
             capture_output=True, text=True, encoding='utf-8', timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
-        prior, current = json.loads(result.stdout)
+        prior, baseline, current = json.loads(result.stdout)
         self.assertEqual(prior['calls'], 6)
         self.assertEqual(current['calls'], prior['calls'])
         self.assertLess(current['totalBytes'], prior['totalBytes'])
         self.assertLess(current['waitingTotalBytes'], prior['waitingTotalBytes'])
         self.assertGreater(current['codeBytes'], 0)
         self.assertGreater(current['returnedBytes'], 0)
-        print('COORDINATION_PAIRED_BYTES ' + json.dumps([prior, current], separators=(',', ':')))
+        self.assertLessEqual(current['totalBytes'], baseline['totalBytes'])
+        self.assertLessEqual(current['wireBytes'], baseline['wireBytes'])
+        print('COORDINATION_PAIRED_BYTES ' + json.dumps([prior, baseline, current], separators=(',', ':')))
+
+        # Frozen one-hour timeline, already merged in every mode. Commentary/tools
+        # never wake native waits. Only error/completion events wake them. Details
+        # use the same bounded fixture; the old automatic quiet tail is counted.
+        timeline = r'''
+const input=JSON.parse(require('fs').readFileSync(0,'utf8')),Async=Object.getPrototypeOf(async function(){}).constructor;
+(async()=>{let results=[];
+for(const scenario of ['quiet','mixed'])for(const mode of ['baseline','default','adaptive']){
+ let memory=new Map(),store=(k,v)=>memory.set(k,v),load=k=>memory.get(k),now=0,calls=0,wakes=0,detailReads=0,tailReads=0,codeBytes=0,requestBytes=0,returnedBytes=0,nativeRequestBytes=0;
+ let live=[...input.ids],targets=live.map(threadId=>({threadId})),last,quiet=0,tailCurrent=false,adaptive=false,seen={},reviews=[];
+ const events=scenario==='quiet'?[{at:3600000,kind:'complete',ids:input.ids}]:[
+  {at:600000,kind:'turn',ids:[input.ids[0]]},{at:900000,kind:'error',ids:[input.ids[1]]},{at:3600000,kind:'complete',ids:[input.ids[0]]}];
+ const text=v=>{const encoded=typeof v==='string'?v:JSON.stringify(v);if(Buffer.byteLength(encoded)+66>4096)throw Error('fixture overflow');returnedBytes+=Buffer.byteLength(encoded)+66;last=v;};
+ const invoke=async code=>{codeBytes+=Buffer.byteLength(code);requestBytes+=Buffer.byteLength(JSON.stringify({code}))+66;await new Async('tools','store','load','text',code)(tools,store,load,text);};
+ let snapshot;
+ const tools={mcp__codex_app__wait_threads:async args=>{
+  calls++;nativeRequestBytes+=Buffer.byteLength(JSON.stringify(args));if(args.targets.length!==live.length)throw Error('unmerged wait');
+  const end=now+args.timeoutMs,wake=events.find(e=>e.at>now&&e.at<=end&&e.kind!=='turn'&&e.ids.some(id=>live.includes(id)));
+  now=wake?wake.at:end;if(wake)wakes++;
+  const polls=[],errors=[];
+  for(const id of live){const failed=events.find(e=>e.at<=now&&e.kind==='error'&&e.ids.includes(id));if(failed){errors.push({threadId:id,error:'not found'});continue;}
+   const final=events.some(e=>e.at<=now&&e.kind==='complete'&&e.ids.includes(id));
+   const turn=events.some(e=>e.at<=now&&e.kind==='turn'&&e.ids.includes(id))?'t2':'t1';
+   polls.push({thread:{id,status:{type:'active'}},cursor:'c:'+id+':'+now,revision:Math.floor(now/30000),changed:true,
+    latestTurn:{id:turn,status:final?'completed':'inProgress',error:null},
+    latestAssistantMessage:{id:'m:'+now,phase:final?'final_answer':'commentary',text:final?'source.py:42; actual applicability verified.':'正在核查当前代码与测试适用性。'.repeat(3)},
+    latestToolMarker:{id:'tool:'+Math.floor(now/30000),status:'completed'}});
+  }
+  snapshot={timedOut:!wake,wake:wake?{kind:wake.kind}:null,polls,errors};return {content:[{type:'text',text:JSON.stringify(snapshot)}]};
+ },mcp__codex_app__read_thread:async args=>({content:[{type:'text',text:'source.py:42; caller, workload and expected result checked. '.repeat(8)}]})};
+ while(live.length&&now<3600000){
+  let seed='';if(mode==='adaptive'&&!adaptive&&quiet>=2){adaptive=true;seed='store("cerIdle",2);';}
+  const body=mode==='baseline'?input.compact:adaptive?input.adaptive:input.hot;
+  await invoke('const targets='+JSON.stringify(targets)+';const framingBytes=64;'+(mode==='baseline'?'':'const parentReady=true;')+seed+'\n'+body);
+  if(last.status==='PARTIAL')throw Error('small fixture unexpectedly paginated');
+  if(JSON.stringify(load('cerRaw').content[0].text)!==JSON.stringify(JSON.stringify(snapshot)))throw Error('raw lost');
+  let changed=false,retired=[];
+  for(const p of snapshot.polls){let key=JSON.stringify([p.latestTurn.id,p.latestTurn.status,p.latestTurn.error,p.latestAssistantMessage.phase==='final_answer'?p.latestAssistantMessage.id:null]);
+   const prior=seen[p.thread.id];if(key!==prior){changed=true;if(prior||p.latestTurn.status==='completed'){
+    reviews.push([p.thread.id,p.latestTurn.id,p.latestTurn.status]);detailReads++;
+    await invoke('const r=await tools.mcp__codex_app__read_thread({threadId:'+JSON.stringify(p.thread.id)+',turnLimit:1,includeOutputs:true,maxOutputCharsPerItem:1200});text(r);');
+   }}seen[p.thread.id]=key;if(p.latestTurn.status==='completed')retired.push(p.thread.id);
+  }
+  for(const error of snapshot.errors){changed=true;reviews.push([error.threadId,'error',error.error]);retired.push(error.threadId);}
+  quiet=changed?0:quiet+1;if(changed)tailCurrent=false;
+  if(mode==='baseline'&&quiet>=2&&!tailCurrent){tailReads++;detailReads++;tailCurrent=true;
+   await invoke('const r=await tools.mcp__codex_app__read_thread({threadId:'+JSON.stringify(live[0])+',cursor:"saved-offset",turnLimit:1,includeOutputs:true,maxOutputCharsPerItem:1200});text(r);');}
+  live=live.filter(id=>!retired.includes(id));targets=live.map(threadId=>({threadId,afterCursor:snapshot.polls.find(p=>p.thread.id===threadId)?.cursor}));
+ }
+ results.push({scenario,mode,calls,wakes,detailReads,tailReads,codeBytes,requestBytes,returnedBytes,nativeRequestBytes,totalBytes:codeBytes+returnedBytes,wireBytes:requestBytes+returnedBytes,reviews});
+}
+process.stdout.write(JSON.stringify(results));})().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
+'''
+        result = subprocess.run([node, '-e', timeline], input=json.dumps({'ids': ids,
+            'compact': compact_baseline, 'hot': self.reader['COORDINATION_JS'],
+            'adaptive': self.reader['COORDINATION_ADAPTIVE_JS']}),
+            capture_output=True, text=True, encoding='utf-8', timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        observed = json.loads(result.stdout)
+        for scenario in ('quiet', 'mixed'):
+            baseline, default, adaptive = [row for row in observed if row['scenario'] == scenario]
+            self.assertEqual(default['calls'], baseline['calls'])
+            self.assertLess(adaptive['calls'], baseline['calls'])
+            for row in (default, adaptive):
+                self.assertEqual(row['reviews'], baseline['reviews'])
+                self.assertEqual(row['wakes'], baseline['wakes'])
+                self.assertEqual(row['tailReads'], 0)
+                self.assertLess(row['wireBytes'], baseline['wireBytes'])
+            self.assertLess(adaptive['wireBytes'], default['wireBytes'])
+        print('COORDINATION_TIMELINE_BYTES ' + json.dumps(observed, separators=(',', ':')))
 
     def text(self, request):
         result = self.reader['assignment_preflight'](request)

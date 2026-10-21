@@ -33,24 +33,51 @@ OPS = frozenset(('read', 'list', 'search', 'diff', 'status', 'index', 'page', 'e
 LEGACY_OPS = frozenset(('read', 'list', 'search', 'diff', 'status'))
 PAGE_BYTES = 4096
 EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
-# Copy the hot wait block into functions.exec; supply targets/framingBytes, no Python.
-# Rows: id,cursor,threadStatus,turnId,turnStatus,error,failedMarker,finalMessageId,changed,messageText.
-# Raw MCP results stay in cerRaw. On overflow/schema failure use COORDINATION_PAGE_JS;
-# drain its next offsets before another wait. Stored values are data, never executable code.
+# Copy COORDINATION_JS into functions.exec for short/dense work; supply targets,
+# framingBytes and parentReady. parentReady=true is a caller contract: finish all
+# available substantive parent code/evidence/test-applicability work first, and
+# review each actionable child turn/error/final result before passive waiting.
+# Bind that declaration to the current evidence, never an old worker-ID receipt.
+# This is not native proof of work/review. False readiness returns WORK, no wait.
+# Merge ALL relevant live targets (native max eight) into one call. Resolve/retire
+# target-specific errors only after review; omitted targets are caller decisions.
+# Reuse explicit cursors. For prolonged quiet work, opt into ADAPTIVE after two
+# unchanged snapshots (seed store("cerIdle",2) when switching); it reuses per-target
+# cursors, omits unchanged detail and
+# extends 50s waits to 60s, preserving native async wake/error/completion. New
+# substantive state resets backoff; commentary/tools alone do not. Host support
+# for 60s is required; UNKNOWN is a gap, never bypass an actual host restriction.
+# Raw MCP results stay in cerRaw. On overflow/schema failure use PAGE, draining
+# every next offset before any new wait. Stored values are data, never code.
+# Rows: id,cursor,threadStatus,turnId,turnStatus,error,failedMarker,finalMessageId,changed,finalText.
 COORDINATION_JS = r'''
-if(!Number.isInteger(framingBytes)||framingBytes<0||framingBytes>3900)throw Error("unknown framing");
+let b=framingBytes;
+if(!Number.isInteger(b)||b<0||b>3900)throw Error("unknown framing");
 if(load("cerPending"))throw Error("pending page");
+if(parentReady!==true)text({action:"WORK"});else{
 const r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});store("cerRaw",r);store("cerPending",true);
 let s;try{s=JSON.parse(r.content.find(c=>c.type==="text").text);let old=load("cerWait")||{};
 s.polls=s.polls.map(p=>{
 let t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;
 let a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,m?.phase==="final_answer"?m.id:null];
 let k=JSON.stringify(a),changed=old[p.thread.id]!==k;old[p.thread.id]=k;
-return [p.thread.id,p.cursor,...a,changed,m?.text];
+return [p.thread.id,p.cursor,...a,changed,a[5]?m.text:null];
 });store("cerWait",old);}catch{s=null;}
-if(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096){store("cerPending",false);text(s);}
+if(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+b<=4096){store("cerPending",false);text(s);}
 else text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});
+}
 '''
+
+# Optional quiet-work variant, derived from the same transport rather than a
+# second review protocol. Copy the evaluated string; no executable-code storage.
+COORDINATION_ADAPTIVE_JS = COORDINATION_JS.replace(
+    'const r=await', 'const cursors=load("cerCursors")||{};const r=await').replace(
+    '{targets,timeoutMs:50000}',
+    '{targets:targets.map(t=>({...t,afterCursor:t.afterCursor||cursors[t.threadId]})),timeoutMs:load("cerIdle")>=2?60000:50000}').replace(
+    '});store("cerWait",old);',
+    '});store("cerWait",old);store("cerIdle",s.polls.some(p=>p[8])||s.errors?.length?0:(load("cerIdle")||0)+1);'
+    'for(const p of s.polls)cursors[p[0]]=p[1];store("cerCursors",cursors);'
+    'let n=s.polls.length;s.polls=s.polls.filter(p=>p[8]||p[5]||p[6]||p[7]);s.unchanged=n-s.polls.length;')
 
 # Explicit data pagination only, also recovers the original result after schema errors.
 COORDINATION_PAGE_JS = r'''

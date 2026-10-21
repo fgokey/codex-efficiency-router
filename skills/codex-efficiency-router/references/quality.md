@@ -16,9 +16,9 @@ Files/rules: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to n
 
 Checks: one Reader `batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N`; one results JSON; keep each cursor; no early member output. ERROR/PARTIAL: retain successful results; retry failed/pending only; disclose gaps. Other: capture/select/serialize/count before emit. No doc/hook preload or child router copy. Never invent identity/savings/enforcement/cleanup.
 
-Workers: compact waits; details at actionable change/completion/error. Use cursors; `changed/revision` includes commentary/tools. Merge reports; retain required liveness/progress/errors. Commentary/queries/waits/prompt rewrites do not reset backoff. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change.
+Workers: compact waits; details at actionable change/completion/error. Parent work first. Merge <=8 targets; retain cursors/liveness/progress/errors. Commentary/tools/queries/waits/rewrites keep backoff. Two unchanged snapshots: back off; one saved-offset delta for diagnostic evidence; no repeat tails/polls/nudges until change.
 
-`COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors.
+`COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors. `parentReady`: caller contract.
 
 Validate semantics/platforms/macros/consumers. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild in affected states; else PARTIAL/BLOCKED.
 

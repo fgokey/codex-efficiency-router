@@ -181,6 +181,8 @@ def inspect_execution(observations: object) -> dict:
                            or (truncation_known and event['truncated']))
         elif kind == 'progress':
             snapshot, action = event.get('snapshot'), event.get('action')
+            diagnostic = event.get('diagnostic_evidence')
+            diagnostic_known = diagnostic is None or (isinstance(diagnostic, str) and bool(diagnostic.strip()))
             # Only execution state and substantive result identity are comparable.
             # Commentary, repeated query/wait cursors and rewritten prompts are not progress.
             valid_snapshot = (isinstance(snapshot, dict) and set(snapshot) == {'state', 'result'}
@@ -188,13 +190,15 @@ def inspect_execution(observations: object) -> dict:
                               and isinstance(snapshot['result'], str))
             if not valid_snapshot or type(event.get('active')) is not bool or not isinstance(action, str):
                 backoff_missing = True; previous = saved_offset = None; delta_seen = False; continue
+            backoff_missing |= not diagnostic_known
             snapshot = (snapshot['state'], snapshot['result'])
             changed = previous is None or snapshot != previous
             unchanged = 0 if changed else unchanged + 1
             if changed: delta_seen = False
             wanted = progress_action(worker_active=event['active'], progress_changed=changed,
-                                     unchanged_polls=unchanged, tail_cursor_current=delta_seen)
-            backoff_bad |= action != wanted
+                                     unchanged_polls=unchanged, tail_cursor_current=delta_seen,
+                                     diagnostic_due=diagnostic is not None)
+            backoff_bad |= diagnostic_known and action != wanted
             if action == 'TAIL_DELTA':
                 if not isinstance(event.get('offset'), str) or not event['offset'] or saved_offset is None:
                     backoff_missing = True

@@ -184,10 +184,16 @@ class QualityProtocolTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 roundtrip_action(**{**batch, 'checks': checks})
 
-    def test_progress_waits_then_reads_one_delta_and_backs_off(self):
+    def test_progress_quiet_status_backs_off_and_diagnostic_evidence_permits_one_delta(self):
         common = {'worker_active': True, 'progress_changed': False}
         self.assertEqual(progress_action(**common, unchanged_polls=0, tail_cursor_current=False), 'WAIT_COMPACT')
-        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=False), 'TAIL_DELTA')
+        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=False), 'BACKOFF')
+        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=False,
+                                         diagnostic_due=True), 'TAIL_DELTA')
+        self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=True,
+                                         diagnostic_due=True), 'BACKOFF')
+        self.assertEqual(progress_action(**common, unchanged_polls=0, tail_cursor_current=False,
+                                         detail_due=True, diagnostic_due=True), 'COLLECT')
         self.assertEqual(progress_action(**common, unchanged_polls=2, tail_cursor_current=True), 'BACKOFF')
         self.assertEqual(progress_action(**common, unchanged_polls=3, tail_cursor_current=True), 'BACKOFF')
         self.assertEqual(progress_action(worker_active=True, progress_changed=True,

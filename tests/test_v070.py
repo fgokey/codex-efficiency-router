@@ -551,8 +551,20 @@ class CanaryV070(TempCase):
                 {'kind':'output','bytes':4094,'framing_bytes':2,'truncated':False}]
         events.extend({'kind':'progress','snapshot':{'state':'working','result':''},'active':True,'action':action,'offset':'saved-offset'}
                       for action in ('WAIT_COMPACT','WAIT_COMPACT','TAIL_DELTA','BACKOFF'))
+        events[-2]['diagnostic_evidence']='execution heartbeat missing; inspect saved delta'
         events[-1]['backoff']={'scope':'in-turn','mechanism':'wait','requested_seconds':30,'elapsed_seconds':30}
         return {'source':'operator-witnessed-native','expected':expected,'events':events}
+
+    def test_execution_quiet_status_needs_backoff_and_tail_needs_diagnostic_evidence(self):
+        data=self.execution_fixture()
+        data['events'][7].pop('diagnostic_evidence')
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'FAIL')
+        data['events'][7]['action']='BACKOFF'
+        data['events'][7]['backoff']=copy.deepcopy(data['events'][8]['backoff'])
+        self.assertEqual(canary.inspect_execution(data)['backoff'],'PASS')
+        for evidence in ('',True,{'reason':'claimed stall'}):
+            bad=copy.deepcopy(data);bad['events'][7]['diagnostic_evidence']=evidence
+            self.assertEqual(canary.inspect_execution(bad)['backoff'],'UNKNOWN')
 
     def test_execution_backoff_requires_effect_evidence(self):
         data=self.execution_fixture()
@@ -617,9 +629,11 @@ class CanaryV070(TempCase):
         changed=copy.deepcopy(data)
         changed['events'][7]['snapshot']['result']='validated-artifact-sha256'
         changed['events'][7]['action']='WAIT_COMPACT'
+        changed['events'][7].pop('diagnostic_evidence')
         changed['events']=changed['events'][:8]
         for action in ('WAIT_COMPACT','TAIL_DELTA','BACKOFF'):
             changed['events'].append({**copy.deepcopy(changed['events'][7]),'action':action})
+            if action=='TAIL_DELTA':changed['events'][-1]['diagnostic_evidence']='missing result evidence'
         changed['events'][-1]['backoff']={'scope':'in-turn','mechanism':'wait','requested_seconds':30,'elapsed_seconds':30}
         self.assertEqual(canary.inspect_execution(changed)['backoff'],'PASS')
 

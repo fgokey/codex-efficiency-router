@@ -172,17 +172,19 @@ def roundtrip_action(*, work_due: bool, checks: int, independent: bool,
 
 def progress_action(*, worker_active: bool, progress_changed: bool,
                     unchanged_polls: int, tail_cursor_current: bool,
-                    detail_due: bool = False) -> ProgressAction:
-    """After two unchanged snapshots, use one saved-offset delta then back off."""
-    for value in (worker_active, progress_changed, tail_cursor_current, detail_due):
+                    detail_due: bool = False, diagnostic_due: bool = False) -> ProgressAction:
+    """Quiet live status backs off; evidence of a diagnostic gap permits one delta."""
+    for value in (worker_active, progress_changed, tail_cursor_current, detail_due, diagnostic_due):
         flag(value)
     if type(unchanged_polls) is not int or unchanged_polls < 0:
         raise ValueError('unchanged polls must be a nonnegative integer')
     if detail_due or not worker_active:
         return 'COLLECT'
+    if diagnostic_due and not tail_cursor_current:
+        return 'TAIL_DELTA'
     if progress_changed or unchanged_polls < 2:
         return 'WAIT_COMPACT'
-    return 'BACKOFF' if tail_cursor_current else 'TAIL_DELTA'
+    return 'BACKOFF'
 
 
 def mutation_action(*, observed_model: str | None, read_only: bool, binding_match: bool,
