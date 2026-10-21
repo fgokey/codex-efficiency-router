@@ -17,7 +17,7 @@ Cheap local Q&A/status/low-risk: no children/references. Delegation always route
 
 ## Completion
 
-Requirements win. Read [quality.md](references/quality.md) before an active engineering parent final and for large evidence, semantic/lifecycle changes, failure or disputed validation.
+Requirements win. Read [quality.md](references/quality.md) before first worker wait/collection, before an active engineering parent final and for large evidence, semantic/lifecycle changes, failure or disputed validation.
 
 ## Routing
 
@@ -27,16 +27,16 @@ New engineering/readonly review: default Sol61/high; Astra: parent very-complex 
 
 ## Delegate
 
-Read [dispatch.md](references/dispatch.md) before delegation, binding or delivery review. Children start read-only; parent verifies/releases writes. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; native admission has no repair exceptions.
+Read [dispatch.md](references/dispatch.md) before delegation, binding or delivery review. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; native admission has no repair exceptions.
 
 ## Handoff
 
-Owned scope; dispatch acceptance.
+Scope.
 
 ## Recovery
 
-Use quality recovery.
+Quality.
 
 ## Context and reporting
 
-Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`. Disk is not live proof.
+Report once: `CER v<loaded/UNKNOWN> | <mode> | guard=<policy-only/guarded/live-verified> | policy=<loaded-hash/UNKNOWN>`.

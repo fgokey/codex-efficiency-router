@@ -2,6 +2,7 @@
 Not a claim that an untested Codex version loads/trusts/enforces the hook.
 """
 import json
+import hashlib
 from contextlib import contextmanager
 import base64
 import os
@@ -66,6 +67,211 @@ class NativeDispatchTests(unittest.TestCase):
             request['complexity_reason'] = 'Several competing lifecycle explanations remain unresolved'
         request.update(changes)
         return request
+
+    def test_execution_declaration_rejects_readonly_mutation_before_dispatch(self):
+        request = self.request()
+        work = request['message']
+        def declared(value):
+            request['message'] = self.reader['EXECUTION_PREFIX'] + json.dumps(value) + '\n' + work
+        execution = {'effects': ['read'], 'permission': 'read-only',
+                     'role_read_only': True, 'parent_released': False}
+        declared(execution)
+        self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'VERIFIED')
+        self.assertEqual(self.hook(text=self.text(request)), {})
+        receipt = self.reader['assignment_preflight'](request)['receipt']
+        self.assertEqual(set(receipt['admission']['signals']), {
+            'spec_complete', 'authority_ready', 'environment_ready', 'observability_ready'})
+        self.assertEqual(receipt['message_sha256'], hashlib.sha256(request['message'].encode()).hexdigest())
+        self.denied(self.hook(text=self.text(request).replace('read-only', 'full-access')))
+        for effects in (['write'], ['build'], ['test'], ['read', 'test']):
+            with self.subTest(effects=effects):
+                declared(dict(execution, effects=effects))
+                result = self.reader['assignment_preflight'](request)
+                self.assertEqual(result['status'], 'MISMATCH')
+                self.assertNotIn('dispatch_arguments', result)
+        writer = dict(execution, effects=['write', 'build', 'test'],
+                      permission='full-access', role_read_only=False, parent_released=True)
+        declared(writer)
+        self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'VERIFIED')
+        admitted = self.text(request)
+        self.assertEqual(self.hook(text=admitted), {})
+        header, body = admitted.split('\n', 1)
+        receipt = json.loads(header.removeprefix('CER assignment (caller evidence): '))
+        receipt['admission']['signals']['execution'] = writer
+        rejected = self.hook(text='CER assignment (caller evidence): ' + json.dumps(receipt) + '\n' + body)
+        self.denied(rejected)
+        self.assertIn('unsupported current admission signals', json.dumps(rejected))
+        declared(dict(writer, parent_released=False))
+        self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'UNKNOWN')
+        for bad in ({}, dict(execution, permission='UNKNOWN'), dict(execution, effects=[]),
+                    dict(execution, role_read_only='false'), dict(execution, effects=['unknown'])):
+            declared(bad)
+            self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'UNKNOWN')
+        declared(execution)
+        request['signals']['execution'] = execution
+        self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'MISMATCH')
+        request['signals'].pop('execution')
+        request['message'] = self.reader['EXECUTION_PREFIX'] + '{"effects":["read"],"effects":["write"]}\n' + work
+        self.assertEqual(self.reader['assignment_preflight'](request)['status'], 'UNKNOWN')
+
+    def test_packaged_javascript_adapter_runs_allowed_parent_path_with_lossless_pages(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable for offline functions.exec replay')
+        snapshots = []
+        for index in range(5):
+            snapshots.append({'timedOut': True, 'wake': None, 'polls': [{
+                'thread': {'id': 'worker', 'status': {'type': 'active'}},
+                'latestTurn': {'id': 't1', 'status': 'inProgress', 'error': None},
+                'cursor': f'cursor:{index}', 'revision': index, 'changed': True,
+                'latestAssistantMessage': {'id': f'm{index}', 'phase': 'commentary', 'text': 'progress'},
+                'latestToolMarker': {'id': f'exec:{index}', 'turnId': 't1', 'type': 'commandExecution',
+                                     'name': 'commandExecution', 'status': 'completed'}}]})
+        from copy import deepcopy
+        snapshots[2]['polls'][0]['latestAssistantMessage'] = deepcopy(snapshots[1]['polls'][0]['latestAssistantMessage'])
+        snapshots[2]['polls'][0]['latestToolMarker'] = deepcopy(snapshots[1]['polls'][0]['latestToolMarker'])
+        snapshots[3]['polls'][0]['latestToolMarker']['name'] = 'wait_threads'
+        failed = deepcopy(snapshots[-1]); failed['polls'][0]['latestToolMarker'].update(id='exec:failure-1', status='failed')
+        repeated_failure = deepcopy(failed); repeated_failure['polls'][0]['cursor'] = 'failure:repeat'
+        new_failure = deepcopy(failed); new_failure['polls'][0]['latestToolMarker']['id'] = 'exec:failure-2'
+        recovered = deepcopy(new_failure); recovered['polls'][0]['latestToolMarker']['status'] = 'completed'
+        new_turn = deepcopy(snapshots[-1]); new_turn['polls'][0]['latestTurn']['id'] = 't2'
+        error = deepcopy(new_turn); error['polls'][0]['latestTurn']['error'] = {'message': '错误' * 4000}
+        final = deepcopy(new_turn); final['polls'][0]['latestTurn']['status'] = 'completed'
+        final['polls'][0]['latestAssistantMessage'] = {'id': 'final', 'phase': 'final_answer', 'text': '证据😀' * 4000}
+        final['errors'] = [{'threadId': 'other', 'error': 'unavailable'}]
+        native_error = {'toolError': 'native wait unavailable: ' + '错误' * 2000}
+        schema_error = {'schemaError': {'unexpected': '保留原始结果'}}
+        snapshots.extend((failed, repeated_failure, new_failure, recovered, new_turn, error, final, native_error, schema_error))
+        script = r'''
+const fs=require('fs'), input=JSON.parse(fs.readFileSync(0,'utf8'));
+const run=new (Object.getPrototypeOf(async function(){}).constructor)('tools','targets','framingBytes','store','load','text',input.code);
+const pageRun=new (Object.getPrototypeOf(async function(){}).constructor)('framingBytes','store','load','text',input.page);
+(async()=>{
+const memory=new Map(), store=(k,v)=>memory.set(k,v), load=k=>memory.get(k), results=[];
+let calls=0,maxBytes=0,totalBytes=0,targets=[{threadId:'worker'}],pageCount=0,pendingRejected=0;
+for(const snapshot of input.snapshots){
+ let pages=[],last;
+ const text=p=>{const bytes=Buffer.byteLength(JSON.stringify(p))+2+64; if(bytes>4096)throw Error('outer overflow');maxBytes=Math.max(maxBytes,bytes);totalBytes+=bytes;pages.push(p);last=p;pageCount++;};
+ const original=snapshot.toolError ? {isError:true,content:[{type:'text',text:snapshot.toolError}]} : {content:[{type:'text',text:JSON.stringify(snapshot.schemaError||snapshot)}]};
+ const tools={mcp__codex_app__wait_threads:async args=>{calls++;if(args.timeoutMs!==50000)throw Error('wait bound');if(calls>1&&!args.targets[0].afterCursor)throw Error('cursor missing');return original;}};
+ await run(tools,targets,64,store,load,text);
+ const summary=last;let recovered=load('cerRaw');
+ if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('original result lost');
+ if(last.status==='PARTIAL'){
+  try{await run(tools,targets,64,store,load,text);throw Error('pending overwritten');}catch(e){if(e.message!=='pending page')throw e;pendingRejected++;}
+  pages=[];do{await pageRun(64,store,load,text);}while(last.next!==null);
+  let raw='',offset=0;for(const page of pages){if(page.offset!==offset)throw Error('page gap');raw+=page.data;offset+=page.data.length;}
+  recovered=JSON.parse(raw);if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('page evidence lost');
+ }
+ const decoded=recovered.isError?recovered:JSON.parse(recovered.content[0].text);
+ results.push({summary,decoded});if(snapshot.polls)targets=[{threadId:'worker',afterCursor:snapshot.polls[0].cursor}];
+}
+let rejected=false;try{await run({},undefined,undefined,store,load,()=>{});}catch(e){rejected=e.message==='unknown framing';}
+process.stdout.write(JSON.stringify({results,calls,maxBytes,totalBytes,pageCount,rejected,pendingRejected}));
+})().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
+'''
+        result = subprocess.run([node, '-e', script], input=json.dumps({
+            'code': self.reader['COORDINATION_JS'], 'page': self.reader['COORDINATION_PAGE_JS'], 'snapshots': snapshots}),
+            capture_output=True, text=True, encoding='utf-8', timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        observed = json.loads(result.stdout)
+        self.assertEqual(observed['calls'], len(snapshots))
+        self.assertLessEqual(observed['maxBytes'], 4096)
+        self.assertGreater(observed['pageCount'], len(snapshots))
+        self.assertTrue(observed['rejected'])
+        self.assertGreater(observed['pendingRejected'], 0)
+        rows = [item['summary']['polls'][0] for item in observed['results'][:10]]
+        self.assertEqual([row[8] for row in rows],
+                         [True, False, False, False, False, True, False, True, True, True])
+        self.assertTrue(all(row[4] == 'inProgress' for row in rows))
+        self.assertEqual(rows[5][6], failed['polls'][0]['latestToolMarker'])
+        self.assertEqual(rows[6][6], repeated_failure['polls'][0]['latestToolMarker'])
+        self.assertFalse(rows[6][8])
+        self.assertEqual(rows[7][6]['id'], 'exec:failure-2')
+        self.assertIsNone(rows[8][6])  # Recovery is actionable, ordinary completed tools are not.
+        self.assertIsNone(rows[2][6])
+        recovered = [item['decoded'] for item in observed['results']]
+        self.assertTrue(all(item['summary']['status'] == 'PARTIAL' for item in observed['results'][10:]))
+        self.assertEqual(recovered[10]['polls'][0]['latestTurn']['error'], error['polls'][0]['latestTurn']['error'])
+        self.assertEqual(recovered[11]['polls'][0]['latestAssistantMessage'], final['polls'][0]['latestAssistantMessage'])
+        self.assertEqual(recovered[11]['errors'], final['errors'])
+        self.assertEqual(recovered[11]['polls'][0]['latestTurn']['status'], 'completed')
+        self.assertTrue(recovered[12]['isError'])
+        self.assertEqual(recovered[12]['content'][0]['text'], native_error['toolError'])
+        self.assertEqual(recovered[13], schema_error['schemaError'])
+        self.assertEqual([row[9] for row in rows[:5]], ['progress'] * 5)
+        print('COORDINATION_OFFLINE ' + json.dumps({key: observed[key] for key in (
+            'calls', 'maxBytes', 'totalBytes', 'pageCount')}, separators=(',', ':')))
+
+    def test_paired_coordination_counts_generated_caller_and_complete_results(self):
+        import shutil
+        import subprocess
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('Node.js unavailable for offline functions.exec replay')
+        ids = ['01a15ba8-f763-72b3-b218-526613d9cc07', '01a15bb8-9042-75e0-ae01-0afa8df6a19c']
+        snapshots = []
+        for index in range(6):
+            polls = []
+            for worker, identifier in enumerate(ids):
+                final = index == 5
+                failed = index in (3, 4) and worker == 0
+                message_id = f'm-{worker}-{5 if final else 2 if index >= 2 else 0}'
+                polls.append({'schemaVersion': 1, 'cursor': f'replay-{worker}:{index}',
+                    'revision': 100 + index, 'changed': True,
+                    'thread': {'id': identifier, 'hostId': 'local', 'status': {'type': 'active', 'activeFlags': []}},
+                    'latestTurn': {'id': f'turn-{worker}', 'status': 'completed' if final else 'inProgress',
+                        'error': None, 'startedAt': 1792547117, 'completedAt': 1792548000 if final else None, 'durationMs': None},
+                    'latestAssistantMessageId': message_id,
+                    'latestAssistantMessage': {'id': message_id, 'turnId': f'turn-{worker}',
+                        'phase': 'final_answer' if final else 'commentary',
+                        'text': ('source.py:42; actual caller and test applicability checked; expected output matched. ' * 3)
+                            if final else ('定位到新证据，继续核对调用链。' if index >= 2 else '正在核查当前代码和已有验证。')},
+                    'latestToolMarkerId': 'failure' if failed else f'exec-{worker}',
+                    'latestToolMarker': {'id': 'failure' if failed else f'exec-{worker}', 'turnId': f'turn-{worker}',
+                        'type': 'commandExecution', 'name': 'commandExecution', 'status': 'failed' if failed else 'completed'}})
+            snapshots.append({'timedOut': index < 5, 'wake': None, 'polls': polls})
+        # Prior caller structure: V6 rollout line 131231 (2026-10-21 UTC).
+        # Same targets/snapshots/framing; source bytes include every generated caller,
+        # including on-demand paging, not just returned payloads. No token/billing claim.
+        script = r'''
+const input=JSON.parse(require('fs').readFileSync(0,'utf8')),Async=Object.getPrototypeOf(async function(){}).constructor;
+(async()=>{let all=[];
+for(const mode of ['prior','current']){let memory=new Map(),calls=0,codeBytes=0,returnedBytes=0,emits=0,targets=input.ids.map(threadId=>({threadId})),steps=[];
+for(const snapshot of input.snapshots){let chunks=[],last,before=codeBytes+returnedBytes;
+const text=v=>{returnedBytes+=Buffer.byteLength(typeof v==='string'?v:JSON.stringify(v))+66;emits++;chunks.push(v);last=v;};
+const original={content:[{type:'text',text:JSON.stringify(snapshot)}]};
+const tools={mcp__codex_app__wait_threads:async()=>{calls++;return original;}},store=(k,v)=>memory.set(k,v),load=k=>memory.get(k);
+let code=mode==='prior'?'let r=await tools.mcp__codex_app__wait_threads({targets:'+JSON.stringify(targets)+',timeoutMs:50000});for(let c of r.content||[])if(c.type==="text")text(c.text);\n':'const targets='+JSON.stringify(targets)+';const framingBytes=64;\n'+input.hot;
+codeBytes+=Buffer.byteLength(code);await new Async('tools','store','load','text',code)(tools,store,load,text);
+let got=mode==='prior'?JSON.parse(last):last,raw=false;
+if(mode==='current'&&last.status==='PARTIAL'){chunks=[];do{code='const framingBytes=64;\n'+input.page;codeBytes+=Buffer.byteLength(code);await new Async('tools','store','load','text',code)(tools,store,load,text);}while(last.next!==null);got=JSON.parse(JSON.parse(chunks.map(p=>p.data).join('')).content[0].text);raw=true;}
+if(mode==='current'&&JSON.stringify(load('cerRaw'))!==JSON.stringify(original))throw Error('original result lost');
+if(got.polls.length!==snapshot.polls.length)throw Error('worker lost');
+for(let j=0;j<got.polls.length;j++){let p=got.polls[j],q=snapshot.polls[j];if((mode==='current'&&!raw?p[1]:p.cursor)!==q.cursor)throw Error('cursor lost');
+if(mode==='current'&&!raw){if(p[4]!==q.latestTurn.status||p[3]!==q.latestTurn.id||JSON.stringify(p[5])!==JSON.stringify(q.latestTurn.error))throw Error('state/error lost');
+if(p[9]!==q.latestAssistantMessage.text)throw Error('message/final evidence lost');
+if(q.latestAssistantMessage.phase==='final_answer'&&p[7]!==q.latestAssistantMessage.id)throw Error('final identity lost');
+if(q.latestToolMarker.status==='failed'&&JSON.stringify(p[6])!==JSON.stringify(q.latestToolMarker))throw Error('failed marker lost');}}
+targets=snapshot.polls.map(p=>({threadId:p.thread.id,afterCursor:p.cursor}));steps.push(codeBytes+returnedBytes-before);}
+all.push({mode,calls,codeBytes,returnedBytes,emits,totalBytes:codeBytes+returnedBytes,waitingTotalBytes:steps.slice(0,-1).reduce((a,b)=>a+b,0),finalTotalBytes:steps.at(-1)});}
+process.stdout.write(JSON.stringify(all));})().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
+'''
+        result = subprocess.run([node, '-e', script], input=json.dumps({'ids': ids, 'snapshots': snapshots,
+            'hot': self.reader['COORDINATION_JS'], 'page': self.reader['COORDINATION_PAGE_JS']}),
+            capture_output=True, text=True, encoding='utf-8', timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        prior, current = json.loads(result.stdout)
+        self.assertEqual(prior['calls'], 6)
+        self.assertEqual(current['calls'], prior['calls'])
+        self.assertLess(current['totalBytes'], prior['totalBytes'])
+        self.assertLess(current['waitingTotalBytes'], prior['waitingTotalBytes'])
+        self.assertGreater(current['codeBytes'], 0)
+        self.assertGreater(current['returnedBytes'], 0)
+        print('COORDINATION_PAIRED_BYTES ' + json.dumps([prior, current], separators=(',', ':')))
 
     def text(self, request):
         result = self.reader['assignment_preflight'](request)

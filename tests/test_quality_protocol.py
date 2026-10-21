@@ -3,6 +3,7 @@ import sys
 import unittest
 import hashlib
 import tempfile
+import json
 from dataclasses import replace
 from itertools import product
 from pathlib import Path
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from quality_reference import (Contract, Evidence, Failure, FinalReview, Unit, completion, handoff,
                                mutation_action, patch_action, progress_action, read_action, retry,
                                roundtrip_action, resume, tool_action, validation_fingerprint, reuse_validation)
+import quality_reference as protocol
 
 
 class QualityProtocolTests(unittest.TestCase):
@@ -48,7 +50,9 @@ class QualityProtocolTests(unittest.TestCase):
         self.evidence = tuple(Evidence(item, 'PASS', 'r1', self.contract.state, 'command', 'Observed exit 0; expected output matched')
                               for item in self.contract.required)
         self.review = FinalReview('r1', self.contract.state, 'diff-sha256', 'diff-sha256',
-                                  self.contract.required)
+                                  self.contract.required, objective_reconciled=True,
+                                  applicable_requirements=self.contract.required,
+                                  disagreements_resolved=True, evidence_basis='source and real-caller validation reviewed')
         self.key = Unit('task-a', 'unit-1', 'observable-failure')
 
     def failure(self, worker='worker-1', approach='approach-1', kind='implementation', key=None):
@@ -56,6 +60,57 @@ class QualityProtocolTests(unittest.TestCase):
 
     def test_complete_current_required_evidence_passes(self):
         self.assertEqual(completion(self.contract, self.evidence, final_review=self.review).status, 'PASS')
+
+    def test_parent_acceptance_requires_substantive_assessment(self):
+        child_only = FinalReview('r1', self.contract.state, 'diff-sha256', 'diff-sha256',
+                                 self.contract.required)
+        self.assertEqual(completion(self.contract, self.evidence, final_review=child_only).status, 'PARTIAL')
+        reviewed = replace(child_only, objective_reconciled=True,
+                           applicable_requirements=self.contract.required,
+                           disagreements_resolved=True, evidence_basis='source.py:12; test.py:8: real caller exercised')
+        self.assertEqual(completion(self.contract, self.evidence, final_review=reviewed).status, 'PASS')
+        for changes in ({'objective_reconciled': False}, {'applicable_requirements': ('behavior',)},
+                        {'disagreements_resolved': False}, {'evidence_basis': ''},
+                        {'open_blocking_findings': ('required integration remains UNKNOWN',)}):
+            with self.subTest(changes=changes):
+                self.assertEqual(completion(self.contract, self.evidence,
+                                            final_review=replace(reviewed, **changes)).status, 'PARTIAL')
+
+    def test_coordination_compact_waits_preserve_errors_newturn_and_final(self):
+        old = {'threadId': 'worker', 'turnId': 't1', 'status': 'working', 'cursor': 'c1',
+               'pending': True, 'error': None, 'evidence': None}
+        unchanged = dict(old, cursor='c2', detail='full replay' * 10000)
+        page = json.loads(protocol.coordination_output((unchanged,), previous=(old,), framing_bytes=64))
+        self.assertEqual(page['workers'][0]['cursor'], 'c2')
+        self.assertFalse(page['workers'][0]['changed'])
+        self.assertFalse(page['workers'][0]['detail_due'])
+        self.assertNotIn('detail', page['workers'][0])
+        for changes in ({'turnId': 't2'}, {'error': 'build failed'},
+                        {'status': 'completed', 'pending': False, 'evidence': 'diff+checks-v2'},
+                        {'evidence': 'new diagnosis'}):
+            with self.subTest(changes=changes):
+                row = json.loads(protocol.coordination_output((dict(old, **changes),),
+                    previous=(old,), framing_bytes=64))['workers'][0]
+                self.assertTrue(row['changed'])
+                self.assertTrue(row['detail_due'])
+                for key, value in changes.items():
+                    self.assertEqual(row[key], value)
+                self.assertEqual(progress_action(worker_active=True, progress_changed=True,
+                    unchanged_polls=4, tail_cursor_current=True, detail_due=row['detail_due']), 'COLLECT')
+        self.assertEqual(progress_action(worker_active=True, progress_changed=False,
+            unchanged_polls=4, tail_cursor_current=True, detail_due=False), 'BACKOFF')
+
+    def test_coordination_aggregate_overflow_requires_pagination_not_truncation(self):
+        row = {'threadId': 'worker', 'turnId': 't1', 'status': 'error', 'cursor': 'c1',
+               'pending': False, 'error': '错误' * 2000, 'evidence': 'saved-error:1'}
+        original = dict(row)
+        with self.assertRaises(ValueError):
+            protocol.coordination_output((row,), framing_bytes=64)
+        self.assertEqual(row, original)
+        small = dict(row, error='failed; page saved-error:1')
+        result = protocol.coordination_output((small, dict(small, threadId='other')), framing_bytes=64)
+        self.assertLessEqual(len(result.encode('utf-8')) + 2 + 64, 4096)
+        self.assertEqual(len(json.loads(result)['workers']), 2)
 
     def test_read_shape_bounds_output_before_content(self):
         cases = (
@@ -239,7 +294,9 @@ class QualityProtocolTests(unittest.TestCase):
             Evidence('affected-states', 'PASS', contract.revision, contract.state, 'command',
                      'Caller-declared offline result: rebuild covered normal initialization and recovery'),
         )
-        review = FinalReview(contract.revision, contract.state, 'cache-diff', 'cache-diff', contract.required)
+        review = FinalReview(contract.revision, contract.state, 'cache-diff', 'cache-diff', contract.required,
+                             objective_reconciled=True, applicable_requirements=contract.required,
+                             disagreements_resolved=True, evidence_basis='derived cache release and rebuild tests reviewed')
         self.assertEqual(completion(contract, evidence, final_review=review).status, 'PASS')
 
     def test_open_semantic_gap_blocks_declared_completion(self):

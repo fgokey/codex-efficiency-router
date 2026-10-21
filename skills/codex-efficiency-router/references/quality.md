@@ -14,20 +14,22 @@ Existing authority/scope only; no automatic monitoring, risky measurement/deploy
 
 Files/rules: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Code: `locate --query Q` -> current located lines: `excerpt --start N --lines N` (count 1..200). Fix limits/page/locate errors.
 
-Checks: one Reader `batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N`. Member caps share the budget; one results JSON; keep each cursor; no early member output. ERROR/PARTIAL/cursors: retain successful results, retry only failed/pending items; disclose gaps. Other: capture/select/serialize/count before emit. Commentary/queries/waits/prompt rewrites do not reset backoff. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change. No doc/hook preload or child router copy. Reconcile requested/observed/unknown effects before replay. Never invent identity/savings/enforcement/cleanup.
+Checks: one Reader `batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N`; one results JSON; keep each cursor; no early member output. ERROR/PARTIAL: retain successful results; retry failed/pending only; disclose gaps. Other: capture/select/serialize/count before emit. No doc/hook preload or child router copy. Never invent identity/savings/enforcement/cleanup.
+
+Workers: compact waits; details at actionable change/completion/error. Use cursors; `changed/revision` includes commentary/tools. Merge reports; retain required liveness/progress/errors. Commentary/queries/waits/prompt rewrites do not reset backoff. Two unchanged snapshots: one saved-offset delta then back off; no repeat tails/polls/nudges until change.
+
+`COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors.
 
 Validate semantics/platforms/macros/consumers. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild in affected states; else PARTIAL/BLOCKED.
 
-Exhaustion stops blind edits, not diagnosis. Patch mismatch: inspect context/encoding/line endings; repair once, stop repeats. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction; exhaustion needs diagnosis/justified absolute ceiling.
+Exhaustion stops blind edits, not diagnosis. Patch mismatch: inspect context/encoding/line endings; repair once. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction; exhaustion needs diagnosis/ceiling.
 
 New tests != independent proof. Never weaken assertions. Unrun: UNKNOWN; required gaps: PARTIAL/BLOCKED.
 
 Contract: requirement/check/state/PASS/FAIL/UNKNOWN. Findings cite before/after or requirement violation; label hypotheses. P1/P2: HEAD/line endings/callee/gray path; separate preexisting defects. Callback/gray/static score cannot prove event loss safe. Keep preexisting hazards open; unchanged baseline != diff.
 
-Red/green: production, exact extraction + named stubs, or handwritten MODEL. Need text identity/full affected baseline; half-old/claimed extraction or whole-project stubs only illustrate.
+Parent: original code/evidence/test applicability, disagreements, original objective/open work; accept delivery once stable. Reread changed/failed only. Independent review/child PASS cannot substitute. `completion_check`: begin before append; reconcile before check.
 
-`quality_reference.reuse_validation`: repo/commit, file/dependency hashes, command/scope/environment, PASS receipt. Change/unknown revalidates; commit-only: unaffected scope. Supplied, not authenticated/cached.
+Red/green: production, exact extraction + named stubs, or handwritten MODEL. Require text identity/full affected baseline; half-old/claimed extraction/whole-project stubs only illustrate.
 
-Checkpoint state/work/workers/failures/pairs/ceiling. Workers: compact waits; details at actionable change/completion/error.
-
-Standalone status/check: one-shot; explicit watch: compact state/cadence; stop on cancel. BACKOFF: in-turn wait; heartbeat: defer schedule or pause, never skipped wakeups. Heartbeat: parent model/effort cost; child cost != task cost. Calls, uncached input/output/checks; cached input separate. Usage/prices UNKNOWN; no paid probes/polls. Run required checks once after final changes stabilize; repeat changed/failed. Router ROOT dev only: `ROOT/scripts/doctor.py --source-tree ROOT --preflight`.
+Standalone status/check: one-shot; explicit watch: compact state/cadence; stop on cancel. BACKOFF: in-turn wait; heartbeat: defer schedule or pause, never skipped wakeups. Child cost != task cost; cached input separate; usage/prices UNKNOWN. Run required checks once after final changes stabilize; repeat changed/failed. Router ROOT dev only: `ROOT/scripts/doctor.py --source-tree ROOT --preflight`.

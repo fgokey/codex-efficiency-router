@@ -33,6 +33,39 @@ OPS = frozenset(('read', 'list', 'search', 'diff', 'status', 'index', 'page', 'e
 LEGACY_OPS = frozenset(('read', 'list', 'search', 'diff', 'status'))
 PAGE_BYTES = 4096
 EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
+# Copy the hot wait block into functions.exec; supply targets/framingBytes, no Python.
+# Rows: id,cursor,threadStatus,turnId,turnStatus,error,failedMarker,finalMessageId,changed,messageText.
+# Raw MCP results stay in cerRaw. On overflow/schema failure use COORDINATION_PAGE_JS;
+# drain its next offsets before another wait. Stored values are data, never executable code.
+COORDINATION_JS = r'''
+if(!Number.isInteger(framingBytes)||framingBytes<0||framingBytes>3900)throw Error("unknown framing");
+if(load("cerPending"))throw Error("pending page");
+const r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});store("cerRaw",r);store("cerPending",true);
+let s;try{s=JSON.parse(r.content.find(c=>c.type==="text").text);let old=load("cerWait")||{};
+s.polls=s.polls.map(p=>{
+let t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;
+let a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,m?.phase==="final_answer"?m.id:null];
+let k=JSON.stringify(a),changed=old[p.thread.id]!==k;old[p.thread.id]=k;
+return [p.thread.id,p.cursor,...a,changed,m?.text];
+});store("cerWait",old);}catch{s=null;}
+if(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096){store("cerPending",false);text(s);}
+else text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});
+'''
+
+# Explicit data pagination only, also recovers the original result after schema errors.
+COORDINATION_PAGE_JS = r'''
+if(!Number.isInteger(framingBytes)||framingBytes<0)throw Error("unknown framing");
+let raw=load("cerPage"),offset=load("cerOffset")||0;
+if(!raw){raw=JSON.stringify(load("cerRaw"));if(!raw)throw Error("missing snapshot");offset=0;store("cerPage",raw);store("cerPending",true);}
+let end=raw.length,page;
+while(true){
+page={status:end<raw.length?"PARTIAL":"PASS",offset,next:end<raw.length?end:null,data:raw.slice(offset,end)};
+if(encodeURIComponent(JSON.stringify(page)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096)break;
+if(end<=offset)throw Error("framing exceeds page budget");end=offset+Math.floor((end-offset)/2);
+}
+store("cerOffset",end);if(end===raw.length){store("cerPage",null);store("cerPending",false);}text(page);
+'''
+
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
   batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N
     Independent requests; full path/schema preflight before capture, one JSON results envelope.
@@ -947,7 +980,16 @@ Native dispatch mode (independent trusted registration):
   signals plus very_complex=true, complexity_reason, and sol61_unsuitable_reason as above.
   Check VERIFIED/exit 0, then send prefix + that exact HOLD as the spawn message.
   Requested spawn parameters are not an actual binding; verify host identity before work.
+  Current callers prepend this exact line to the checked work message (not signals):
+  CER execution (caller evidence): {"effects":["read"],"permission":"read-only","role_read_only":true,"parent_released":false}
+  Check permission/role against current host binding; writes/build/tests require writable
+  permission, a non-readonly role and parent release. Declarations grant no authority.
+  Existing message_sha256 binds the complete declaration/work body; scope_sha256 binds
+  its admitted scope. Keep the existing readiness signals unchanged; no new envelope fields.
+  Legacy envelopes remain compatible; install validator/rules together, never live-edit guards.
 '''
+
+EXECUTION_PREFIX = 'CER execution (caller evidence): '
 
 
 def assignment_policy_sha256(skill_root: Path | None = None) -> str:
@@ -1005,6 +1047,28 @@ def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
     return result
 
 
+def execution_admission(execution: object, model: str) -> str:
+    """Check caller-declared effects/permissions; never authenticate or grant authority."""
+    if not isinstance(execution, dict) or set(execution) != {
+            'effects', 'permission', 'role_read_only', 'parent_released'}:
+        return 'UNKNOWN'
+    effects = execution['effects']
+    if (not isinstance(effects, list) or not effects
+            or any(not isinstance(item, str) or item not in ('read', 'write', 'build', 'test') for item in effects)
+            or len(set(effects)) != len(effects)
+            or execution['permission'] not in ('read-only', 'workspace-write', 'full-access')
+            or type(execution['role_read_only']) is not bool
+            or type(execution['parent_released']) is not bool):
+        return 'UNKNOWN'
+    if set(effects) != {'read'}:
+        if (model == 'gpt-6-astra' or execution['role_read_only']
+                or execution['permission'] == 'read-only'):
+            return 'MISMATCH'
+        if not execution['parent_released']:
+            return 'UNKNOWN'
+    return 'VERIFIED'
+
+
 def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> dict:
     """Installed pre-dispatch entry; never authenticates supplied recipient evidence."""
     if not isinstance(request, dict):
@@ -1029,6 +1093,24 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
     if boundary['status'] not in ('READY', 'VERIFIED'):
         return result
     signals = request.get('signals', {})
+    # The current native guard rejects additional signals. Bind capability metadata
+    # to the existing checked message body instead; never broaden its allowlist.
+    if 'execution' in signals:
+        result['status'] = 'MISMATCH'
+        return result
+    # Legacy bodies keep their admitted authority; current guidance requires the
+    # declaration for new work. This is caller evidence, not host authentication.
+    if message.startswith(EXECUTION_PREFIX):
+        header, separator, work = message.partition('\n')
+        try:
+            declaration = json.loads(header[len(EXECUTION_PREFIX):], object_pairs_hook=unique,
+                                     parse_constant=reject_constant)
+        except (ValueError, TypeError):
+            declaration = None
+        execution = execution_admission(declaration, receiver['model']) if separator and work.strip() else 'UNKNOWN'
+        if execution != 'VERIFIED':
+            result['status'] = execution
+            return result
     if boundary['status'] == 'READY':
         model, effort = receiver['model'], receiver['effort']
         prerequisites = ('spec_complete', 'authority_ready', 'environment_ready', 'observability_ready')

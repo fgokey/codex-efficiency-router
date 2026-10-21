@@ -54,6 +54,40 @@ def bounded_output(value: object, *, framing_bytes: int, max_bytes: int = 4096) 
     return output
 
 
+def coordination_output(workers: tuple[dict, ...], *, previous: tuple[dict, ...] = (),
+                        framing_bytes: int, max_bytes: int = 4096) -> str:
+    """Offline projection of caller-normalized results, not a live polling adapter."""
+    fields = ('threadId', 'turnId', 'status', 'cursor', 'pending', 'error', 'evidence')
+    def indexed(rows):
+        if not isinstance(rows, tuple):
+            raise ValueError('worker snapshots must be tuples')
+        result = {}
+        for row in rows:
+            if not isinstance(row, dict) or any(key not in row for key in fields):
+                raise ValueError('complete worker status/error/cursor/pending/evidence required')
+            for key in ('threadId', 'status'):
+                text(row[key], key)
+            for key in ('turnId', 'cursor', 'error', 'evidence'):
+                if row[key] is not None and not isinstance(row[key], str):
+                    raise ValueError(f'{key} must be text or None')
+            flag(row['pending'])
+            if row['threadId'] in result:
+                raise ValueError('duplicate worker identity')
+            result[row['threadId']] = row
+        return result
+    old, current = indexed(previous), indexed(workers)
+    selected = []
+    for identifier, row in current.items():
+        prior = old.get(identifier)
+        changed = prior is None or any(row[key] != prior[key]
+            for key in ('turnId', 'status', 'pending', 'error', 'evidence'))
+        detail_due = changed and (prior is not None or row['error'] is not None
+                                  or row['evidence'] is not None or not row['pending'])
+        selected.append(dict((key, row[key]) for key in fields) |
+                        {'changed': changed, 'detail_due': detail_due})
+    return bounded_output({'workers': selected}, framing_bytes=framing_bytes, max_bytes=max_bytes)
+
+
 def read_action(*, mandatory_full: bool, size_known: bool, aggregate_fits: bool,
                 members_bounded: bool, truncated: bool = False,
                 continuation_known: bool = False) -> ReadAction:
@@ -137,13 +171,14 @@ def roundtrip_action(*, work_due: bool, checks: int, independent: bool,
 
 
 def progress_action(*, worker_active: bool, progress_changed: bool,
-                    unchanged_polls: int, tail_cursor_current: bool) -> ProgressAction:
+                    unchanged_polls: int, tail_cursor_current: bool,
+                    detail_due: bool = False) -> ProgressAction:
     """After two unchanged snapshots, use one saved-offset delta then back off."""
-    for value in (worker_active, progress_changed, tail_cursor_current):
+    for value in (worker_active, progress_changed, tail_cursor_current, detail_due):
         flag(value)
     if type(unchanged_polls) is not int or unchanged_polls < 0:
         raise ValueError('unchanged polls must be a nonnegative integer')
-    if not worker_active:
+    if detail_due or not worker_active:
         return 'COLLECT'
     if progress_changed or unchanged_polls < 2:
         return 'WAIT_COMPACT'
@@ -245,8 +280,16 @@ class FinalReview:
     reviewed_diff: str
     validated_requirements: tuple[str, ...]
     open_blocking_findings: tuple[str, ...] = ()
+    objective_reconciled: bool = False
+    applicable_requirements: tuple[str, ...] = ()
+    disagreements_resolved: bool = False
+    evidence_basis: str = ''
 
     def validate(self) -> None:
+        flag(self.objective_reconciled)
+        flag(self.disagreements_resolved)
+        if not isinstance(self.evidence_basis, str):
+            raise ValueError('parent evidence basis must be text')
         for value, field in ((self.contract_revision, 'review contract'), (self.state, 'review state'),
                              (self.delivered_diff, 'delivered diff'), (self.reviewed_diff, 'reviewed diff')):
             text(value, field)
@@ -258,6 +301,10 @@ class FinalReview:
                 or any(not isinstance(item, str) or not item.strip()
                        for item in self.open_blocking_findings)):
             raise ValueError('open blocking findings must be nonempty text records')
+        if (not isinstance(self.applicable_requirements, tuple)
+                or any(not isinstance(item, str) or not item.strip() for item in self.applicable_requirements)
+                or len(set(self.applicable_requirements)) != len(self.applicable_requirements)):
+            raise ValueError('applicable requirements must be unique nonempty IDs')
 
 
 def completion(contract: Contract, evidence: tuple[Evidence, ...], *,
@@ -302,6 +349,14 @@ def completion(contract: Contract, evidence: tuple[Evidence, ...], *,
             gaps.append('parent did not review all required validation evidence')
         if final_review.open_blocking_findings:
             gaps.append('parent review has open blocking findings')
+        if not final_review.objective_reconciled:
+            gaps.append('parent has not reconciled original objective and remaining required work')
+        if set(final_review.applicable_requirements) != set(contract.required):
+            gaps.append('parent has not examined code/evidence and test applicability for every requirement')
+        if not final_review.disagreements_resolved:
+            gaps.append('parent has not resolved review disagreements')
+        if not final_review.evidence_basis.strip():
+            gaps.append('parent evidence basis missing; child PASS is not parent acceptance')
     if blocked:
         gaps.append('blocking finding or prerequisite remains')
         return Completion('BLOCKED', tuple(gaps))

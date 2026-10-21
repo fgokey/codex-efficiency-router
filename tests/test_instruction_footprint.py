@@ -239,6 +239,19 @@ class InstructionFootprintTests(unittest.TestCase):
                        'accepts integration'):
             self.assertIn(phrase, text)
 
+    def test_coordination_and_acceptance_enter_before_waits_without_python_parent(self):
+        core = SKILL.read_text(encoding='utf-8')
+        quality = (SKILL.parent / 'references/quality.md').read_text(encoding='utf-8')
+        dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
+        self.assertIn('before first worker wait/collection', core)
+        for phrase in ('COORDINATION_JS', 'installed `scripts/readonly_reader.py`',
+                       'Astra `functions.exec`', 'no Python/shell', 'drain/reuse cursors',
+                       'completion_check', 'begin before append',
+                       'original code/evidence/test applicability', 'Independent review/child PASS cannot substitute'):
+            self.assertIn(phrase, quality)
+        for phrase in ('checked-body `CER execution`', 'unchanged signals', 'role_read_only', 'parent_released', 'legacy compatible'):
+            self.assertIn(phrase, dispatch)
+
 
 if __name__ == '__main__':
     unittest.main()
