@@ -171,16 +171,24 @@ class InstructionFootprintTests(unittest.TestCase):
                        'No full-file slicing/merging pages/files',
                        'JSON+CRLF+framing <=4KiB',
                        'capture/select/serialize/count before emit',
-                       'one results JSON', 'keep each cursor', 'no early member output',
+                       'aggregate JSON', 'keep each cursor', 'no early member output',
                        'batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N',
                        'retain successful results', 'disclose gaps'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            phrases = ('Given Python -I -B <reader>', 'page files',
-                       'excerpt located lines (count 1..200)', 'Check exit before JSON',
-                       'One page, no full-file slicing/merging',
-                       'other totals <outer incl framing')
+            if name == 'astra-architect.toml':
+                phrases = ('Given Python -I -B <reader>', 'page files',
+                           'excerpt located lines (count 1..200)', 'Check exit before JSON',
+                           'One page, no full-file slicing/merging',
+                           'other totals <outer incl framing')
+            else:
+                # Upgrade the ambiguous one-file routing assertion; retain every read boundary.
+                phrases = ('reuse loaded unchanged, else full',
+                           'Python -I -B <reader>', 'batch fitting independent reads',
+                           'known-small first', '1..200-line located excerpts',
+                           'Check exit before JSON', 'keep each cursor/status/error',
+                           'aggregate+framing<=4KiB', 'no full-file slicing/merging')
             for phrase in phrases:
                 self.assertIn(phrase, role, name)
 
@@ -197,7 +205,7 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('assignment --help', dispatch)
         self.assertIn('Verify script paths before use', dispatch)
         self.assertNotIn('Run dispatch preflight.', dispatch)
-        self.assertIn('Checks: one Reader `batch', contract_text())
+        self.assertIn('Reads/checks: Reader `batch', contract_text())
         self.assertIn('Router ROOT dev only:', contract_text())
         self.assertIn('ROOT/scripts/doctor.py --source-tree ROOT --preflight', contract_text())
         from manage import source_files

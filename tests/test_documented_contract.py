@@ -198,6 +198,14 @@ class DocumentedContractTests(unittest.TestCase):
         self.assertIn('Read dispatch before writes', core)
         self.assertIn('before delegation, binding or delivery review', core)
 
+    def test_first_authorized_assignment_contains_the_current_unit_release(self):
+        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
+        for phrase in ('first authorized assign checked body',
+                       'RELEASE current unit', 'host-observed model/effort/role/permission/owner',
+                       'UNKNOWN/MISMATCH blocks writes', 'Read-only leaves/cer-read only read',
+                       'Binary copy/runtime config/deploy/destructive recovery: separate authority'):
+            self.assertIn(phrase, dispatch)
+
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
         import inspect
