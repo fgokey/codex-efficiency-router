@@ -16,7 +16,7 @@ Files/rules: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to n
 
 Checks: one Reader `batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N`; one results JSON; keep each cursor; no early member output. ERROR/PARTIAL: retain successful results; retry failed/pending only; disclose gaps. Other: capture/select/serialize/count before emit. No doc/hook preload or child router copy. Never invent identity/savings/enforcement/cleanup.
 
-Workers: compact waits; details at actionable change/completion/error. Parent work first. Merge <=8 targets; retain cursors/liveness/progress/errors. Commentary/tools/queries/waits/rewrites keep backoff. Two unchanged snapshots: back off; one saved-offset delta for diagnostic evidence; no repeat tails/polls/nudges until change.
+Workers: compact waits; details at actionable change/completion/error. Before passive wait: readiness (effort), then available parent review/integration. Merge <=8 targets; retain cursors/liveness/progress/errors. Commentary/tools/queries/waits/rewrites keep backoff. Two unchanged snapshots: back off; one saved-offset delta for diagnostic evidence; no repeat tails/polls/nudges until change.
 
 `COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors. `parentReady`: caller contract.
 
@@ -28,8 +28,8 @@ New tests != independent proof. Never weaken assertions. Unrun: UNKNOWN; require
 
 Contract: requirement/check/state/PASS/FAIL/UNKNOWN. Findings cite before/after or requirement violation; label hypotheses. P1/P2: HEAD/line endings/callee/gray path; separate preexisting defects. Callback/gray/static score cannot prove event loss safe. Keep preexisting hazards open; unchanged baseline != diff.
 
-Parent: original code/evidence/test applicability, disagreements, original objective/open work; accept delivery once stable. Reread changed/failed only. Independent review/child PASS cannot substitute. `completion_check`: begin before append; reconcile before check.
+Parent: original code/evidence/test applicability, disagreements, objective/open work. Reread changed/failed only. Independent review/child PASS cannot substitute. `completion_check`: begin before append; reconcile before check.
 
-Red/green: production, exact extraction + named stubs, or handwritten MODEL. Require text identity/full affected baseline; half-old/claimed extraction/whole-project stubs only illustrate.
+Red/green: production, exact extraction + named stubs, or handwritten MODEL. Text identity/full affected baseline required; half-old/claimed extraction/whole-project stubs only illustrate.
 
 Standalone status/check: one-shot; explicit watch: compact state/cadence; stop on cancel. BACKOFF: in-turn wait; heartbeat: defer schedule or pause, never skipped wakeups. Child cost != task cost; cached input separate; usage/prices UNKNOWN. Run required checks once after final changes stabilize; repeat changed/failed. Router ROOT dev only: `ROOT/scripts/doctor.py --source-tree ROOT --preflight`.

@@ -16,6 +16,42 @@ import quality_reference as protocol
 
 
 class QualityProtocolTests(unittest.TestCase):
+    def test_ready_work_dispatch_respects_value_conflicts_and_global_capacity(self):
+        # Declared offline scenarios; no claim about live dispatch, tokens or elapsed time.
+        common = dict(local_sufficient=False, ready_units=2, independent=True,
+                      net_benefit=True, active_writers=0, free_slots=3)
+        cases = (
+            ('tiny status read with current tools', dict(local_sufficient=True), 0),
+            ('one coupled unit', dict(ready_units=1, independent=False), 1),
+            ('two substantial disjoint units', {}, 2),
+            ('overlapping writes or dependencies', dict(independent=False), 1),
+            ('conflict with active owner', dict(independent=False, active_writers=1), 0),
+            ('one newly-ready unit beside active writer', dict(active_writers=1, ready_units=1), 1),
+            ('two writers already active', dict(active_writers=2), 0),
+            ('one global slot left', dict(free_slots=1), 1),
+            ('no global slots', dict(free_slots=0), 0),
+            ('split has no net value', dict(net_benefit=False), 0),
+            ('no ready work', dict(ready_units=0), 0),
+        )
+        for name, changes, expected in cases:
+            with self.subTest(name=name):
+                self.assertEqual(protocol.dispatch_count(**(common | changes)), expected)
+        for field in ('ready_units', 'active_writers', 'free_slots'):
+            for invalid in (-1, True, None):
+                with self.subTest(field=field, invalid=invalid):
+                    with self.assertRaises(ValueError):
+                        protocol.dispatch_count(**(common | {field: invalid}))
+
+    def test_available_parent_review_precedes_wait_and_quiet_work_keeps_backoff(self):
+        common = dict(worker_active=True, progress_changed=False, unchanged_polls=4,
+                      tail_cursor_current=True)
+        self.assertEqual(progress_action(**common, parent_work_due=True), 'PARENT_WORK')
+        self.assertEqual(progress_action(**common, detail_due=True, parent_work_due=True), 'COLLECT')
+        self.assertEqual(progress_action(**(common | {'worker_active': False}),
+                                         parent_work_due=True), 'COLLECT')
+        self.assertEqual(progress_action(**common), 'BACKOFF')
+        self.assertEqual(progress_action(**(common | {'unchanged_polls': 0})), 'WAIT_COMPACT')
+
     def test_validation_reuse_binds_actual_file_dependency_command_scope_and_environment(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);source=root/'source.py';dependency=root/'dependency.txt'

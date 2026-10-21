@@ -16,7 +16,7 @@ Status = Literal['PASS', 'PARTIAL', 'BLOCKED']
 ReadAction = Literal['INDEX', 'BATCH', 'RANGE', 'RESUME', 'LOCATE_GAP']
 ToolAction = Literal['REUSE', 'DISCOVER']
 RoundtripAction = Literal['DEFER', 'BATCH', 'SINGLE']
-ProgressAction = Literal['COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
+ProgressAction = Literal['PARENT_WORK', 'COLLECT', 'WAIT_COMPACT', 'TAIL_DELTA', 'BACKOFF']
 MutationAction = Literal['ADMIT', 'REROUTE', 'DECOMPOSE', 'BLOCKED']
 PatchAction = Literal['INSPECT', 'REPAIR', 'DIAGNOSE']
 MUTATION_CLASSES = frozenset(('implementation', 'build_config', 'format', 'targeted_test',
@@ -170,16 +170,36 @@ def roundtrip_action(*, work_due: bool, checks: int, independent: bool,
     return 'BATCH' if checks > 1 and independent and known_small and aggregate_fits else 'SINGLE'
 
 
+def dispatch_count(*, local_sufficient: bool, ready_units: int, independent: bool,
+                   net_benefit: bool, active_writers: int, free_slots: int) -> int:
+    """Offline caller-declared ready-work example, not a live scheduler/admission gate."""
+    for value in (local_sufficient, independent, net_benefit):
+        flag(value)
+    for value in (ready_units, active_writers, free_slots):
+        if type(value) is not int or value < 0:
+            raise ValueError('unit/writer/slot counts must be nonnegative integers')
+    if local_sufficient or not net_benefit:
+        return 0
+    available = min(free_slots, max(0, 2 - active_writers))
+    if not independent:
+        return min(ready_units, available, int(active_writers == 0))
+    return min(ready_units, available)
+
+
 def progress_action(*, worker_active: bool, progress_changed: bool,
                     unchanged_polls: int, tail_cursor_current: bool,
-                    detail_due: bool = False, diagnostic_due: bool = False) -> ProgressAction:
-    """Quiet live status backs off; evidence of a diagnostic gap permits one delta."""
-    for value in (worker_active, progress_changed, tail_cursor_current, detail_due, diagnostic_due):
+                    detail_due: bool = False, diagnostic_due: bool = False,
+                    parent_work_due: bool = False) -> ProgressAction:
+    """Parent work precedes passive polling; quiet status backs off, diagnostics get one delta."""
+    for value in (worker_active, progress_changed, tail_cursor_current, detail_due,
+                  diagnostic_due, parent_work_due):
         flag(value)
     if type(unchanged_polls) is not int or unchanged_polls < 0:
         raise ValueError('unchanged polls must be a nonnegative integer')
     if detail_due or not worker_active:
         return 'COLLECT'
+    if parent_work_due:
+        return 'PARENT_WORK'
     if diagnostic_due and not tail_cursor_current:
         return 'TAIL_DELTA'
     if progress_changed or unchanged_polls < 2:

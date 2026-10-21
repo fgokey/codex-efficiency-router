@@ -23,7 +23,7 @@ Requirements win. Read [quality.md](references/quality.md) before first worker w
 
 Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
 
-New engineering/readonly review: default Sol61/high; Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
+Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
 
 ## Delegate
 
@@ -31,11 +31,7 @@ Read [dispatch.md](references/dispatch.md) before delegation, binding or deliver
 
 ## Handoff
 
-Scope.
-
 ## Recovery
-
-Quality.
 
 ## Context and reporting
 
