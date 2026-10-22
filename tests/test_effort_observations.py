@@ -32,7 +32,7 @@ class EffortObservationTests(unittest.TestCase):
 
     def test_new_verified_or_unknown_identity_cannot_erase_affected_work(self):
         for effort in ('high',None):
-            c=record_observation(self.mismatch(),C('sol','high'),'gpt-6-sol',effort)
+            c=record_observation(self.mismatch(),C('sol','high'),'gpt-6.1-sol',effort)
             self.assertEqual(plan(S(),c,ADAPTIVE).action,'prerequisite')
             self.assertEqual(c.observation_review,'pending')
 
@@ -48,7 +48,7 @@ class EffortObservationTests(unittest.TestCase):
         scope=WriteScope('unit-a',True,True,True,local_owner=True,astra_write=proof)
         for c in (replace(self.mismatch(),operation='local_patch',write_scope=scope),
                   replace(self.mismatch(),operation='mutation',write_scope=replace(scope,local_owner=False,
-                          writers=(Writer('old','unit-a','gpt-5.6-sol','idle',effort='high'),))),
+                          writers=(Writer('old','unit-a','gpt-6.1-sol','idle',effort='high'),))),
                   replace(self.mismatch(),host_supports_routing=False),
                   replace(self.mismatch(),diagnosis_only=True)):
             self.assertEqual(plan(S(no_subagents=True),c,ADAPTIVE).action,'prerequisite')
@@ -93,10 +93,10 @@ class EffortObservationTests(unittest.TestCase):
 
     def test_legacy_mismatch_state_cannot_be_overwritten_without_review(self):
         c=context(last_observation='MISMATCH')
-        next_c=record_observation(c,C('sol','high','gpt-6-sol'),'gpt-6-sol','high')
+        next_c=record_observation(c,C('sol','high','gpt-6.1-sol'),'gpt-6.1-sol','high')
         self.assertEqual(plan(S(),next_c,ADAPTIVE).action,'prerequisite')
         resolved=self.resolve(c)
-        later=record_observation(resolved,C('sol','high','gpt-6-sol'),'gpt-6-sol','high')
+        later=record_observation(resolved,C('sol','high','gpt-6.1-sol'),'gpt-6.1-sol','high')
         self.assertTrue(later.automatic_low_suspended)
         self.assertEqual(later.observation_review,'resolved')
 

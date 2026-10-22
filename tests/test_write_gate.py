@@ -132,7 +132,7 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual(before_action('mutation','gpt-6-astra',scope(writers=ws),host_supports_routing=True).action,'defer')
 
     def test_reuse_compatible_idle_owner_without_extra_slot(self):
-        ws=(Writer('classification_fix','unit-a','gpt-5.6-sol','idle'),)
+        ws=(Writer('classification_fix','unit-a','gpt-6.1-sol','idle'),)
         d=before_action('mutation','gpt-6-astra',scope(writers=ws),host_supports_routing=True)
         self.assertEqual((d.action,d.owner),('reuse','classification_fix'))
 
@@ -192,7 +192,6 @@ class WriteGateTests(unittest.TestCase):
     def test_exception_unit_allows_multiple_patches_but_not_unbounded_repairs(self):
         c=host(operation='local_patch',write_scope=scope(local_owner=True,astra_write=astra_write()),
                repair_extension_reason='parent: new diagnosis',repair_attempt_limit=3)
-        # Implementation and test patches in one attempt do not consume another unit.
         for _ in range(2):
             self.assertEqual(plan(S(failed_attempts=2),c).action,'local')
         self.assertEqual(plan(S(failed_attempts=3),c).action,'blocked')
@@ -201,7 +200,7 @@ class WriteGateTests(unittest.TestCase):
         self.assertNotEqual(plan(S(failed_attempts=2),replace(c,write_scope=completed)).action,'local')
 
     def test_reuse_preserves_prerequisites_boundary_and_effort_floor(self):
-        c=host(write_scope=scope(writers=(Writer('old','unit-a','gpt-5.6-sol','idle',effort='medium'),)))
+        c=host(write_scope=scope(writers=(Writer('old','unit-a','gpt-6.1-sol','idle',effort='medium'),)))
         self.assertEqual(plan(S(),c).action,'reuse')
         self.assertEqual(plan(S(environment_ready=False),c).action,'prerequisite')
         self.assertEqual(plan(S(),replace(c,worker_active=True)).action,'defer')
@@ -220,22 +219,32 @@ class WriteGateTests(unittest.TestCase):
         self.assertEqual(plan(S(no_subagents=True),host()).action,'blocked')
 
     def test_joint_planner_reuse_returns_existing_id_without_spawn(self):
-        c=host(write_scope=scope(writers=(Writer('existing','unit-a','gpt-5.6-sol','idle',effort='medium'),)))
+        c=host(write_scope=scope(writers=(Writer('existing','unit-a','gpt-6.1-sol','idle',effort='medium'),)))
         d=plan(S(),c)
         self.assertEqual((d.action,d.owner_id,d.requested_role),('reuse','existing',None))
 
+    def test_joint_planner_never_reuses_retired_sol_or_resets_inflight_state(self):
+        for model in ('gpt-6-sol','gpt-5.6-sol'):
+            for state,expected in (('idle','blocked'),('active','defer'),('unknown','defer')):
+                with self.subTest(model=model,state=state):
+                    c=host(write_scope=scope(writers=(Writer('old','unit-a',model,state,effort='high'),)))
+                    result=plan(S(),c)
+                    self.assertEqual(result.action,expected)
+                    self.assertIsNone(result.requested)
+                    self.assertIsNone(result.requested_role)
+
     def test_owner_reuse_cannot_reset_failed_write_budget(self):
-        c=host(write_scope=scope(writers=(Writer('old','unit-a','gpt-5.6-sol','idle'),)),diagnosis_only=True)
+        c=host(write_scope=scope(writers=(Writer('old','unit-a','gpt-6.1-sol','idle'),)),diagnosis_only=True)
         self.assertEqual(plan(S(failed_attempts=2),c).action,'blocked')
 
     def test_reuse_respects_model_and_effort_locks(self):
-        ws=scope(writers=(Writer('old','unit-a','gpt-5.6-sol','idle',effort='high'),))
+        ws=scope(writers=(Writer('old','unit-a','gpt-6.1-sol','idle',effort='high'),))
         self.assertEqual(plan(S(),host(current=C('terra','medium'),no_escalation=True,write_scope=ws)).action,'blocked')
         self.assertEqual(plan(S(),host(keep_model=True,write_scope=ws)).action,'blocked')
         self.assertEqual(plan(S(),host(write_scope=ws),explicit_effort='medium').action,'blocked')
 
     def test_reuse_unknown_effort_cannot_verify_ceiling(self):
-        ws=scope(writers=(Writer('old','unit-a','gpt-5.6-sol','idle'),))
+        ws=scope(writers=(Writer('old','unit-a','gpt-6.1-sol','idle'),))
         self.assertEqual(plan(S(),host(no_effort_escalation=True,write_scope=ws)).action,'blocked')
 
     def test_complex_write_splits_out_readonly_diagnosis(self):
@@ -263,7 +272,6 @@ class WriteGateTests(unittest.TestCase):
         c=host(operation='reasoning', diagnosis_only=True,failure_kind='unexplained')
         d=plan(S(failed_attempts=2,prior_lane='terra'),c)
         self.assertEqual(d.action,'local');self.assertIn('read-only diagnosis',d.reason)
-        # This diagnosis has NOT replenished the writing budget.
         self.assertEqual(plan(S(failed_attempts=2),host()).action,'blocked')
 
     def test_exhausted_workers_can_request_astra_without_repair_extension(self):

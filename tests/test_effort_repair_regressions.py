@@ -38,8 +38,7 @@ class EffortRepairRegressions(unittest.TestCase):
         positive = plan(signals, context, base.AUTO, automatic_effort='ultra', effort_evidence=evidence)
         self.assertEqual(positive.action, 'delegate')
         self.assertEqual(positive.requested, C('sol', 'ultra'))
-        missing = replace(context, unavailable_models={
-            model: 'observed unavailable' for model in ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-5.6-sol')})
+        missing = replace(context, unavailable_models={'gpt-6.1-sol': 'observed unavailable'})
         result = plan(signals, missing, base.AUTO, automatic_effort='ultra', effort_evidence=evidence)
         self.assertEqual(result.action, 'blocked')
         self.assertIsNone(result.requested)

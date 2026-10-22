@@ -280,10 +280,57 @@ class AutomaticInstallTests(unittest.TestCase):
         self.assertEqual(select_profile(from_manifest({})),Profile('auto'))
 
     def test_auto_catalog_does_not_require_unused_high_on_every_model(self):
-        data={'data':[{'model':m,'supportedReasoningEfforts':[{'reasoningEffort':e}]} for _,m,e in EXPECTED.values()],
-              'nextCursor':None}
+        models={}
+        for _,model,effort in EXPECTED.values():
+            models.setdefault(model,set()).add(effort)
+        data={'data':[{'model':model,'supportedReasoningEfforts':[
+            {'reasoningEffort':effort} for effort in sorted(efforts)]}
+            for model,efforts in models.items()], 'nextCursor':None}
         self.assertEqual(doctor.validate_catalog(data,Profile('auto')),[])
         self.assertTrue(doctor.validate_catalog(data,Profile('adaptive')))
+
+    def prior_sol_model(self, mode='auto'):
+        self.install(mode=mode)
+        manifest=self.manifest()
+        names=('sol-engineer.toml','cer-auto-sol-engineer.toml') if mode=='auto' else ('sol-engineer.toml',)
+        for name in names:
+            path=self.agents/name
+            raw=path.read_bytes().replace(b'model = "gpt-6.1-sol"',b'model = "gpt-6-sol"')
+            self.assertIn(b'model = "gpt-6-sol"',raw)
+            path.write_bytes(raw)
+            manifest['files']['agents/'+name]=manage.digest(raw)
+        (self.skill/MANIFEST).write_text(json.dumps(manifest),encoding='utf-8')
+        return names
+
+    def test_retired_owned_sol_roles_upgrade_in_place_and_restore_exactly(self):
+        for mode in ('auto','fixed','adaptive'):
+            with self.subTest(mode=mode):
+                names=self.prior_sol_model(mode)
+                before=self.state();previous=self.backup()
+                self.install(dry_run=True)
+                self.assertEqual(self.state(),before)
+                self.assertEqual(self.backup(),previous)
+                self.install()
+                self.assertEqual(self.manifest()['mode'],mode)
+                for name in names:
+                    self.assertEqual(tomllib.loads((self.agents/name).read_text())['model'],'gpt-6.1-sol')
+                for path in self.agents.glob('*.toml'):
+                    self.assertNotIn(tomllib.loads(path.read_text())['model'],('gpt-6-sol','gpt-5.6-sol'))
+                backup=self.backup()
+                self.assertNotEqual(backup,previous)
+                manage.restore(backup,'project',self.root)
+                self.assertEqual(self.state(),before)
+                self.install()
+
+    def test_retired_sol_customization_blocks_migration_without_partial_writes(self):
+        self.prior_sol_model()
+        changed=self.agents/'cer-auto-sol-engineer.toml'
+        changed.write_bytes(changed.read_bytes()+b'\n# user customization\n')
+        before=self.state();backup=self.backup()
+        with self.assertRaisesRegex(ValueError,'managed file was changed'):
+            self.install()
+        self.assertEqual(self.state(),before)
+        self.assertEqual(self.backup(),backup)
 
     def test_policy_default_and_modes_match_installer(self):
         from profiles import MODES

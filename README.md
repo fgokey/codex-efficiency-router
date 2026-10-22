@@ -2,15 +2,21 @@
 
 [简体中文](README.zh-CN.md) · [Repair scope](docs/REPAIR-2026-10-22.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.5 corrective branch · Codex only · MIT · Python 3.11+**
+**v0.8.5 corrective updates · Codex only · MIT · Python 3.11+**
 
 Route substantial engineering work to a suitable native Codex worker with explicit model/effort, bounded ownership and evidence-based acceptance. Astra remains a read-only adviser in strict execution paths. Prefer one implementation owner and a reviewer only when useful; retain the same owner for follow-up work.
 
 This community project does not switch the parent model. Static tests, text-token counts and a successful installation do not establish live compliance, coding quality, speed or subscription savings.
 
+## Sol model retirement
+
+Sol routing now uses **`gpt-6.1-sol` only**. `gpt-6-sol` and `gpt-5.6-sol` are removed from model selection, explicit pins, fallbacks and assignment admission. New Sol routes use `cer_auto_sol61_engineer` with the appropriate effort. Missing 6.1 support never re-enables an older Sol model or silently rewrites an exact model pin.
+
+The owned `sol_engineer` / `cer_auto_sol_engineer` filenames remain migration aliases, also bound to 6.1. This preserves existing references and manifest-owned backup/restore without adding another selectable Sol model. Ordinary reinstall updates unchanged owned files; customized files stop for review. Historical fixtures and accounting evidence are not routing options. Reach a safe boundary, update the Skill and any separately registered Guard, then reload Codex; do not hot-switch running workers.
+
 ## Current repair
 
-The Reader and dispatch guard now share supported model/effort pairs. Shipped Luna, Terra and Sol bindings are not rejected solely for being cheaper than Sol61. Known executor medium/high HOLD creation needs no redundant work-admission envelope. Actual binding and RELEASE remain required before writes.
+The Reader and dispatch guard share supported model/effort pairs. Shipped Luna, Terra and Sol61 bindings have complete admission paths. Known executor medium/high HOLD creation needs no redundant work-admission envelope. Actual binding and RELEASE remain required before writes.
 
 Exact continue/status/stop controls retain the original current-policy receipt and scope; they do not create a new worker or authorize new work. Additional instructions need fresh admission. The guard rejects control-labelled work. With the optional custom host, pass the Reader's returned `admitted_dispatch_arguments`, including model/effort, instead of inheriting Sol61/high defaults.
 
@@ -22,7 +28,7 @@ Windows coverage includes UTF-8 BOM input, exact CRLF preservation, non-default 
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol_engineer` | `gpt-6-sol` | `medium` |
+| `sol_engineer` | `gpt-6.1-sol` | `medium` (compatibility name) |
 | `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 

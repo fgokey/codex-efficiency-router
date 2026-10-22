@@ -34,10 +34,11 @@ def context(**overrides):
 class EffortPolicyTests(unittest.TestCase):
     def test_existing_assignment_preserves_checked_model_and_effort_pins(self):
         s=S()
-        selection=plan(s,context(),ADAPTIVE,explicit_model='gpt-6-sol',explicit_effort='medium')
-        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='legacy-pinned',
+        selection=plan(s,context(current=C('luna','high')),ADAPTIVE,
+                       explicit_model='gpt-6.1-sol',explicit_effort='medium')
+        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='pinned-sol61',
             unit_id='unit-b',purpose='new_unit',selection=selection),'VERIFIED')
-        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='legacy-pinned',
+        self.assertEqual(check_existing_assignment(s,selection.requested,recipient_id='pinned-sol61',
             unit_id='unit-b',purpose='new_unit'),'UNKNOWN')
         pinned=S(force_astra=True)
         selection=plan(pinned,context(),ADAPTIVE,explicit_effort='medium')
@@ -47,9 +48,10 @@ class EffortPolicyTests(unittest.TestCase):
     def test_old_simple_selection_cannot_certify_new_hard_unit(self):
         for old in (S(),S(uncertainty=0,risk=1,coupling=1,verifiability=3)):
             with self.subTest(old=old):
-                selection=plan(old,context(),ADAPTIVE,explicit_model='gpt-6-sol',explicit_effort='medium')
+                selection=plan(old,context(current=C('luna','high')),ADAPTIVE,
+                               explicit_model='gpt-6.1-sol',explicit_effort='medium')
                 harder=S(uncertainty=2,risk=3,coupling=2)
-                self.assertEqual(check_existing_assignment(harder,selection.requested,recipient_id='legacy-pinned',
+                self.assertEqual(check_existing_assignment(harder,selection.requested,recipient_id='pinned-sol61',
                     unit_id='new-hard-unit',purpose='new_unit',selection=selection),'MISMATCH')
 
     def test_old_hard_judgment_floor_survives_without_automatic_astra(self):
@@ -96,18 +98,18 @@ class EffortPolicyTests(unittest.TestCase):
             with self.subTest(changes=changes):
                 self.assertEqual(recommend(replace(simple, **changes)), C('sol', 'high'))
 
-    def test_sol61_high_preference_preserves_explicit_legacy_model_and_effort(self):
+    def test_sol61_effort_selection_never_reenables_retired_sol_pins(self):
         for model in ('gpt-6-sol', 'gpt-5.6-sol'):
             catalog = dict(context().catalog)
             catalog[model] = frozenset(('medium', 'high'))
             roles = dict(context().roles)
             roles[EXPECTED['sol-engineer.toml'][0]] = RoleBinding(model, None)
-            result = plan(S(), context(roles=roles, catalog=catalog), ADAPTIVE, explicit_model=model)
-            self.assertEqual(result.requested, C('sol', 'medium', model))
+            with self.assertRaises(ValueError):
+                plan(S(), context(roles=roles, catalog=catalog), ADAPTIVE, explicit_model=model)
         result = plan(S(), context(current=C('astra', 'high'), current_sufficient=True,
                                   benefit_clear=True), ADAPTIVE, explicit_effort='medium')
         self.assertEqual(result.requested, C('sol', 'medium'))
-        current = C('sol', 'high', 'gpt-6-sol')
+        current = C('sol', 'high', 'gpt-6.1-sol')
         result = plan(S(), context(current=current, current_sufficient=True, keep_model=True), ADAPTIVE)
         self.assertEqual(result.action, 'local')
         self.assertIsNone(result.requested)
@@ -236,25 +238,26 @@ class EffortPolicyTests(unittest.TestCase):
             result = plan(ASTRA, context(**kwargs), ADAPTIVE)
             self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
 
-    def test_configuration_normalizes_default_model_but_legacy_identity_remains_distinct(self):
+    def test_configuration_normalizes_sol61_and_rejects_retired_identities(self):
         self.assertEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6.1-sol'))
-        self.assertNotEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-6-sol'))
-        self.assertNotEqual(C('sol', 'medium'), C('sol', 'medium', 'gpt-5.6-sol'))
+        for retired in ('gpt-6-sol', 'gpt-5.6-sol'):
+            with self.assertRaises(ValueError): C('sol', 'medium', retired)
+            self.assertEqual(check_observation(C('sol','medium'),retired,'medium'),'MISMATCH')
 
-    def test_exact_legacy_pin_is_preserved_and_unavailable_pin_fails_closed(self):
-        old = C('sol', 'medium', 'gpt-5.6-sol')
-        roles = {EXPECTED['sol-engineer.toml'][0]: RoleBinding(old.model, None)}
-        catalog = {old.model: frozenset(('medium', 'high'))}
+    def test_exact_sol61_pin_is_preserved_and_unavailable_pin_fails_closed(self):
+        pinned = C('sol', 'medium', 'gpt-6.1-sol')
+        roles = {EXPECTED['sol61-engineer.toml'][0]: RoleBinding(pinned.model, None)}
+        catalog = {pinned.model: frozenset(('medium', 'high'))}
         c = context(current=C('luna', 'high'), roles=roles, catalog=catalog)
-        result = plan(S(), c, ADAPTIVE, explicit_model=old.model)
-        self.assertEqual((result.action, result.requested), ('delegate', old))
-        result = plan(S(), replace(c, unavailable_models={old.model: 'host rejected model'}),
-                      ADAPTIVE, explicit_model=old.model)
+        result = plan(S(), c, ADAPTIVE, explicit_model=pinned.model, explicit_effort='medium')
+        self.assertEqual((result.action, result.requested), ('delegate', pinned))
+        result = plan(S(), replace(c, unavailable_models={pinned.model: 'host rejected model'}),
+                      ADAPTIVE, explicit_model=pinned.model, explicit_effort='medium')
         self.assertEqual(result.action, 'blocked'); self.assertIsNone(result.requested)
 
     def test_explicit_stronger_model_is_allowed_but_astra_keeps_its_admission_gate(self):
         self.assertEqual(plan(DATA_TRANSFORM, context(current=C('luna', 'high'), current_sufficient=True),
-                              ADAPTIVE, explicit_model='gpt-6-sol').requested.model, 'gpt-6-sol')
+                              ADAPTIVE, explicit_model='gpt-6.1-sol').requested.model, 'gpt-6.1-sol')
         self.assertEqual(plan(DATA_TRANSFORM, context(), ADAPTIVE,
                               explicit_model='gpt-6-astra').action, 'blocked')
 
@@ -288,14 +291,14 @@ class EffortPolicyTests(unittest.TestCase):
         self.assertEqual(plan(risky, c, ADAPTIVE, explicit_model=old,
                               explicit_effort='medium').action, 'blocked')
 
-    def test_model_lock_keeps_legacy_sol_while_effort_increases(self):
-        old = 'gpt-5.6-sol'
-        bindings = {EXPECTED['sol-engineer.toml'][0]: RoleBinding(old, None)}
-        catalog = {old: frozenset(('medium', 'high'))}
-        c = context(current=C('sol', 'medium', old), current_sufficient=False,
+    def test_model_lock_keeps_sol61_while_effort_increases(self):
+        model = 'gpt-6.1-sol'
+        bindings = {EXPECTED['sol61-engineer.toml'][0]: RoleBinding(model, None)}
+        catalog = {model: frozenset(('medium', 'high'))}
+        c = context(current=C('sol', 'medium', model), current_sufficient=False,
                     keep_model=True, roles=bindings, catalog=catalog)
         result = plan(SOL, c, ADAPTIVE, deep_reasoning=True)
-        self.assertEqual(result.requested, C('sol', 'high', old))
+        self.assertEqual(result.requested, C('sol', 'high', model))
 
     def test_automatic_xhigh_and_max_need_specific_high_insufficiency_evidence(self):
         c = context(current=C('luna','high'), current_sufficient=False)

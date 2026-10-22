@@ -111,9 +111,15 @@ class DoctorTests(unittest.TestCase):
                       plain.stdout)
 
     def catalog(self):
+        # The catalog lists models, not role aliases. Preserve both fixed efforts
+        # when multiple role names share the same current model.
+        models = {}
+        for _, model, effort in EXPECTED.values():
+            models.setdefault(model, set()).add(effort)
         return {"result": {"data": [
-            {"model": model, "supportedReasoningEfforts": [{"reasoningEffort": effort}]}
-            for _, model, effort in EXPECTED.values()], "nextCursor": None}}
+            {"model": model, "supportedReasoningEfforts": [
+                {"reasoningEffort": effort} for effort in sorted(efforts)]}
+            for model, efforts in models.items()], "nextCursor": None}}
 
     def test_instruction_chain_follows_links_not_orphan_files(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -216,6 +222,11 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(doctor.validate_catalog(data), [])
         self.assertEqual(doctor.validate_catalog(data["result"]), [])
 
+    def test_duplicate_model_entries_still_fail_with_compatibility_roles(self):
+        data = self.catalog()
+        data['result']['data'].append(copy.deepcopy(data['result']['data'][0]))
+        self.assertTrue(doctor.validate_catalog(data))
+
     def test_incomplete_catalog_refused(self):
         data = self.catalog()
         data["result"]["nextCursor"] = "more"
@@ -235,8 +246,13 @@ class DoctorTests(unittest.TestCase):
     def test_policy_manifest_matches_shipped_models(self):
         policy = json.loads((ROOT / "policy/routing-policy.json").read_text())
         actual = {(v["model"], v["effort"]) for v in policy["models"].values()}
-        self.assertEqual(actual | {(policy['prior_sol_model'], 'medium')},
+        alias = policy['sol_compatibility_binding']
+        self.assertEqual(actual | {(alias['model'], alias['effort'])},
                          {(m, e) for _, m, e in EXPECTED.values()})
+        self.assertEqual(alias['model'], 'gpt-6.1-sol')
+        self.assertEqual(set(policy['retired_sol_models']), {'gpt-6-sol', 'gpt-5.6-sol'})
+        self.assertNotIn('sol', policy['legacy_models'])
+        self.assertNotIn('prior_sol_model', policy)
         self.assertIn("benefit_gated_deescalation", policy["principles"])
         self.assertIn("bounded_output_envelope_before_batch_reads", policy["principles"])
         self.assertIn("model_roundtrips_are_budgeted_even_with_cached_input", policy["principles"])

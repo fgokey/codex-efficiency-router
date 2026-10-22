@@ -28,36 +28,34 @@ def host(**kwargs):
 
 
 class AutomaticBindingTests(unittest.TestCase):
-    def test_sol61_default_and_exact_old_sol_pin(self):
+    def test_sol61_default_and_retired_sol_pins_rejected(self):
         self.assertEqual(PRESETS['sol'], ('sol61_engineer', 'gpt-6.1-sol', 'high'))
         self.assertEqual(C('sol', 'medium').model, 'gpt-6.1-sol')
-        self.assertEqual(C('sol', 'medium', 'gpt-6-sol').role, 'sol_engineer')
+        self.assertEqual(C('sol', 'medium').role, 'sol61_engineer')
         c=host(current=C('luna','high'),current_sufficient=False)
         self.assertEqual(plan(S(),c,AUTO).requested_role,'cer_auto_sol61_engineer')
-        roles=dict(c.roles)
-        roles['sol_engineer']=RoleBinding('gpt-6-sol','medium')
-        roles['cer_auto_sol_engineer']=RoleBinding('gpt-6-sol',None)
-        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high'))
-        old=plan(S(),replace(c,roles=roles,catalog=catalog),AUTO,explicit_model='gpt-6-sol')
-        self.assertEqual((old.requested.model,old.requested_role),
-                         ('gpt-6-sol','cer_auto_sol_engineer'))
+        for old in ('gpt-6-sol', 'gpt-5.6-sol'):
+            with self.subTest(model=old):
+                with self.assertRaises(ValueError): C('sol', 'medium', old)
+                with self.assertRaises(ValueError): plan(S(),c,AUTO,explicit_model=old)
 
-    def test_sol61_requires_exact_support_before_old_sol_fallback(self):
+    def test_sol61_requires_exact_support_without_retired_sol_fallback(self):
         c=host(current=C('luna','high'),current_sufficient=False)
-        roles=dict(c.roles)
-        roles['sol_engineer']=RoleBinding('gpt-6-sol','medium')
-        roles['cer_auto_sol_engineer']=RoleBinding('gpt-6-sol',None)
-        catalog=dict(c.catalog);catalog['gpt-6-sol']=frozenset(('medium','high'))
-        missing=dict(roles)
-        del missing['sol61_engineer'];del missing['cer_auto_sol61_engineer']
-        self.assertEqual(plan(S(),replace(c,roles=missing,catalog=catalog),AUTO).action,'blocked')
-        unknown=dict(catalog);del unknown['gpt-6.1-sol']
-        self.assertEqual(plan(S(),replace(c,roles=roles,catalog=unknown),AUTO).action,'blocked')
-        observed=replace(c,roles=roles,catalog=catalog,
-                         unavailable_models={'gpt-6.1-sol':'host rejected selected model'})
-        selected=plan(S(),observed,AUTO)
-        self.assertEqual((selected.requested.model,selected.requested_role),
-                         ('gpt-6-sol','cer_auto_sol_engineer'))
+        for old in ('gpt-6-sol', 'gpt-5.6-sol'):
+            roles=dict(c.roles)
+            roles['sol_engineer']=RoleBinding(old,'medium')
+            roles['cer_auto_sol_engineer']=RoleBinding(old,None)
+            catalog=dict(c.catalog);catalog[old]=frozenset(('medium','high'))
+            missing=dict(roles)
+            del missing['sol61_engineer'];del missing['cer_auto_sol61_engineer']
+            self.assertEqual(plan(S(),replace(c,roles=missing,catalog=catalog),AUTO).action,'blocked')
+            unknown=dict(catalog);del unknown['gpt-6.1-sol']
+            self.assertEqual(plan(S(),replace(c,roles=roles,catalog=unknown),AUTO).action,'blocked')
+            observed=replace(c,roles=roles,catalog=catalog,
+                             unavailable_models={'gpt-6.1-sol':'host rejected selected model'})
+            selected=plan(S(),observed,AUTO)
+            self.assertEqual(selected.action,'blocked')
+            self.assertIsNone(selected.requested)
 
     def test_task_difficulty_selects_model_and_explicit_effort_without_root_inheritance(self):
         cases=(
@@ -191,37 +189,33 @@ class AutomaticBindingTests(unittest.TestCase):
         for value in (['x'], frozenset((1,)), frozenset(('',))):
             with self.assertRaises(ValueError):plan(S(),host(unavailable_roles=value),AUTO)
 
-    def test_confirmed_new_model_failure_can_use_exact_legacy_binding(self):
-        c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6.1-sol':'host rejected selected model',
-                                   'gpt-6-sol':'host rejected older model'})
+    def test_confirmed_luna_failure_can_use_exact_supported_legacy_luna_binding(self):
+        c=host(current=None,current_sufficient=False,
+               unavailable_models={'gpt-6-luna':'host rejected selected model'})
         roles=dict(c.roles)
-        roles['cer_auto_sol_engineer']=RoleBinding('gpt-5.6-sol',None)
-        roles['sol_engineer']=RoleBinding('gpt-5.6-sol','medium')
-        catalog=dict(c.catalog);catalog['gpt-5.6-sol']=frozenset(('medium','high'))
-        d=plan(S(),replace(c,roles=roles,catalog=catalog),AUTO)
+        roles['cer_auto_luna_worker']=RoleBinding('gpt-5.6-luna',None)
+        roles['luna_worker']=RoleBinding('gpt-5.6-luna','medium')
+        catalog=dict(c.catalog);catalog['gpt-5.6-luna']=frozenset(('medium','high'))
+        d=plan(DATA_TRANSFORM,replace(c,roles=roles,catalog=catalog),AUTO)
         self.assertEqual((d.action,d.requested.model,d.requested_role),
-                         ('delegate','gpt-5.6-sol','cer_auto_sol_engineer'))
+                         ('delegate','gpt-5.6-luna','cer_auto_luna_worker'))
         self.assertIn('legacy fallback',d.reason)
 
-    def test_legacy_fallback_needs_unavailability_evidence_and_respects_model_lock(self):
-        c=host(current=C('luna','high'),current_sufficient=False)
+    def test_luna_fallback_needs_unavailability_evidence_and_respects_model_lock(self):
+        c=host(current=None,current_sufficient=False)
         roles=dict(c.roles)
-        roles['cer_auto_sol_engineer']=RoleBinding('gpt-5.6-sol',None)
-        roles['sol_engineer']=RoleBinding('gpt-5.6-sol','medium')
-        del roles['cer_auto_sol61_engineer'];del roles['sol61_engineer']
-        catalog=dict(c.catalog);catalog['gpt-5.6-sol']=frozenset(('medium',))
-        self.assertEqual(plan(S(),replace(c,roles=roles,catalog=catalog),AUTO).action,'blocked')
+        roles['cer_auto_luna_worker']=RoleBinding('gpt-5.6-luna',None)
+        roles['luna_worker']=RoleBinding('gpt-5.6-luna','medium')
+        catalog=dict(c.catalog);catalog['gpt-5.6-luna']=frozenset(('medium',))
+        self.assertEqual(plan(DATA_TRANSFORM,replace(c,roles=roles,catalog=catalog),AUTO).action,'blocked')
         c=replace(c,roles=roles,catalog=catalog,
-                  unavailable_models={'gpt-6.1-sol':'host rejected selected model',
-                                      'gpt-6-sol':'host rejected older model'},keep_model=True)
-        self.assertEqual(plan(S(),c,AUTO).action,'blocked')
+                  unavailable_models={'gpt-6-luna':'host rejected selected model'},keep_model=True)
+        self.assertEqual(plan(DATA_TRANSFORM,c,AUTO).action,'blocked')
 
     def test_complex_sol_never_falls_back_to_terra(self):
         s=S(reasoning_bound=False,coupling=2)
         c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6.1-sol':'host rejected selected model',
-                                   'gpt-6-sol':'host rejected older model'})
+               unavailable_models={'gpt-6.1-sol':'host rejected selected model'})
         roles=dict(c.roles)
         del roles['cer_auto_sol61_engineer'];del roles['sol61_engineer']
         del roles['cer_auto_sol_engineer'];del roles['sol_engineer']
@@ -249,8 +243,7 @@ class AutomaticBindingTests(unittest.TestCase):
             coordinator_contract_verified=True, single_coordinator=True,
             capacity_available=True, shared_limits_retained=True)
         c=host(current=C('luna','high'),current_sufficient=False,
-               unavailable_models={'gpt-6.1-sol':'unavailable','gpt-6-sol':'unavailable',
-                                   'gpt-5.6-sol':'unavailable'})
+               unavailable_models={'gpt-6.1-sol':'unavailable'})
         catalog=dict(c.catalog);catalog['gpt-5.6-terra']=frozenset(('medium','high','ultra'))
         self.assertEqual(plan(S(),replace(c,catalog=catalog),AUTO,
                               automatic_effort='ultra',effort_evidence=evidence).action,'blocked')

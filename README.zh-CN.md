@@ -2,15 +2,21 @@
 
 [English](README.md) · [本轮修复范围](docs/REPAIR-2026-10-22.md) · [实装验收](docs/ACCEPTANCE.md)
 
-**v0.8.5 修复分支 · 仅 Codex · MIT · Python 3.11+**
+**v0.8.5 纠错更新 · 仅 Codex · MIT · Python 3.11+**
 
 按子任务选择原生 Codex 执行者的模型和思考档位，明确写入范围和验收证据。严格执行路径下 Astra 只读分析，困难问题直接参与判断；实现交给适当执行者。默认一个实现者，必要时增加复核者，同一问题优先复用原负责人。
 
 这是社区项目，不会切换父模型。安装成功、单测通过、指令文本变短，都不能直接证明实际质量、速度或套餐额度收益。
 
+## Sol 只保留 6.1
+
+Sol 路由只使用 **`gpt-6.1-sol`**。`gpt-6-sol` 和 `gpt-5.6-sol` 已从模型选择、显式指定、回退及任务准入中移除。新 Sol 任务使用 `cer_auto_sol61_engineer` 并明确选择思考档位；缺少 6.1 支持不会重新启用旧 Sol，也不会偷偷改写用户指定的模型。
+
+为平滑升级，原有 `sol_engineer` / `cer_auto_sol_engineer` 文件名保留为兼容别名，但绑定同样是 6.1，不是另一款 Sol。普通重装会备份并更新未被修改的自有文件，发现用户定制则停止并提示。历史测试夹具和用量记录不是可选择模型。现有任务到安全边界后更新 Skill 及单独注册的 Guard，再重新加载 Codex，不在运行中热切换代理。
+
 ## 本轮解决的问题
 
-Reader 和派发门禁共用模型/档位支持范围，Luna、Terra、旧 Sol 不再仅因低于 Sol61 被拒绝。已知执行者的 medium/high 身份 HOLD 不再重复申请业务任务准入；实际身份核验与写入前 RELEASE 仍然必需。
+Reader 和派发门禁共用模型/档位支持范围，Luna、Terra、Sol61 都有完整的任务准入路径。已知执行者的 medium/high 身份 HOLD 不再重复申请业务任务准入；实际身份核验与写入前 RELEASE 仍然必需。
 
 同任务的精确 continue/status/stop 控制消息复用原有当前策略凭据和范围，不必重建子代理，也不授予新任务权限。夹带新工作、改变范围或身份仍拒绝。可选定制宿主必须使用 Reader 返回的 `admitted_dispatch_arguments`，显式传递接收者模型和档位，不能沿用默认 Sol61/high。
 
@@ -22,7 +28,7 @@ Windows 验证覆盖 UTF-8 BOM、原样 CRLF、包含中文和空格的 CODEX_HO
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol_engineer` | `gpt-6-sol` | `medium` |
+| `sol_engineer` | `gpt-6.1-sol` | `medium`（兼容名称） |
 | `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 

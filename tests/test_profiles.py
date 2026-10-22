@@ -259,7 +259,7 @@ class ProfileAndCatalogUnitTests(unittest.TestCase):
 
     def catalog(self):
         return {'data': [{'model': m, 'supportedReasoningEfforts': [{'reasoningEffort': e} for e in ('medium', 'high')]}
-                         for _, m, _ in EXPECTED.values()], 'nextCursor': None}
+                         for m in dict.fromkeys(m for _, m, _ in EXPECTED.values())], 'nextCursor': None}
 
     def test_catalog_for_fixed_adaptive_and_opt_in_low(self):
         data = self.catalog()
@@ -270,7 +270,9 @@ class ProfileAndCatalogUnitTests(unittest.TestCase):
         self.assertEqual(doctor.validate_catalog(data, Profile('adaptive', True)), [])
 
     def test_catalog_missing_high_rejected_for_adaptive_not_fixed(self):
-        data = self.catalog(); data['data'][2]['supportedReasoningEfforts'] = [{'reasoningEffort': 'medium'}]
+        data = self.catalog()
+        terra = next(row for row in data['data'] if row['model'] == 'gpt-5.6-terra')
+        terra['supportedReasoningEfforts'] = [{'reasoningEffort': 'medium'}]
         self.assertEqual(doctor.validate_catalog(data), [])
         self.assertTrue(doctor.validate_catalog(data, Profile('adaptive')))
 
