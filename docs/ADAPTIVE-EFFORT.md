@@ -1,10 +1,12 @@
-# Automatic capability adaptation — v0.5
+# Automatic capability adaptation
 
 ## Product behavior
 
 Ordinary install/update is auto. Users do not choose fixed/adaptive to suit each Codex host. The parent selects a model/effort pair from task evidence, then a supported native binding. No new model level, classifier call, proxy, daemon, hidden CLI or in-flight hot switching is introduced.
 
 Five canonical fixed definitions generate five additional aliases named `cer_auto_<role>` in files `cer-auto-<original-file>.toml`. Aliases preserve model, developer instructions and sandbox fields, add a short auto-effort discovery marker, change the name and remove the top-level effort pin. Auto installs ten bindings; explicit legacy fixed/adaptive overrides install five. A file does not spawn a worker. Extra role discovery text has a cost and is reported separately.
+
+Sol routing selects only `gpt-6.1-sol`. Retired `gpt-6-sol` and `gpt-5.6-sol` are not valid explicit pins, fallback candidates, new assignments or reusable idle owners. `sol_engineer` is retained only as an owned installation compatibility name, now bound to GPT-6.1 Sol/medium; `sol61_engineer` is the canonical new routing name. Both names use the same model. Unsupported retired pins fail instead of being silently rewritten. Already running work must reach a safe boundary before updating/reloading; no model hot-switch is introduced.
 
 ## Admission order
 
@@ -35,13 +37,13 @@ reuse. These remain declared offline inputs, not authenticated host evidence.
 
 ## Defaults and overrides
 
-GPT-6.1 Sol high is the engineering default when difficulty is unknown; confirmed simple work may use medium, selected explicitly by the parent. The separate GPT-6 Sol role retains medium for exact pins and evidenced fallback. Luna high is focused low-risk code, while deterministic conversion may use Luna medium; Astra defaults high. Auto-low stays opt-in. Parent-selected XHigh/Max needs reviewed bottleneck, High-limit and value evidence without a forced lower trial. Ultra also requires exact Sol/Astra support and one authorized coordinator for 2+ independent disjoint units, capacity, benefit and shared subtree limits; explicit Ultra grants no authority. Preferences never waive quality/authority. No-escalation constrains both axes; keep-model preserves exact identity. Unsupported routes never certify a weak parent.
+GPT-6.1 Sol high is the engineering default when difficulty is unknown; confirmed simple work may use medium, selected explicitly by the parent. There is no older Sol model fallback. Luna high is focused low-risk code, while deterministic conversion may use Luna medium; Astra defaults high. Auto-low stays opt-in. Parent-selected XHigh/Max needs reviewed bottleneck, High-limit and value evidence without a forced lower trial. Ultra also requires exact Sol/Astra support and one authorized coordinator for 2+ independent disjoint units, capacity, benefit and shared subtree limits; explicit Ultra grants no authority. Preferences never waive quality/authority. No-escalation constrains both axes; keep-model preserves exact supported identity. Unsupported routes never certify a weak parent.
 
-New installations and ordinary upgrades from old manifests use auto. Pre-v0.5 manifests cannot prove whether fixed/adaptive was an explicit preference; migration is printed before mutation, with backups and customization checks. New manifests use `profile_schema=2`; explicit advanced overrides made with this version survive later plain updates. Existing low choices are preserved unless switching to fixed. Restore reads old profiles literally and never performs migration. These are package fields, not Codex configuration keys.
+New installations and ordinary upgrades from old manifests use auto. Pre-v0.5 manifests cannot prove whether fixed/adaptive was an explicit preference; migration is printed before mutation, with backups and customization checks. New manifests record their profile schema; explicit advanced overrides survive later plain updates. Existing low choices are preserved unless switching to fixed. Restore reads old profiles literally and never performs migration. These are package fields, not Codex configuration keys. An explicit restore can restore historical files, but does not make retired models selectable in the current policy.
 
 ## Evidence and scope
 
-Source doctor validates five fixed definitions; installed doctor validates all bindings required by that installation. Optional saved catalog checking in auto requires baseline fixed pairs, not every unused high setting. Each actual dispatch must confirm its selected pair. Neither a catalog export nor file validation proves runtime loading. No credentials, model probes or extra sessions are used by maintenance tools.
+Source doctor validates five fixed definitions; installed doctor validates all bindings required by that installation. Optional saved catalog checking in auto requires baseline fixed pairs, not every unused high setting. Catalog entries represent unique models, not role names; multiple Sol aliases must not create duplicate model entries. Each actual dispatch must confirm its selected pair. Neither a catalog export nor file validation proves runtime loading. No credentials, model probes or extra sessions are used by maintenance tools.
 
 Runtime rules live in the Skill; Python is an offline reference, not a hard enforcement layer. Live capability selection, model identity, quality, total tokens and latency remain user-run acceptance. Existing byte/token gates stay in force. Additional alias descriptions are measured, not claimed free.
 

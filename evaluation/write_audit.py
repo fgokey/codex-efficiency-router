@@ -16,6 +16,7 @@ def main() -> int:
     mutations = run(ROOT, output)
     files = [*sorted((ROOT / 'hooks').glob('*.py')), ROOT / 'scripts/write_policy.py',
              ROOT / 'scripts/write_guard.py', ROOT / 'scripts/effort_reference.py',
+             ROOT / 'tests/native_guard_cases.py',
              *sorted((ROOT / 'tests').glob('test_*write*.py'))]
     report = {
         'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
