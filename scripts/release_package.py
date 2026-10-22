@@ -83,6 +83,18 @@ def source_payload(root=ROOT):
                  '.editorconfig', '.gitattributes', '.gitignore', 'plugin.json',
                  'install.sh', 'install.ps1', 'uninstall.sh', 'uninstall.ps1', 'cer.ps1'):
         payload[name] = (root / name).read_bytes()
+    # The install guide links this opt-in host source. Include only the reviewed
+    # patch, never a developer's entire host checkout, binaries or private logs.
+    name = 'host/required-agent-admission.patch'
+    patch = root / name
+    if patch.is_symlink() or patch.parent.is_symlink():
+        raise ValueError('distribution refuses symlinks')
+    if patch.is_file():
+        payload[name] = patch.read_bytes()
+    else:
+        guide = root / 'docs/INSTALL.md'
+        if guide.is_file() and '../' + name in guide.read_text(encoding='utf-8'):
+            raise ValueError('documented host patch is missing from source: ' + name)
     return payload
 
 
