@@ -1,0 +1,50 @@
+name: prepare-routing-candidate
+on:
+  push:
+    branches: [audit/source-20261022]
+    paths: [.github/workflows/prepare-routing-candidate.yml]
+permissions:
+  contents: read
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decode and verify the exact reviewed source patch
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, lzma, os
+          from pathlib import Path
+          encoded = ''.join(Path(f'.maintenance/cer-part{i}.b64').read_text().strip() for i in range(4))
+          data = lzma.decompress(base64.b64decode(encoded, validate=True))
+          expected = 'e7473f179a83fe5d95778d1592526c967b3af6fb1423f4d57344a732cae3bd38'
+          assert hashlib.sha256(data).hexdigest() == expected, 'patch digest mismatch'
+          Path(os.environ['RUNNER_TEMP'], 'candidate.patch').write_bytes(data)
+          PY
+      - name: Apply to the immutable latest-source baseline and publish candidate only
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=5457e97d95d77f2dc17b6a869e4082c338b510f0
+          git switch --detach "$BASE"
+          git apply --index --whitespace=error-all "$RUNNER_TEMP/candidate.patch"
+          test "$(git write-tree)" = 9f7de871741d2623a1adec9449835ce951492132
+          # Workflow updates use the user's connector separately, never elevated Actions credentials.
+          git restore --source="$BASE" --staged --worktree .github/workflows/validate.yml
+          git diff --cached --check
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'fix: align dispatch admission and simplify ordinary routing for v0.8.6'
+          git push origin HEAD:refs/heads/fix/usable-routing-20261022
+          git rev-parse HEAD > "$RUNNER_TEMP/candidate-commit.txt"
+          git rev-parse HEAD^{tree} >> "$RUNNER_TEMP/candidate-commit.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: routing-candidate-identity
+          path: ${{ runner.temp }}/candidate-commit.txt
+          retention-days: 3
+          if-no-files-found: error
