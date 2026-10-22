@@ -174,7 +174,7 @@ def validate(request: object) -> dict:
                 raise ValueError('batch members cannot request pages; split batch')
             validate(item)
             if structured:
-                key = json.dumps(item, sort_keys=True, ensure_ascii=True, allow_nan=False)
+                key = json.dumps(item, sort_keys=True, separators=(',', ':'), ensure_ascii=True, allow_nan=False)
                 if key in seen: raise ValueError('duplicate batch request; reuse its result')
                 seen.add(key)
         return request
@@ -311,7 +311,7 @@ def snapshot(root: Path, path: Path) -> tuple[bytes, dict]:
             getattr(before, field) != getattr(after, field) for field in fields):
         raise ValueError('file changed while being read or exceeds 16 MiB')
     identity = {'path': path.relative_to(root).as_posix(), 'size': after.st_size,
-                'mtime_ns': after.st_mtime_ns, 'dev': after.st_dev, 'ino': after.st_ino,
+                'mtime_ns': after.st_mtime_ns, 'dev': before.st_dev, 'ino': after.st_ino,
                 'sha256': hashlib.sha256(raw).hexdigest()}
     return raw, identity
 
@@ -961,7 +961,7 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
             raw = sys.stdin.buffer.read(INPUT_LIMIT + 1)
             if len(raw) > INPUT_LIMIT:
                 raise ValueError('reader input exceeds 16 KiB')
-            request_text = raw.decode('utf-8')
+            request_text = raw.decode('utf-8-sig')
         if len(request_text.encode('utf-8')) > INPUT_LIMIT:
             raise ValueError('reader input exceeds 16 KiB')
         root = Path(values['--root'])
@@ -1002,24 +1002,29 @@ ASSIGNMENT_HELP = '''CER existing-worker assignment preflight (caller evidence, 
   receipt/dispatch_arguments. Exit 1: MISMATCH or UNKNOWN, no execution parameters.
   Exit 2: invalid input. Check exit/status, then send prefix + the exact checked body;
   verify body_sha256 before merging. Do not mirror the work prompt into tool output.
+  admitted_agent_task: use admitted_dispatch_arguments plus body=prefix+message;
+  never inherit its Sol61/high defaults for another receiver. Raw sends use dispatch_arguments.
 Minimal engineering review input (replace recipient/evidence with observed values):
 {"unit_id":"review-1","purpose":"new_unit","scope":"Conan review","message":"Review Conan configuration","recipient":{"id":"observed-child","model":"gpt-6.1-sol","effort":"high","evidence_ref":"session_meta/current turn_context"},"signals":{"spec_complete":true,"authority_ready":true,"environment_ready":true,"observability_ready":true}}
   Astra new work: signals.very_complex=true, complexity_reason, and
   signals.sol61_unsuitable_reason; both readable reasons appear in the prefix.
   force_astra alone is not a user authorization. Missing/unknown binding: no task send.
   Medium: confirmed_simple=true + current simple uncertainty/risk/coupling <=1,
-  no conflict/failure/irreversibility, novelty <=1; admitted Astra floor remains high.
+  no conflict/failure/irreversibility, novelty <=1; Luna/Terra always need this simple gate.
+  Exact shipped and legacy model IDs share admission. Astra floor remains high.
+  Low requires simple Luna work, explicit supported effort and reason; never inferred.
   xhigh/max/ultra: effort_supported=true + effort_reason; no support is inferred.
   Pure purpose/message continue/status/stop (or exact Chinese control word): same
   unit/scope/recipient/current-policy receipt may cache admission; added work text
   re-admits, even with unchanged IDs. Wait needs none. New spawn: explicit role/effort,
   HOLD identity report; verify binding before this existing-worker entry releases work.
 Native dispatch mode (independent trusted registration):
-  Every task message requires purpose=new_unit with complete current admission fields;
-  old receipts and continue do not waive admission. Dedicated wait/stop tools are separate.
+  New work needs purpose=new_unit. An exact continue/status/stop with the same current
+  receipt reuses its unit/scope/binding, not write authority. Prefer native wait/interrupt/close.
+  Bare controls, changed work, stale policy or changed identity remain denied.
   Spawn body must be exactly this fixed identity HOLD, with no additional work:
   HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.
-  Sol61/high may spawn with that plain body. For Astra creation, run assignment with
+  Non-Astra medium/high identity-only HOLDs need no task preflight. For Astra creation, use
   recipient.id="unbound-spawn", the explicitly requested model/effort, purpose=new_unit,
   scope="identity HOLD", and message equal to the fixed HOLD above. Supply all readiness
   signals plus very_complex=true, complexity_reason, and sol61_unsuitable_reason as above.
@@ -1035,6 +1040,41 @@ Native dispatch mode (independent trusted registration):
 '''
 
 EXECUTION_PREFIX = 'CER execution (caller evidence): '
+
+# All shipped roles are reachable through the same admission contract. This table
+# is checked against package.EXPECTED/TOML in cross-layer tests. It describes our
+# presets, not account availability; caller/host catalog checks still apply.
+ASSIGNMENT_ROLES = {
+    'luna_worker': ('gpt-6-luna', 'high'),
+    'terra_executor': ('gpt-5.6-terra', 'medium'),
+    'sol_engineer': ('gpt-6-sol', 'medium'),
+    'sol61_engineer': ('gpt-6.1-sol', 'high'),
+    'astra_architect': ('gpt-6-astra', 'high'),
+}
+ASSIGNMENT_LEGACY_MODELS = ('gpt-5.6-sol', 'gpt-5.6-luna')
+ASSIGNMENT_EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+CONTROL_WORDS = {'continue': ('continue', '继续'),
+                 'status': ('status', '状态'), 'stop': ('stop', '停止')}
+
+
+def assignment_pair_known(model: object, effort: object) -> bool:
+    """Recognize exact configured identities, never infer a permission grant."""
+    models = tuple(pair[0] for pair in ASSIGNMENT_ROLES.values()) + ASSIGNMENT_LEGACY_MODELS
+    return (isinstance(model, str) and model in models
+            and isinstance(effort, str) and effort in ASSIGNMENT_EFFORTS
+            and not (effort == 'ultra' and model in
+                     ('gpt-6-luna', 'gpt-5.6-luna', 'gpt-5.6-terra')))
+
+
+def assignment_simple(request: dict, signals: dict) -> bool:
+    """Require explicit classification; bools/strings are not numerical risk scores."""
+    return (request.get('confirmed_simple') is True
+            and all(type(signals.get(key, 1)) is int and 0 <= signals.get(key, 1) <= 1
+                    for key in ('uncertainty', 'risk', 'coupling', 'novelty'))
+            and type(signals.get('irreversibility', 0)) is int
+            and signals.get('irreversibility', 0) == 0
+            and all(signals.get(key, False) is False
+                    for key in ('evidence_conflict', 'capability_failure', 'very_complex')))
 
 
 def assignment_policy_sha256(skill_root: Path | None = None) -> str:
@@ -1078,12 +1118,12 @@ def assignment_astra_admitted(signals: dict) -> bool:
 
 
 def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
-                        scope=None, message=None, signals=None, prior=None) -> dict:
+                        scope=None, message=None, signals=None, prior=None, policy_sha256=None) -> dict:
     """Caller evidence only. Work hidden in a control message needs fresh admission."""
     result = {'status': 'UNKNOWN', 'effective_purpose': purpose}
     if not all(isinstance(value, str) and value for value in (recipient_id, model, effort, unit_id)):
         return result
-    controls = {'continue': ('continue', '继续'), 'status': ('status', '状态'), 'stop': ('stop', '停止')}
+    controls = CONTROL_WORDS
     if purpose not in ('new_unit', *controls):
         return result
     if purpose in controls and message in controls[purpose]:
@@ -1091,7 +1131,7 @@ def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
             return result
         expected = {'recipient_id': recipient_id, 'unit_id': unit_id, 'model': model, 'effort': effort,
                     'scope_sha256': hashlib.sha256(scope.encode('utf-8')).hexdigest(),
-                    'policy_sha256': assignment_policy_sha256()}
+                    'policy_sha256': policy_sha256 or assignment_policy_sha256()}
         if not all(isinstance(prior.get(key), str) and prior[key] for key in expected):
             return result
         fingerprint = prior.get('message_sha256')
@@ -1141,20 +1181,23 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
     scope, message = request.get('scope'), request.get('message')
     boundary = assignment_boundary(recipient_id=receiver.get('id'), model=receiver.get('model'),
         effort=receiver.get('effort'), unit_id=request.get('unit_id'), purpose=request.get('purpose'),
-        scope=scope, message=message, signals=request.get('signals'), prior=request.get('receipt'))
+        scope=scope, message=message, signals=request.get('signals'), prior=request.get('receipt'),
+        policy_sha256=policy_sha256)
     result = {'status': boundary['status'], 'effective_purpose': boundary['effective_purpose'],
               'evidence_basis': 'caller-supplied; not host authentication'}
     if (not isinstance(scope, str) or not scope or not isinstance(message, str) or not message
             or not isinstance(receiver.get('evidence_ref'), str) or not receiver['evidence_ref']):
         result['status'] = 'UNKNOWN'
         return result
-    if (receiver.get('model') not in ('gpt-6.1-sol', 'gpt-6-astra')
-            or receiver.get('effort') not in ('medium', 'high', 'xhigh', 'max', 'ultra')):
+    if not assignment_pair_known(receiver.get('model'), receiver.get('effort')):
         result['status'] = 'UNKNOWN'
         return result
     if boundary['status'] not in ('READY', 'VERIFIED'):
         return result
     signals = request.get('signals', {})
+    if not isinstance(signals, dict):
+        result['status'] = 'UNKNOWN'
+        return result
     # The current native guard rejects additional signals. Bind capability metadata
     # to the existing checked message body instead; never broaden its allowlist.
     if 'execution' in signals:
@@ -1179,16 +1222,17 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
         if not all(signals.get(key) is True for key in prerequisites):
             result['status'] = 'UNKNOWN'
             return result
-        if model not in ('gpt-6.1-sol', 'gpt-6-astra'):
-            result['status'] = 'UNKNOWN'
-            return result
-        simple = (request.get('confirmed_simple') is True
-                  and all(type(signals.get(key, 1)) is int and 0 <= signals.get(key, 1) <= 1
-                          for key in ('uncertainty', 'risk', 'coupling'))
-                  and all(signals.get(key, False) is False for key in ('evidence_conflict', 'capability_failure'))
-                  and signals.get('irreversibility', 0) == 0 and signals.get('novelty', 0) <= 1)
-        if effort == 'medium' and (not simple or model == 'gpt-6-astra'):
+        simple = assignment_simple(request, signals)
+        bounded_model = model in ('gpt-6-luna', 'gpt-5.6-luna', 'gpt-5.6-terra')
+        if ((bounded_model and not simple)
+                or (effort == 'medium' and (not simple or model == 'gpt-6-astra'))
+                or (effort == 'low' and (not simple or model not in
+                                        ('gpt-6-luna', 'gpt-5.6-luna')))):
             result['status'] = 'MISMATCH'
+            return result
+        if effort == 'low' and not (request.get('effort_supported') is True
+                and isinstance(request.get('effort_reason'), str) and request['effort_reason'].strip()):
+            result['status'] = 'UNKNOWN'
             return result
         if effort in ('xhigh', 'max', 'ultra') and not (
                 request.get('effort_supported') is True and isinstance(request.get('effort_reason'), str)
@@ -1215,14 +1259,22 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
             'unit_id', 'purpose', 'scope', 'signals', 'complexity_reason',
             'confirmed_simple', 'effort_supported', 'effort_reason') if key in request}
     if boundary['effective_purpose'] != 'new_unit':
-        receipt = request['receipt']  # Retain the admitted work fingerprint across pure controls.
+        # Retain the work hash and original admission, not a newly authorized unit.
+        # Exact control words cannot carry extra work. This is still not a signature.
+        receipt = dict(request['receipt'])
+        receipt['control'] = boundary['effective_purpose']
+        if not isinstance(receipt.get('admission'), dict):
+            result['status'] = 'UNKNOWN'
+            return result
     prefix = 'CER assignment (caller evidence): ' + json.dumps(receipt, ensure_ascii=False, separators=(',', ':')) + '\n'
     if boundary['effective_purpose'] == 'new_unit' and receiver['model'] == 'gpt-6-astra':
         prefix += ('Parent judgment: very complex; ' + request['complexity_reason'].strip()
                    + '\nSol61 unsuitable: ' + signals['sol61_unsuitable_reason'].strip() + '\n')
     result.update(status='VERIFIED', receipt=receipt, prefix=prefix,
                   body_sha256=hashlib.sha256(message.encode('utf-8')).hexdigest(),
-                  dispatch_arguments={'id': receiver['id']})
+                  dispatch_arguments={'id': receiver['id']},
+                  admitted_dispatch_arguments={'operation': 'assign', 'target': receiver['id'],
+                      'model': receiver['model'], 'reasoning_effort': receiver['effort']})
     return result
 
 
@@ -1245,7 +1297,7 @@ def main() -> int:
             raw = sys.stdin.buffer.read(INPUT_LIMIT + 1)
             if len(raw) > INPUT_LIMIT:
                 raise ValueError('assignment input exceeds limit')
-            request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
+            request = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=unique, parse_constant=reject_constant)
             result = assignment_preflight(request)
             output = json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
             if len(output) > PAGE_BYTES:
@@ -1265,7 +1317,7 @@ def main() -> int:
                 raise ValueError('expected workspace and bounded encoded request')
             token = sys.argv[2]
             raw = base64.b64decode(token + '=' * (-len(token) % 4), altchars=b'-_', validate=True)
-            request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
+            request = json.loads(raw.decode('utf-8-sig'), object_pairs_hook=unique, parse_constant=reject_constant)
             root = Path(sys.argv[1])
             validate(request)
             cap = request.get('max_bytes', PAGE_BYTES) - request.get('framing_bytes', 0)

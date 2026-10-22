@@ -22,9 +22,10 @@ VERSION = '0.8.5'
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
 COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan', 'completion_check'))
 EXECUTOR_FAMILIES = ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
-SPAWN_ROLES = {'luna_worker': ('gpt-6-luna', 'high'), 'terra_executor': ('gpt-5.6-terra', 'medium'),
-               'sol_engineer': ('gpt-6-sol', 'medium'), 'sol61_engineer': ('gpt-6.1-sol', 'high'),
-               'astra_architect': ('gpt-6-astra', 'high')}
+def reader_contract() -> dict:
+    return runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+
+
 PREFIX = 'cer-read '
 HOLD_MESSAGE = 'HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.'
 ASSIGNMENT_PREFIX = 'CER assignment (caller evidence): '
@@ -44,7 +45,7 @@ DISPATCH_ALIASES.update({name: 'send_message_to_thread' for name in (
     'send_message_to_thread', 'mcp__codex_app__send_message_to_thread', 'mcp__codex_app.send_message_to_thread',
     'functions.mcp__codex_app__send_message_to_thread')})
 DISPATCH_MATCHER = '^(?:' + '|'.join(re.escape(name) for name in sorted(DISPATCH_ALIASES)) + ')$'
-HOST_DIRECTORY = Path.home() / '.codex'
+HOST_DIRECTORY = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser()
 REASON = ('CER strict Guard: Astra/unknown identity cannot write, build, format or run tests. '
           'Reuse an authorized exact-model executor owner or wait. Continue read-only diagnosis; '
           'for source inspection use cer-read {"op":"read","path":"..."}.')
@@ -82,10 +83,16 @@ def validate_spawn(data: object) -> tuple[str, str]:
     role = data.get('agent_type')
     automatic = isinstance(role, str) and role.startswith('cer_auto_')
     base = role.removeprefix('cer_auto_') if isinstance(role, str) else None
+    data = dict(data)
+    if 'fork_context' in data:
+        if data.pop('fork_context') is not False or data.get('fork_turns', 'none') != 'none':
+            raise ValueError('spawn cannot inherit context or use conflicting context flags')
+        data['fork_turns'] = 'none'
     if data.get('fork_turns') != 'none':
         raise ValueError('spawn requires fork_turns=none; hand off only necessary unit context')
-    if base in SPAWN_ROLES:
-        model, fixed_effort = SPAWN_ROLES[base]
+    roles = reader_contract()['ASSIGNMENT_ROLES']
+    if base in roles:
+        model, fixed_effort = roles[base]
         if 'model' in data and data['model'] != model:
             raise ValueError('spawn role/model mismatch')
         effort = data.get('reasoning_effort') if automatic else fixed_effort
@@ -95,8 +102,8 @@ def validate_spawn(data: object) -> tuple[str, str]:
         model, effort = data.get('model'), data.get('reasoning_effort')
         if model not in EXECUTOR_FAMILIES + ('gpt-6-astra',):
             raise ValueError('spawn default/inherit requires an explicit exact model pin')
-    if effort not in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
-        raise ValueError('spawn requires a bound reasoning_effort')
+    if not reader_contract()['assignment_pair_known'](model, effort):
+        raise ValueError('spawn requires a supported exact model and bound reasoning_effort')
     return model, effort
 
 
@@ -105,6 +112,8 @@ def host_recipient(session_id: object, target: object, directory: Path) -> dict:
     if not all(isinstance(value, str) and value and len(value) <= 512
                for value in (session_id, target)):
         raise ValueError('missing host session or recipient')
+    if not directory.is_absolute():
+        raise ValueError('absolute native host directory required; inspect CODEX_HOME')
     database = directory / 'state_5.sqlite'
     # mode=ro observes WAL normally; immutable would silently miss current rows.
     with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True, timeout=0.2)) as db:
@@ -137,8 +146,7 @@ def host_recipient(session_id: object, target: object, directory: Path) -> dict:
         identifier, model, effort, source, archived = rows[0]
         if archived != 0 or recipient_owner(source) != session_id:
             raise ValueError('recipient is archived or belongs to another parent')
-        if model not in ('gpt-6.1-sol', 'gpt-6-astra') or effort not in (
-                'medium', 'high', 'xhigh', 'max', 'ultra'):
+        if not reader_contract()['assignment_pair_known'](model, effort):
             raise ValueError('recipient model/effort UNKNOWN or outside current admission policy')
         return {'id': identifier, 'model': model, 'effort': effort,
                 'evidence_ref': 'native state_5.sqlite threads; current direct-parent ownership'}
@@ -184,7 +192,7 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
     if not isinstance(receipt, dict) or not isinstance(receipt.get('admission'), dict):
         raise ValueError('complete current admission fields required')
     if set(receipt) - {'recipient_id', 'unit_id', 'model', 'effort', 'evidence_ref',
-                       'scope_sha256', 'message_sha256', 'policy_sha256', 'admission'}:
+                       'scope_sha256', 'message_sha256', 'policy_sha256', 'admission', 'control'}:
         raise ValueError('unsupported assignment envelope fields')
     request = dict(receipt['admission'])
     if set(request) - {'unit_id', 'purpose', 'scope', 'signals', 'complexity_reason',
@@ -199,7 +207,12 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
         raise ValueError('unsupported current admission signals')
     if request.get('purpose') != 'new_unit' or 'receipt' in request:
         raise ValueError('native task messages require fresh purpose=new_unit admission')
-    if receiver['model'] == 'gpt-6-astra':
+    control = receipt.get('control')
+    reader = reader_contract()
+    if control is not None and (not isinstance(control, str) or
+            control not in reader['CONTROL_WORDS'] or body not in reader['CONTROL_WORDS'][control]):
+        raise ValueError('control must be an exact word without additional work')
+    if control is None and receiver['model'] == 'gpt-6-astra':
         signals = request.get('signals')
         if not isinstance(signals, dict) or not isinstance(request.get('complexity_reason'), str):
             raise ValueError('Astra requires current complexity and Sol61-unsuitable reasons')
@@ -219,6 +232,13 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
                 'policy_sha256': policy, 'unit_id': request.get('unit_id'),
                 'scope_sha256': hashlib.sha256(request.get('scope', '').encode('utf-8')).hexdigest(),
                 'message_sha256': hashlib.sha256(body.encode('utf-8')).hexdigest()}
+    if control is not None:
+        # Work fingerprints stay attached to the original unit. A control cannot
+        # become a release, change scope/effort, or replace the admitted task body.
+        expected.pop('message_sha256')
+        if not isinstance(receipt.get('message_sha256'), str) or re.fullmatch(
+                '[0-9a-f]{64}', receipt['message_sha256']) is None:
+            raise ValueError('control requires the original work fingerprint')
     if any(receipt.get(key) != value for key, value in expected.items()):
         raise ValueError('assignment target/body/identity/policy mismatch')
     request.update(purpose='new_unit', message=body, recipient=receiver)
@@ -247,8 +267,11 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                     or len(json.dumps(data, ensure_ascii=False).encode('utf-8')) > 16 * 1024):
                 raise ValueError('bounded Reader assignment request required')
             request = data['request']
-            if request.get('purpose') != 'new_unit' or 'receipt' in request:
-                raise ValueError('native preparation requires fresh purpose=new_unit')
+            purpose = request.get('purpose')
+            if purpose != 'new_unit' and purpose not in reader_contract()['CONTROL_WORDS']:
+                raise ValueError('native preparation requires a known assignment purpose')
+            if purpose == 'new_unit' and 'receipt' in request:
+                raise ValueError('new work cannot reuse a prior receipt')
             if policy_root is None or not policy_root.is_absolute():
                 raise ValueError('registered policy root UNKNOWN')
             reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
@@ -278,12 +301,11 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
             if 'task_name' in data and (not isinstance(data['task_name'], str)
                     or re.fullmatch('[a-z][a-z0-9_]{0,63}', data['task_name']) is None):
                 raise ValueError('spawn task name must be an identifier')
-            if model not in ('gpt-6.1-sol', 'gpt-6-astra') or effort not in (
-                    'medium', 'high', 'xhigh', 'max', 'ultra'):
+            if not reader_contract()['assignment_pair_known'](model, effort):
                 raise ValueError('spawn outside current model/effort admission policy')
             text = data.get('message')
             # Astra is admitted even for HOLD creation; requested identity is not a host binding.
-            if model == 'gpt-6-astra' or effort != 'high' or text != HOLD_MESSAGE:
+            if model == 'gpt-6-astra' or effort not in ('medium', 'high') or text != HOLD_MESSAGE:
                 if not isinstance(text, str):
                     raise ValueError('spawn requires the fixed identity HOLD')
                 receiver = {'id': 'unbound-spawn', 'model': model, 'effort': effort,
@@ -331,7 +353,7 @@ def decide(event: object, *, dispatch_only: bool = False,
                     'fresh spawn with explicit role/model/effort, verify host binding, then RELEASE.')
     if name == 'spawn_agent':
         try: validate_spawn(data)
-        except (ValueError, TypeError) as exc:
+        except Exception as exc:
             return deny(f'CER spawn preflight: {exc}. No child binding or authority inferred.')
         return {}  # Other host/user policy still applies; parent must verify the new binding.
     marker = name == 'Bash' and isinstance(data, dict) and isinstance(data.get('command'), str) and data['command'].startswith(PREFIX)
