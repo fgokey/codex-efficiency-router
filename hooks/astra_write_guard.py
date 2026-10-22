@@ -272,6 +272,10 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                 raise ValueError('native preparation requires a known assignment purpose')
             if purpose == 'new_unit' and 'receipt' in request:
                 raise ValueError('new work cannot reuse a prior receipt')
+            if purpose != 'new_unit' and (
+                    request.get('message') not in reader_contract()['CONTROL_WORDS'][purpose]
+                    or not isinstance(request.get('receipt'), dict) or not request['receipt']):
+                raise ValueError('control preparation requires an exact control word and prior receipt')
             if policy_root is None or not policy_root.is_absolute():
                 raise ValueError('registered policy root UNKNOWN')
             reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
