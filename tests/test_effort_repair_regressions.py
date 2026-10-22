@@ -2,7 +2,7 @@
 from dataclasses import replace
 import unittest
 import test_effort_auto as base
-from effort_reference import Configuration as C, EffortEvidence, plan
+from effort_reference import Configuration as C, EffortEvidence, RoleBinding, plan
 from policy_reference import TaskSignals as S
 
 
@@ -19,6 +19,33 @@ class EffortRepairRegressions(unittest.TestCase):
         result = plan(S(), unavailable, base.AUTO)
         self.assertEqual(result.action, 'blocked')
         self.assertIsNone(result.requested)
+
+    def test_model_lock_keeps_sol61_when_a_cheaper_lane_would_otherwise_be_selected(self):
+        context = base.host(current=C('sol', 'medium'), keep_model=True,
+                            same_config_reason='independent_review')
+        locked = plan(base.DATA_TRANSFORM, context, base.AUTO)
+        self.assertEqual(locked.action, 'delegate')
+        self.assertEqual(locked.requested, C('sol', 'medium'))
+        self.assertEqual(locked.requested_role, 'cer_auto_sol61_engineer')
+        unlocked = plan(base.DATA_TRANSFORM, replace(context, keep_model=False), base.AUTO)
+        self.assertEqual(unlocked.action, 'delegate')
+        self.assertEqual(unlocked.requested, C('luna', 'medium'))
+
+    def test_model_lock_retains_exact_supported_luna_identity_when_effort_increases(self):
+        # Sol retirement must not erase exact-identity coverage for supported pins.
+        current = C('luna', 'medium', 'gpt-5.6-luna')
+        context = base.host(current=current, current_sufficient=False, keep_model=True)
+        roles = dict(context.roles)
+        roles['cer_auto_luna_worker'] = RoleBinding(current.model, None)
+        roles['luna_worker'] = RoleBinding(current.model, 'medium')
+        catalog = dict(context.catalog)
+        catalog[current.model] = frozenset(('medium', 'high'))
+        context = replace(context, roles=roles, catalog=catalog)
+        result = plan(base.DATA_TRANSFORM, context, base.AUTO, explicit_effort='high')
+        self.assertEqual(result.action, 'delegate')
+        self.assertEqual(result.requested, C('luna', 'high', current.model))
+        self.assertEqual(result.requested_role, 'cer_auto_luna_worker')
+        self.assertEqual(context.current, current)  # No live-model or context mutation.
 
     def test_ultra_fallback_guard_is_reached_for_an_ordinary_base_recommendation(self):
         signals = S(uncertainty=0, novelty=0, risk=1, coupling=1, verifiability=3)

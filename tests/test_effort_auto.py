@@ -197,8 +197,9 @@ class AutomaticBindingTests(unittest.TestCase):
         roles['luna_worker']=RoleBinding('gpt-5.6-luna','medium')
         catalog=dict(c.catalog);catalog['gpt-5.6-luna']=frozenset(('medium','high'))
         d=plan(DATA_TRANSFORM,replace(c,roles=roles,catalog=catalog),AUTO)
-        self.assertEqual((d.action,d.requested.model,d.requested_role),
-                         ('delegate','gpt-5.6-luna','cer_auto_luna_worker'))
+        # Compare the whole pair without dereferencing an unexpectedly absent request.
+        self.assertEqual((d.action,d.requested,d.requested_role),
+                         ('delegate',C('luna','medium','gpt-5.6-luna'),'cer_auto_luna_worker'))
         self.assertIn('legacy fallback',d.reason)
 
     def test_luna_fallback_needs_unavailability_evidence_and_respects_model_lock(self):
