@@ -1,35 +1,11 @@
-# Quality
+# Evidence and completion
 
-## Completion
+Before final, reconcile the original user objective, accepted scope, every remaining required item and current authority. CONTINUE while useful authorized diagnosis, delegation or implementation remains; child PASS or green local checks are not parent completion. COMPLETE requires current evidence for every requirement. BLOCKED requires the exact external missing resource, evidence, affected scope and required external action; finish unaffected work. STOP on explicit pause/cancel, scope change or actual system budget ceiling. Answer mid-task status briefly and continue; standalone questions end after answering. Never start unrequested monitoring or risky measurements.
 
-Reconcile the original user objective, accepted scope, every remaining required item and current authority.
+Reuse unchanged loaded rules; fully read necessary new/changed rules. Use physical paths and preserve link checks. Released writers may use authorized bounded native reads; Astra/readonly/unknown actors keep guarded reads. Reader uses verified Python `-I -B`, UTF-8 stdin and one aggregate budget including JSON, CRLF and framing (<=4KiB). Check exit before parsing; retain successful results, errors and each cursor. Read required ranges completely; continue missing pages rather than rereading files. Never slice full-file output, concatenate pages to evade limits or assume truncation means completion.
 
-- CONTINUE while useful authorized diagnosis, delegation or implementation remains. Unit PASS/PARTIAL/checks/reviews != parent completion. Missing measurement/design alone proves neither done nor blocked. Continue without a user nudge.
-- COMPLETE only when every required item is satisfied by current evidence.
-- BLOCKED: actual external barrier; exact missing access/input/resource, evidence, affected scope and required user/external action; finish unaffected authorized work.
-- STOP on explicit stop/pause/cancel, accepted scope change or actual tool/system budget ceiling; report remaining work.
-- Only standalone STATUS/Q&A ends after answering; mid-task questions: answer briefly, continue the original objective unless stopped/changed.
+Review available work before waiting. Batch independent reads and merged worker waits. Inspect detail only on actionable change, failure or completion; after two unchanged snapshots back off. One saved-offset diagnostic delta is enough; do not repeat tails or nudges without new evidence. Optional `COORDINATION_JS` is an adapter, not proof of work.
 
-Existing authority/scope only; no automatic monitoring, risky measurement/deploy, infinite retry or extra model probes.
+Check platform/macros, consumers and lifecycle effects. Loss/eviction/coalescing must preserve effects or prove safe discard/replay/rebuild. Findings need source evidence or a requirement violation; distinguish hypotheses and preexisting hazards. Tests use real production behavior or explicitly labelled models; a green model or static score is not proof of end-to-end correctness. Never weaken assertions.
 
-Files/rules: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Code: `locate --query Q` -> current located lines: `excerpt --start N --lines N` (count 1..200). Fix limits/page/locate errors.
-
-Reads/checks: Reader `batch --root ABS --requests - --max-bytes N --framing-bytes N` via UTF-8 stdin; aggregate JSON; keep each cursor; no early member output. ERROR/PARTIAL: retain successful results; retry failed/pending only; disclose gaps. Other: capture/select/serialize/count before emit. No doc/hook preload or child router copy. Never invent identity/savings/enforcement/cleanup.
-
-Workers: compact waits; details at actionable change/completion/error. Before passive wait: readiness (effort), then available parent review/integration. Merge <=8 targets; retain cursors/liveness/progress/errors. Commentary/tools/queries/waits/rewrites keep backoff. Two unchanged snapshots: back off; one saved-offset delta for diagnostic evidence; no repeat tails/polls/nudges until change.
-
-`COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors. `parentReady`: caller contract.
-
-Validate semantics/platforms/macros/consumers. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild in affected states; else PARTIAL/BLOCKED.
-
-Exhaustion stops blind edits, not diagnosis. Patch mismatch: inspect context/encoding/line endings; repair once. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction.
-
-Never weaken assertions. Unrun: UNKNOWN; required gaps: PARTIAL/BLOCKED.
-
-Contract: requirement/check/state/PASS/FAIL/UNKNOWN. Findings cite before/after or requirement violation; label hypotheses. P1/P2: HEAD/line endings/callee/gray path; preexisting hazards open. Callback/gray/static score cannot prove event loss safe; unchanged baseline != diff.
-
-Parent: original code/evidence/test applicability, disagreements, objective/open work. Reread changed/failed only. Independent review/child PASS cannot substitute. `completion_check`: begin before append; reconcile before check.
-
-Red/green: production/exact extraction+named stubs/handwritten MODEL; text identity/full affected baseline required; half-old/claimed extraction/whole-project stubs only illustrate.
-
-Standalone status/check: one-shot; explicit watch: compact state/cadence; stop on cancel. BACKOFF: in-turn wait; heartbeat: defer schedule or pause, never skipped wakeups. Child cost != task cost; cached input separate; usage/prices UNKNOWN. Run required checks once after final changes stabilize; repeat changed/failed.
+Attempts persist per task/unit/failure across all owners, models and compaction. A patch mismatch gets context/encoding/EOL inspection and one targeted repair. Exhaustion stops blind edits, not Astra diagnosis. Run required checks on final stable state; repeat only affected or failed checks. Unrun evidence is UNKNOWN; required gaps remain PARTIAL/BLOCKED. Parent independently reviews the actual diff, evidence and test applicability. Use `completion_check` only when provided by the host, beginning before appending requirements. Count all parent/child work; cached input is a subset, and unavailable prices or usage remain UNKNOWN.

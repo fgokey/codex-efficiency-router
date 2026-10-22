@@ -1,8 +1,4 @@
-# Effort/binding
-
-Keep requirement/unit IDs/prerequisites. same-model needs contextual value AND net benefit. Two writers max; no agent per file/permission bypass.
-
-Dispatch/completion/readiness/blocking change: check dependencies/owners/free slots, not polls. Two substantial ready disjoint units: two engineers within slots; coupled/dependent/shared writes one; tiny checks local. Review overlaps unrelated work only with current scoped hashes/applicability; scope changes invalidate receipts.
+# Select capability once per work unit
 
 |Role|Model/effort|
 |---|---|
@@ -12,16 +8,10 @@ Dispatch/completion/readiness/blocking change: check dependencies/owners/free sl
 |`sol_engineer`|gpt-6-sol/medium|
 |`astra_architect`|gpt-6-astra/high|
 
-High: coupling/lifetime/ambiguity/conflict.
+Choose model and effort jointly. Use `cer_auto_<role>` with explicit effort and `fork_turns=none`; fixed fallback requires observed unavailability and the exact role/catalog pair. Never silently remap. Verify actual host binding before RELEASE; requested parameters are not identity. Respect explicit pins and model/effort ceilings.
 
-Select model AND effort: `cer_auto_<role>`+explicit effort; avoidable base role is MISMATCH. higher efforts need evidence/support. Fallback: observed unavailability/exact role/catalog pair/locks/floors/history; no remap.
+Default engineering or review uses Sol61/high when difficulty is unknown. Confirmed simple work may use medium; bounded Terra and mechanical Luna work require low risk and strong checks. Low remains opt-in for deterministic Luna tasks. Higher effort needs a demonstrated reasoning bottleneck, supported effort and expected benefit, not build duration or a retry count. Ultra additionally needs one authorized Sol/Astra coordinator and independent disjoint units; it grants no permission.
 
-Default engineering: also review; `agent_type="cer_auto_sol61_engineer",reasoning_effort="high",fork_turns="none"`; parent may explicitly select medium for confirmed simple work. Owned task_name/message. Exact pins prevail. No default/inherit/hot-load; verify host binding before RELEASE. Preflight params!=identity. `gpt-5.6-sol/luna`: explicit/fallback. No blacklist; recheck stale unavailability. Capability failure: adequate; others fix prerequisites. Keep attempts; no probes/replay/ladder; High cannot replace capability.
+Same-configuration delegation needs contextual value AND net benefit. Prefer one implementation owner plus an independent reviewer only when useful. Two writers max; never one agent per file. At meaningful changes check ready work, dependencies and ownership; parallelize only independent units without shared write/build state.
 
-Luna: low-risk mechanical; confirmed transform medium. Auto-low: opt-in deterministic Luna/strong checks/no novelty/conflict/failure. Low: floors; Astra medium explicit-only.
-
-Auto XHigh/Max: reviewed bottleneck/High-limit/value; no lower trial. Ultra: exact Sol/Astra support/one authorized coordinator/2+ disjoint units/capacity/benefit/retry bounds; owns unit. Role conflict blocks; no effort token cap/guarantee.
-
-Reconcile binding/effects at safe boundary; review affected checks. Retain work/attempts/limits. Later VERIFIED does not erase review; UNKNOWN is not failure.
-
-Resolve MISMATCH before continuation. UNKNOWN/MISMATCH suspends auto-low. Honor disable/no-subagent/no-escalation.
+Resolve MISMATCH at a safe boundary, reconcile effects and review affected acceptance. UNKNOWN is not proof of mismatch, but neither permits unverified writes. Both suspend automatic low; later VERIFIED does not erase outstanding review. Keep attempts and user limits. Missing requirements, authority, environment or observations need repair, not escalation. No repeated model probes or compulsory tier ladder.

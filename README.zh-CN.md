@@ -1,344 +1,72 @@
 # Codex Efficiency Router
 
-可选的[固定版本宿主补丁](docs/INSTALL.md#pinned-host-compatibility-patch)用独立明文准入入口处理原生协作参数加密的问题。Windows 原生实测已覆盖 Sol61/high 正常完成，以及 Astra 无准入、旧凭据改正文、裸“继续”和原生复用入口被拒绝。需要匹配版本的宿主、已信任 Hook 和明确启用；普通 Skill 安装不会自动启用，也不改变父模型。回滚只移除新增宿主设置、恢复原 `CODEX_CLI_PATH` 并重启，Skill/Hook 的卸载独立处理。
+[English](README.md) · [本轮修复范围](docs/REPAIR-2026-10-22.md) · [实装验收](docs/ACCEPTANCE.md)
 
-宿主工具说明现已写明子任务命名格式、派发与文件读取分开执行，以及工具检索只输出匹配名称。更新这些说明需要重建宿主并完整重启桌面应用；这不等于新增了宿主级输出拦截。
+**v0.8.5 修复分支 · 仅 Codex · MIT · Python 3.11+**
 
-更新后的可选宿主补丁还在原生统一工具入口限制 Astra/未知模型执行，覆盖代码模式内部调用和终端续写。用 `read_only` 读取有界文件页，用 `prepare_agent_task` 经必需的已信任 Hook 生成新的 Reader 凭证，再由 `admitted_agent_task` 派发执行者。两个已审计的桌面只读工具同时支持原生动态传输和宿主发现的内置桌面 MCP：`read_thread` 必须明确指定 `turnLimit` 1..5 和 `maxOutputCharsPerItem` 0..8000；`wait_threads` 必须有 1..8 个目标并明确指定 `timeoutMs` 0..60000。MCP 权限要求原生插件来源、规范化内置安装根、预期本地启动器及继承的桌面管道；重复、远端来源或覆盖的管道变量均撤销权限。两条路径共享参数校验，Hook 改写后仍复查，缓存权限也随来源变化撤销。手工同名 MCP、任意插件标识或 `readOnlyHint` 均不授予权限。上述模型仍不能直接运行任意 shell、补丁、构建、测试或其他第三方工具，父 Astra 的局部修复例外也不适用；Sol61 执行者保留正常工具，旧 Astra 工作仍须新凭证准入。需要重建匹配宿主并重启；单改 Skill 或派发 Hook 不会启用这一边界。
+按子任务选择原生 Codex 执行者的模型和思考档位，明确写入范围和验收证据。严格执行路径下 Astra 只读分析，困难问题直接参与判断；实现交给适当执行者。默认一个实现者，必要时增加复核者，同一问题优先复用原负责人。
 
-[English](README.md) · [自动适配设计](docs/ADAPTIVE-EFFORT.md) · [质量协议](docs/QUALITY-PROTOCOL.md) · [实装验收](docs/ACCEPTANCE.md)
+这是社区项目，不会切换父模型。安装成功、单测通过、指令文本变短，都不能直接证明实际质量、速度或套餐额度收益。
 
-准入入口支持保留 V1 状态的旧会话和 V2 会话，也可由代码模式发现。旧宿主曾只向 V2 暴露入口，导致 V1 的旧调用被拦却无可用新入口；这需要更新宿主并完全重启桌面，单独重装 Skill 无法解决，不需要改变父模型或会话历史。
+## 本轮解决的问题
 
-**v0.8.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
+Reader 和派发门禁共用模型/档位支持范围，Luna、Terra、旧 Sol 不再仅因低于 Sol61 被拒绝。已知执行者的 medium/high 身份 HOLD 不再重复申请业务任务准入；实际身份核验与写入前 RELEASE 仍然必需。
 
-## 宿主启动检查与显式兼容模式
+同任务的精确 continue/status/stop 控制消息复用原有当前策略凭据和范围，不必重建子代理，也不授予新任务权限。夹带新工作、改变范围或身份仍拒绝。可选定制宿主必须使用 Reader 返回的 `admitted_dispatch_arguments`，显式传递接收者模型和档位，不能沿用默认 Sol61/high。
 
-`--host-mode full|compat` 与路由档位 `--mode auto|fixed|adaptive` 独立。新装和旧安装默认 **full**；缺能力绝不自动降为 compat。用户显式安装的选择在普通更新时保留。
+Windows 验证覆盖 UTF-8 BOM、原样 CRLF、包含中文和空格的 CODEX_HOME、PowerShell 7/5.1 启动器、错误解释器拒绝，以及安装、打包和卸载。是否通过以对应提交的 CI 为准，不以这段功能说明代替测试结果。
 
-任务开始时先检查宿主工具、当前真实绑定、权限/RELEASE 和 Guard 证据。在本仓库运行 `python scripts/doctor.py --startup --source-tree .` 可得到廉价本地报告，不跑测试、不调用模型、不安装。改用 `--scope user` 可读取已安装档位和本地 Guard 注册。可选 `--host-context FILE` 最多接收 16 KiB 的不可信声明，包括自报接口；这些 JSON、配置、目录或旧凭据均不能证明实际当前模型、effort 或权限。CLI 无法认证当前绑定，因此 full 报 BLOCKED（退出 1），等待当前可信宿主/工具证据；原 full 准入和 RELEASE 门仍适用，报告不授予写权。`--preflight` 继续只做源码和测试检查。
+## 角色配置
 
-显式兼容安装先预演：`python scripts/install.py --scope user --host-mode compat --dry-run`，有安装授权后才移除 `--dry-run`。`doctor.py --startup --host-mode compat` 仅选择本次报告，不改变安装。compat 提供规划、上下文精简和复核；当前执行者可在已有宿主/用户权限内使用原生工具完成工作，缺模型元数据或可选 Python/Reader/completion 辅助不构成额外停工条件。它不强制派发模型、不改父模型、不注册 Guard、不安装或接管角色、不创建模型默认值。真实只读角色、沙箱/Hook 禁令、输出/必要规则/质量要求和独立的部署发布授权仍有效；不承诺模型身份、强制生效或 Token 收益。
-
-已有完整安装直接切 compat 会被拒绝，`--force` 也不能绕过；compat 同时拒绝旧版接管和模型默认值开关。若确需更换安装，应先核对原安装，再使用明确的卸载/恢复流程；不会为启用 compat 静默删除角色、定制文件、默认值、其他 Hook 或宿主保护。compat 切回 full 必须显式选择，并继续检查所有权和路径碰撞。安装器/doctor 仍需 Python 3.11+，但已安装 compat 规则下的正常授权工作不依赖这些辅助程序。
-
-## v0.8.5：明确委派与有界证据
-
-canonical `spawn_agent` 预检查在执行者/协调白名单放行前拒绝未绑定的 default/inherit、缺 effort 和历史继承。固定角色及明确的模型/effort pin 保留；实际宿主绑定和用户授权仍须独立核验。`Agent` 参数形状尚未验证。只有已注册的原生 Hook 才会执行此检查，本地测试不证明宿主强制。
-
-读取器旧 `read/search/list/diff/status` 的 CLI 输出也按整体 4096 字节分页，包含 JSON、cursor 和 CRLF。编码协议的小结果保留原文本，大结果返回 JSON 页；相同请求加 cursor 续读。过大的 batch 明确失败并要求拆分。Git 最多捕获 128 KiB，读完捕获前缀仍为 PARTIAL；文件读取上限仍为 16 MiB。其他工具仍需各自捕获/投影预算。
-
-先独立读 core，仅按阶段触发引用；角色表位于 dispatch 前的 effort 引用。`quality_reference.reuse_validation` 核调用者提供的仓库/提交、文件/依赖哈希、命令、范围、环境和 PASS 证据，变化或未知不能错误复用。`python -B scripts/canary.py inspect` 从 stdin 读最小执行观察（16 KiB），分别输出读取/绑定/输出/退避结果（4 KiB）；证据依据为调用者提供，宿主强制和全任务覆盖仍 UNKNOWN。见 [Canary](docs/CANARY.md)。
-
-## v0.8.4：大 JSON 定点读取
-
-用 `python -I -B <Skill>/scripts/readonly_reader.py json --root ABS --path FILE --pointer /path` 获取原样 JSON 值文本，加 `--mode members` 获取直接子成员的键/索引、类型和 Pointer。`next_cursor` 非空时，用相同命令、Pointer、模式加 `--cursor TOKEN` 续页；先检查退出码再解析。每页以 64 KiB 块重新验证并计算完整 UTF-8 源文件的 SHA（扫描上限 256 MiB），不建立 DOM 或缓存，因此每页耗时为 O(文件大小)。深度最多 64，键最多 16 KiB，成员目录最多 16384 项且解码后键合计最多 1 MiB。响应连游标和 CRLF 最多 4096 字节；旧读取操作仍限 16 MiB。仅支持字符串形式 JSON Pointer，源文件变更或资源超限明确失败。
-
-## v0.8.3：执行器生命周期和工具结果限量输出
-
-还有检查或修正时保留执行器，父级验收完成后再关闭。真实恢复会使旧授权失效：先只读返回，核验新的宿主绑定，再单独授权；不能假定模型保持不变。大工具结果先保存在工具内部，只选必要字段并保留续页游标；统计序列化结果和外层包装的总量后，再输出一页。现有读取算法和指令预算不变。
-
-首次单独分页加载 SKILL。已知文件或完整规则用 `page`，只有已定位的当前行范围才用 `excerpt`（行数 1–200）；解析 JSON 前先检查退出码。非法范围仍非零退出且 stdout 为空，错误提示给出限制或实际行数以及 page/locate 恢复方向。0.8.1 已支持 `page --root ABS --path FILE` 不带游标读取首个页面；4096 字节上限和文件变更拒绝保持生效。
-
-## v0.8.0：GPT-6.1 Sol 绑定
-
-普通 Sol 新任务默认选 `gpt-6.1-sol`；难度未知时显式选 high，已确认简单的工作可选 medium。独立的 `gpt-6-sol` 角色保留精确钉选及有证据的回退。新别名缺失或宿主目录未知时，不会悄悄转到旧模型。两代标准 API 输入/输出单价相同，但缓存输入分别为 [6.1 的每百万 $0.10](https://developers.openai.com/api/docs/models/gpt-6.1-sol) 和 [6 的 $0.20](https://developers.openai.com/api/docs/models/gpt-6-sol)；不据此推断实际任务总费用。宿主目录可能额外支持 Ultra，仍受原有授权门槛约束。
-
-## v0.7.1：定位与范围读取
-
-已知行号时，用已验证的 Python 直接调用已安装读取器：`python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N`（1–200 行）。未知位置先用 `locate --root ABS --path DIR --query LITERAL` 获取有界的文件/行号候选，不输出正文；`--help` 列出参数。长范围用游标续 `page`；完整规则先用 `page --root ABS --path FILE`，仅在 `next_cursor` 非空时续页；原有 `index`/`page` 游标保持兼容。每次仅输出一页，不整文件分页后截取，也不合并多页/多文件大输出。`cer.ps1 read` 保留便捷入口。定位遵循 rg 默认忽略/隐藏规则，排除常见构建目录及超过 16 MiB 的文件；PARTIAL 要缩小范围。仅经过此读取器的输出受边界保护。
-
-## v0.7.0：随普通 Skill 安装的有界读取器
-
-普通 Skill 安装会部署只读的 `cer.ps1 read index/page` 与 Python 读取器。使用绝对根目录和字面量相对文件路径；可用 `index --start N --lines N` 定位源码范围。沿 `next_cursor` 续读至 null 才算完整覆盖该范围。每次 CLI 响应连同 JSON、游标和换行最多 4096 个 UTF-8 字节；超过 16 MiB 的文件明确报错。该入口不拦截其他工具，也不启用 Hook。
-
-## v0.7.0-rc.17：有界读取与证据核查
-
-未知大小先索引再读取；捕获的输出按序列化后总字节预算分页，续读位置也计入预算。规则还明确同一会话写入放行的复用、容量故障后按新职责重评，以及评审中的基线和源码证据。这些仍是策略与离线示例，不代表宿主已强制执行。
-
-## v0.7.0-rc.16：父级放行与输出总量
-
-新派发或恢复的子执行者先只读准备。父代理核对当前宿主观测到的代理与会话绑定，再明确放行一个修复单元；仅绑定匹配不能写入。大型工具返回先捕获，再按外层总预算挑选字段或分页输出；内层与单项限制不能代替总预算。强制规则按有界分块完整读取。这些是策略指令与离线检查，不代表宿主已强制执行。
-
-按子任务联合选择模型和思考档位。普通安装和更新默认自动适配，无需判断 fixed/adaptive 或反复重装。质量与授权优先；不承诺任意任务都更省、更快或质量完全不变。这是独立社区项目。
-
-## v0.7.0-rc.15：GPT-6 路由与有证据的高档位
-
-现行路由在工程难度未知时优先选 GPT-6.1 Sol/high，已确认简单的工作可选 medium；聚焦低风险代码选 GPT-6 Luna/high。精确钉选保持不变；旧 GPT-5.6 绑定只作显式选择或有证据的回退。XHigh/Max 需要父代理审查任务证据；Ultra 还要求一个获授权的 Sol/Astra 协调者和互相独立的叶子任务。
-
-
-## Windows 解释器预检与验收边界
-
-下方统一使用 `cer.ps1`；install/uninstall 包装脚本也复用它。入口实际检查 Python
-版本及 `tomllib`，尝试 PATH 中可用解释器和 `py -0p` 列出的已安装版本，**在调用
-安装器前拒绝 3.10**。`python` 或 `py -3` 不代表一定满足 3.11+。不下载运行时，
-不改 PATH，不修改全局配置。
-
-已有可用解释器（包括你确认可用的应用内置 Python）时，在当前 PowerShell 会话
-显式指定它的**真实完整路径**：
-
-```powershell
-$env:CER_PYTHON = 'C:\实际目录\Python312\python.exe'
-.\cer.ps1 doctor --scope user --json
-```
-
-显式路径无效就停止，不静默换解释器。选中的路径和版本输出到 stderr，JSON stdout
-不混入提示。应用更新可能移动内置 Python；独立 Guard 会绑定安装时解释器绝对路径，
-路径变化后要重新检查/更新 Guard 并审查定义。Portable Plugin 的解释器发现另行验收，
-本入口不证明其生效。
-
-**安装 Skill 仍不等于启用 Guard。** 未显式安装并现场验证时，仍是 policy-only；
-CI 全绿也不等于原生 Canary 通过或真实任务已经更省、更快。没有对应宿主证据时，
-`enforcement=NOT_VERIFIED`、加载版本 `UNKNOWN` 继续保留。
-见[显式启用 Guard 与 Canary](docs/UPGRADE-v0.7.0-rc.1.md)。
-
-## v0.7.0-rc.13：控制最外层输出总量
-
-合并 shell、web 或嵌套工具结果前，先确认全部输出加余量仍能装入最小的外层输出上限。
-仅有行数不能说明内容体量；估算未知时先索引、摘要或拆分。强制规则通过独立的有界分块
-保持完整。输出截断后只从游标恢复缺失范围，不重放副作用。连续两次快照无变化并读取一次
-已保存偏移的增量后，只要状态仍未变化，监控就保持退避。
-
-## v0.7.0-rc.12：限制批量读取中的每个成员
-
-读取大小未知的报告、日志或源码前，先检查大小、行数或索引，只取相关范围。批量命令中的
-每个读取都必须有界；旁边的小型搜索结果或工具输出上限，不能让完整文件读取变得有界。
-输出截断后只续读缺失且相关的范围。离线测试覆盖该边界，但不声称宿主已强制执行。
-
-## v0.7.0-rc.11：按修复单元授权与父级验收
-
-父代理核对一次宿主实际观测到的写入者绑定，并在同一修复单元内复用；该单元可包含实现、
-源码/构建配置、格式化和定向检查。模型、档位、角色、权限、所有者、会话恢复或相反证据变化
-会使绑定失效。二进制复制、运行时/权限配置、部署和破坏性恢复仍分别受限。只有实际策略拒绝
-才停止等价重放；`approval=never` 本身不构成必须手工处理的边界。
-
-Astra 父代理对完整结果负责：审查全部交付 diff 和实际验证结果，给出具体修正，复核受影响
-区域，关闭阻塞性问题，并完成最终集成验收。子任务 PASS 只是单元证据，不等于父级 PASS。
-
-## v0.7.0-rc.10（历史，已由 rc.11 取代）：逐调用写入准入
-
-策略要求父代理在每次写入工具调用前核对宿主实际观测到的 Terra/Sol 绑定。每个写入调用
-只允许一份精确清单和一种有界操作；正向复制、配置改写和破坏性恢复相互分离。
-宿主策略拒绝后，在策略改变前不得原样重试、等价重放或换壳执行；禁用审批时明确
-报告需要用户手动处理的边界。
-
-## v0.7.0-rc.9：减少长上下文工具往返
-
-已发现的工具结构会复用到失效为止。长上下文只在状态变化或检查点到期时继续工作，
-并只批量执行有界、独立的检查。监控子代理时使用紧凑等待和退避；连续两次原生快照
-无变化后，只按已保存偏移读取一次有限的 rollout 增量，随后等待进展，不同时轮询两条
-路径。离线状态机测试覆盖工具重查、工具往返准入和增量读取行为。
-
-## v0.7.0-rc.8：限制读取输出并避免重复前缀
-
-强制规则文件分别读取；其他大小未知的文件先看索引，再读取相关范围；只有已知较小且
-合计不超输出预算的片段才能批量读取。输出被截断后，只续读缺失范围，不再重复已取得
-的前缀。所有角色都携带同一约束，并增加了可执行的离线决策测试，现有指令预算不变。
-这是策略行为，不证明旧任务已经加载。
-
-## v0.7.0-rc.7：处理档位不匹配并保留关键上下文
-
-发现实际模型或档位不匹配后，在安全边界核对配置、副作用并复核受影响的验收结果；
-保留有效修改和尝试记录，后续一次匹配记录不能自动清除待复核问题。UNKNOWN 本身
-不等于已确认配置错误。精简交接必须保留适用规则路径、关键决定及理由；所有角色
-读取项目规则，关键上下文缺失时暂停受影响的工作。
-独占所有权的父 Astra 可以继续同一合格修复单元，其他写入者仍会阻止例外。
-需要对比费用和质量时复用既有任务日志，不增加探测或轮询。
-
-## v0.7.0-rc.6：修复边界与按任务显式调档
-
-父 Astra 修复例外和执行者复用都必须通过前置条件、能力/档位、安全边界及绝对重试上限
-检查。一个受限修复单元可包含代码、测试等多次补丁；仅给理由不能续期。
-Sol/Terra 可在父代理明确移交已有用户授权、仓库/分支/目标及必要检查后负责交付。
-
-自动联合选择模型与档位：实现 Terra/medium，诊断 Sol/medium，耦合或高后果推理
-Sol/high，特别困难的判断 Astra/high。显式传入自动角色、思考档位和 `fork_turns="none"`，
-通过精简完整的契约交接，避免继承父代理 max。优先复用足够能力的空闲执行者，
-保留 fixed/low 偏好。离线测试不能证明运行时已加载或节省。原生修改文件徽标以宿主
-归属证据为准，不能凭模型名称或 Review 入口断言生效。这取代 rc.4 的模型限制和
-rc.5 的单补丁限制；严格 Guard 仍禁止 Astra 写入。
-
-## v0.7.0-rc.5（历史）：父 Astra 的受限修复
-
-Astra 继续负责困难诊断和裁决。Astra 子代理及只读角色始终禁止写入。父 Astra 仅在
-执行者经过合格尝试仍失败，或移交会实质丢失修复所需的关键推理时，才可直接完成一次
-范围明确的本地代码修改；同时必须已确认用户授权、精确范围、当前任务工作区、独占
-所有权、安全边界和验证方法，且没有活跃写入者、既往例外或已观察到的活跃严格 Guard。
-未知 Hook 层仍可能在运行时拒绝写入，成功前不能声称已经修改。
-Shell、构建、有副作用测试及发布仍由 Sol/Terra 执行。证据不完整就委派、等待或阻塞。
-可选原生 Guard 有意保持更严格，会禁止所有 Astra 写入。
-
-## v0.7.0-rc.4（历史）：原生修改汇总预检
-
-写入派发前，Router 现在会检查目标 Git 仓库是否属于当前任务工作区，以及修改是否
-由同一个具备写权限的父线程完成，避免再把 Review 入口描述成原生“修改文件”徽标的
-修复。必须保留徽标的写任务应在目标仓库中使用 Sol/Terra 父线程，Astra 只承担困难
-判断的只读子任务。
-
-## v0.7.0-rc.3：显式自动档位派发
-
-自动生成的角色现在会在宿主角色发现信息中标明自己是自动档位绑定。宿主同时暴露
-匹配的 `cer_auto_<角色名>` 和显式档位字段时，父 Agent 必须使用该别名并传入选定
-档位。固定角色只作有证据的兼容回退；自动路径可用时仍选择固定角色会报告为不匹配。
-本次仍是 policy-only，不增加模型调用或常驻进程。
-
-## v0.7.0-rc.2：精简指令
-
-本候选版压缩核心 Skill、按需 references 和独立角色指令，不改变路由与写权限。
-引用文件仅在对应条件触发且尚未加载、失效或压缩后丢失时读取，避免逐工具重读。
-详见[体积与验证记录](docs/VALIDATION-v0.7.0-rc.2.md)。保留 fixed/low 设置和底层安装参数；Windows 入口见上方预检说明。
-
-
-## v0.7.0-rc.1：可验证状态，不冒充运行时已生效
-
-源码仍是基于 v0.6.0 的**候选版本，不是稳定正式版**；尚未完成全部发布门槛。
-保留已安装的 fixed 模式与 automatic low 关闭状态；不增加 Write Lease、
-常驻进程或强制并发状态账本。Astra 遇到复杂问题仍亲自诊断和验收，但不直接写入。
-
-`policy-only` 只代表规则；`guarded` 只代表已注册，不代表已信任或已拦截；
-`live-verified` 需要与当前环境绑定且未过期的**操作者见证原生 Canary**。
-磁盘版本、静态测试和“哨兵文件不存在”都不能单独证明现场生效。
-Hosted tools、已有执行会话的 `write_stdin` 仍不在完整覆盖范围内。
-
-新增状态 JSON、版本/哈希诊断、显式 Guard 更新、受限 batch 读取、三组逐调用
-费用统计，以及可复现 Plugin/源码打包。Plugin manifest 已有离线校验；插件角色发现、
-信任与 Windows 原生执行仍需实装验收。现有用户优先沿用 Skill 安装器加显式独立
-Guard 的路径，不要同时安装两套重复 Hook。
-
-Git 工作区可按下方命令快进更新，并记录实际 commit。下载 ZIP 的用户解压审查后，
-按[候选版升级说明](docs/UPGRADE-v0.7.0-rc.1.md)执行。
-详见 [Canary](docs/CANARY.md)、[对比数据格式](docs/BENCHMARKING-v0.7.md)、
-[验证状态](docs/VALIDATION-v0.7.0-rc.1.md)和[优化计划评审](docs/REVIEW-v0.7.0.md)。
-
-## v0.6 历史规则：Astra 不亲自写，但必须参与难题
-
-写入资格现在优先于“小任务本地完成”：Astra 根/子代理只读，不能 patch、写检查点、格式化、构建或运行有副作用的测试。它仍直接分析源码/diff、裁决架构和诊断反复失败；两次有质量尝试仍无法解释时，停止盲改、交 Astra 分析，结论由现有 Sol/Terra 实施。重试预算不重置。已有修改保留并移交独立复核；两个写入者忙时等待，不再开第三个。rc.5 已用上方受限例外取代这条历史规则中仅针对父 Astra 的部分。
-
-Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Codex 原生同步 PreToolUse 门禁，拦截已覆盖路径上的直接写入，并提供受限只读读取方式。**门禁必须显式注册并在 `/hooks` 中信任；普通 Skill 安装不改共享 hooks.json，也不等于硬拦截已生效。** 这是一项作用于配置范围的权限保护，不是又一个路由模式。优先按项目一次安装，详见[写入门禁、安装/卸载与验收](docs/WRITE-GATE.md)。
-
-仅需要任务准入时，可独立注册：`python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT>`，随后在 `/hooks` 审阅并信任这个确切定义。卸载使用同一命令并将 `install` 换成 `remove`。它保留 strict 写入 Guard 和其他 hooks，不限制父 Astra 的 shell/patch 工具；通过本地只读 `~/.codex/state_5.sqlite` 检查接收者记录，每条 Astra 任务及 Astra HOLD 创建都重新要求双理由。数据库字段不能证明子任务仍已加载，也不能证明后续宿主派发仍保持该身份。原生别名、应用消息、code-mode 内层 hook、信任和异常/超时行为均需真实宿主验收。详见[独立任务准入及固定 HOLD 协议](docs/INSTALL.md#optional-native-dispatch-admission)。
-
-## 一次安装，运行时自动适配
-
-父 Agent 先判断必要能力和委派收益，再依据实际工具、已加载角色和支持的模型/档位选择：
-
-| 当前宿主条件 | 行为 |
-| --- | --- |
-| 可显式传档位，且自适应绑定正确加载 | 必须使用自适应绑定并明确传入选定档位 |
-| 缺少上述能力，但固定角色恰好满足同一模型/档位 | 使用固定兼容绑定，并记录自动路径不可用的原因 |
-| 两条路径均不满足 | 仅能力及权限均足够的本地工作可继续；Astra 通常交执行者，父线程受限例外完整成立时可本地修改，否则阻塞 |
-
-只选择一个绑定、创建一个必要子任务。不会为了探测而调用模型，不修改运行中的配置；未知写入者或副作用未确认前不重新派发。兼容回退不代表动态调档成功，实际身份未知时仍标记 UNKNOWN。
-
-| 角色职责 | 模型 | 固定兼容档位 |
+| 角色 | 模型 | 固定档位 |
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-自动模式从这五份源定义生成五个 `cer_auto_<角色名>` 自适应别名，加上五个固定兼容角色，共 **10 个小型 TOML 文件、4 种职责**。这不是 10 个同时运行的代理，也不增加模型等级；别名增加一段简短的自动档位发现标记、改变名称并去掉档位固定，模型、指令及权限保持一致。新增发现文本会占用少量宿主上下文，不宣称零开销。
-
-普通工作使用 Sol/medium；聚焦低风险代码使用 Luna/high，确定性转换可用 Luna/medium。自动 low 仍需主动开启。父代理自动选择 XHigh/Max 时必须记录瓶颈、High 不足及额外档位价值；Ultra 还需精确 Sol/Astra 支持和一个获授权协调者管理互斥叶子任务及共享边界，显式 Ultra 不会自动授予协调权。不强制逐档试错，不静默替代，也不重置失败预算。旧 GPT-5.6 Sol/Luna/Terra 保留为精确显式/回退选项。
+普通安装默认 `auto`：五个固定兼容入口加五个 `cer_auto_*` 自动入口，每项任务只选一个入口，并非启动十个代理。实际支持范围由宿主决定。自动 low 默认关闭。本次保留既有高档默认策略，先修通执行链路，不把模型调优与协议修复混在一起。
 
 ## 安装与更新
 
-安装包的 `scripts/readonly_reader.py assignment` 通过有界 stdin 在给现有子任务发送工作前检查准入，只返回短前缀和正文哈希；实际消息必须合并同哈希正文。缺失/未知证据不给执行参数。纯同范围 continue/status/stop 可缓存当前凭据；廉价只读审查仍须派发检查。这是调用方必须消费的策略检查，不是宿主拦截或接收者身份认证；既有 live 角色不会因安装而热更新接收规则。已释放的可写执行者可在既有授权内使用有界原生读取，仍须遵守同一任务、根目录、链接和输出限制；其他角色保留受保护的读取边界。Reader 的完整预检、严格解析、续页和总包装限制不变，不声称原生读取与 Reader 等价。[输入、入口和限制](docs/INSTALL.md)。
-
-先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "high"`；更新时把工具拥有且未改动的旧 medium 迁移到 high。父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同的用户自有值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
-
-先运行 `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run` 预览，再去掉 `--dry-run` 应用。更新保留设置，doctor 核验当前值；卸载只移除工具插入的配置并保留用户其他改动，包括旧安装中用户自有的 medium。restore 遇到后续任何 config 改动均拒绝覆盖，即使带 `--force`。这两项只表达子默认配置意图，宿主加载与会话是否采用必须实测，不能保证当前存量会话生效。工程规则要求明确 `cer_auto_sol61_engineer`，难度未知时显式选 high、确认简单时可选 medium，并传 `fork_turns=none`；宿主绑定匹配才 RELEASE。规则禁止工程派发使用裸 `default`，这不是宿主已强制禁用该工具。全历史 fork 仍继承父模型。
-
-### Windows / PowerShell
+在仓库目录执行，保持与原安装相同的范围。先核对改动，正在执行的任务到安全边界后再更新。
 
 ```powershell
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-.\cer.ps1 install --scope user --dry-run
-.\cer.ps1 install --scope user
-.\cer.ps1 doctor --scope user
-```
-
-### macOS / Linux
-
-```sh
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-python3 scripts/install.py --scope user --dry-run
-python3 scripts/install.py --scope user
-python3 scripts/doctor.py --scope user
-```
-
-### 已安装用户更新
-
-```powershell
+git switch main
 git pull --ff-only
 .\cer.ps1 install --scope user --dry-run
 .\cer.ps1 install --scope user
-.\cer.ps1 doctor --scope user
+.\cer.ps1 doctor --scope user --json
 ```
 
-macOS/Linux 将 `./cer.ps1 <action>` 换为 `python3 -B scripts/<action>.py`，并先确认版本为 3.11+。**不再需要 `--mode adaptive`。** v0.4 及更早带清单安装在普通更新时迁移到 auto，并打印迁移提示、备份原文件、保留 low 设置。旧清单没有选择来源，无法区分旧默认和用户当时的意图；确需保持旧模式的高级用户可显式指定旧参数，见[迁移与兼容](docs/INSTALL.md)。v0.5+ 明确设定的高级覆盖会在以后普通更新中保留。原始 v0.1 无清单安装仍需安全认领 `--adopt-v01`，不凭文件名覆盖。
+首次使用先克隆 `https://github.com/fgokey/codex-efficiency-router.git` 并进入目录。启动器实际检查 Python 3.11+，不下载 Python、不修改 PATH。指定已有解释器时，把 `$env:CER_PYTHON` 设置为真实 python.exe 完整路径；显式路径错误时直接失败，不偷偷换解释器。不需要为本项目全局关闭 PowerShell 执行策略。
 
-发现定制文件或同名冲突先核对，不直接 `--force`。`doctor: STATIC PASS` 仅表示静态安装一致，不是模型运行证据。更新后重新加载 Codex，新开任务可避免旧上下文混入。只复制 SKILL.md 不会部署角色，完整安装使用本仓库脚本。
+macOS/Linux 使用 `python3 scripts/install.py --scope user --dry-run`，确认后去掉 `--dry-run`，再运行 `python3 scripts/doctor.py --scope user`。项目级使用 `--scope project --project-root` 和真实项目路径；不要双范围重复安装。保留仓库克隆以便卸载恢复。定制文件或同名非本项目文件发生冲突时先检查，不直接使用 `--force`。
 
-### 项目级安装
+更新后重新加载 Codex。验收时显式使用 `$codex-efficiency-router`；符合描述的复杂任务也允许自动发现。磁盘更新不代表旧长会话已经加载了新规则。
 
-```powershell
-.\cer.ps1 install --scope project --project-root "C:/Work/my-project" --dry-run
-.\cer.ps1 install --scope project --project-root "C:/Work/my-project"
-.\cer.ps1 doctor --scope project --project-root "C:/Work/my-project"
-```
+## 必须分清三层能力
 
-macOS/Linux 使用 `python3 -B scripts/<action>.py` 和实际绝对路径。用户级 Skill 位于 `~/.agents/skills/codex-efficiency-router`，角色位于 `$CODEX_HOME/agents`（默认 `~/.codex/agents`）；项目级分别为 `.agents/skills`、`.codex/agents`。具体备份路径由安装器打印。
+**Skill/角色、可选写入/派发 Hook、实验性定制 Codex 宿主是三个独立层。** 普通安装不注册 Hook、不修改信任、不替换二进制。`policy-only` 只代表指令约束，不是运行时强制。doctor 静态通过不是实际 Canary 通过。
 
-## 使用
+路由档位 `auto/fixed/adaptive` 与宿主选择 `full/compat` 不同。保留既有显式选择，full 仍为默认。full 的相关操作需要真实绑定和已有授权；本地 `doctor --startup` 无法认证运行中的身份，报告 BLOCKED 不等于代码坏了，不要把它变成每项任务重复执行的前置条件。显式 compat 只在现有权限内提供规划、精简上下文和复核，不承诺模型路由，不解除沙箱/Hook，也不自动替换已有 full 安装。切换前阅读[安装与恢复](docs/INSTALL.md)。
 
-```text
-$codex-efficiency-router
-完成当前任务，按任务需求选择模型与思考档位，保留必要验收。
-```
-
-支持相关任务的隐式触发；显式调用更明确。父线程模型不改变。简单且有权限的工作直接执行；Astra 写入通常交执行者，仅适用上述父线程受限例外。不默认多 Agent，不叠加 Router；“禁用路由”“不要子 Agent”“不要升级”仍有效。必要要求逐项对应当前证据，区分 PASS/PARTIAL/BLOCKED；换绑定、模型或上下文不重置重试次数。
-
-原生“修改文件”徽标归属于任务工作区及该任务自己的文件变更事件。必须保留徽标时，目标仓库与写入父线程必须属于当前任务。通常使用 Sol/Terra 父线程；父 Astra 仅在受限本地修改例外完整成立时合格。任务工作区外仓库或不汇总子线程 `fileChange` 的宿主不能保证徽标。Router 必须在写入前识别这一点，不能把未暂存 Review 当成徽标修复。写入者仍返回仓库根目录和精确路径，父线程逐仓库核对并打开受支持的 Review。
+已注册 Guard 的用户，须按相应边界的生命周期更新，并在 `/hooks` 重新审查变化后的命令。单独更新 Skill 不会更新独立注册的 Hook。可选宿主补丁只打包明确允许的源文件，不包含自定义二进制；它的启用、V1/V2 及数据库兼容需要单独验收。本轮没有重编译或接管你正在运行的桌面宿主。
 
 ## 卸载与恢复
-
-使用与安装相同的 scope、项目路径和 CODEX_HOME。
 
 ```powershell
 .\cer.ps1 uninstall --scope user --dry-run
 .\cer.ps1 uninstall --scope user
-```
-
-```sh
-python3 scripts/uninstall.py --scope user --dry-run
-python3 scripts/uninstall.py --scope user
-```
-
-项目级使用 `--scope project --project-root ...`。只删除清单拥有的角色及 Skill，保留未跟踪文件、现有配置和备份；用户修改默认阻止卸载。默认不会恢复旧版，没有 `--no-restore` 参数。需要恢复时用真实备份目录：
-
-```powershell
+# 仅在确实需要恢复已核对的备份时使用：
 .\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
-.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
-恢复按备份原样还原，不顺便升级到 auto；卸载后重新加载 Codex。不要公开包含私人定制的备份。完整[安装与安全恢复说明](docs/INSTALL.md)。
+卸载只处理清单拥有的 Skill/角色文件，保留用户增加的文件和备份，只逆转明确拥有的子代理默认设置；不自动恢复旧版本。独立 Hook 和定制宿主必须分别处理。不要删除整个 `.codex`，不要回滚业务代码来修复 Router。[完整说明](docs/INSTALL.md)。
 
-doctor 会拒绝当前受管理文件归属不完整的清单。标准文件已存在却没有声明归属时，卸载会停止并保留清单和文件，`--force` 也不能绕过；旧清单缺少后来新增且磁盘上不存在的文件，仍可正常升级。
+## 验证边界
 
-## 验证和边界
+CI 在 Windows/macOS/Linux 执行源码回归、静态检查、可复现打包，并从解压包重新跑全套测试。独立审计检查规则变异和参考编码的文本预算，不启动模型任务。真实模型行为及完整任务用量仍按[实装清单](docs/ACCEPTANCE.md)和[配对测量](docs/BENCHMARKING.md)验收。
 
-```sh
-python3 -m unittest discover -s tests -v
-python3 scripts/doctor.py --source-tree .
-python3 evaluation/offline_audit.py --without-tokenizer
-```
-
-以上不调用模型。CI 另使用固定 tokenizer 统计文本；离线函数检查声明的条件，不是强制执行器。真实角色加载、模型/档位、任务质量、完整父子线程 token 和耗时仍由[实装验收](docs/ACCEPTANCE.md)确认。历史失败报告保留，按[评估方法](docs/BENCHMARKING.md)解释结果，不把静态通过当作实际节省。
-
-[架构](docs/ARCHITECTURE.md) · [参考资料](docs/PRIOR-ART.md) · [变更](CHANGELOG.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [许可](LICENSE)
-
-[Validation v0.6.0](docs/VALIDATION-v0.6.0.md)
+[架构](docs/ARCHITECTURE.md) · [自动档位](docs/ADAPTIVE-EFFORT.md) · [写入门禁](docs/WRITE-GATE.md) · [参考资料](docs/PRIOR-ART.md) · [变更记录](CHANGELOG.md) · [贡献](CONTRIBUTING.md) · [安全](SECURITY.md) · [许可](LICENSE)

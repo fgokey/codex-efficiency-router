@@ -1,382 +1,72 @@
 # Codex Efficiency Router
 
-[简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
+[简体中文](README.zh-CN.md) · [Repair scope](docs/REPAIR-2026-10-22.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.5 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.5 corrective branch · Codex only · MIT · Python 3.11+**
 
-## Host startup check and explicit compatibility
+Route substantial engineering work to a suitable native Codex worker with explicit model/effort, bounded ownership and evidence-based acceptance. Astra remains a read-only adviser in strict execution paths. Prefer one implementation owner and a reviewer only when useful; retain the same owner for follow-up work.
 
-`--host-mode full|compat` is separate from routing `--mode auto|fixed|adaptive`. New and old installations default to **full**; missing capabilities never select compat. An explicitly installed choice persists on ordinary updates.
+This community project does not switch the parent model. Static tests, text-token counts and a successful installation do not establish live compliance, coding quality, speed or subscription savings.
 
-At task start check available host tools, current binding, permissions/RELEASE and Guard evidence. From this repository, `python scripts/doctor.py --startup --source-tree .` provides a cheap local report without tests, model calls or installation. Use `--scope user` instead of `--source-tree .` to inspect the installed profile and local Guard registration. Optional `--host-context FILE` accepts at most 16 KiB of **untrusted claims**, including declared interfaces; neither those claims nor configuration, directories or old receipts authenticate a live model/effort/permission binding. The local CLI cannot attest that binding: full reports BLOCKED (exit 1) pending current trusted host/tool evidence. Existing full admission and RELEASE checks remain required; this report never grants writes. `--preflight` retains its source/test meaning.
+## Current repair
 
-For an explicit compatibility installation preview, run `python scripts/install.py --scope user --host-mode compat --dry-run`, then omit `--dry-run` only when authorized to install. For a session-only report, `doctor.py --startup --host-mode compat` does not change installation. Compat supplies planning, context reduction and review; the current executor may perform already authorized work using native host tools even when model metadata or optional Python/Reader/completion helpers are unavailable. It does not force model dispatch, change the parent model, register Guard, install/adopt roles or create model defaults. It preserves actual read-only roles, sandbox/Hook prohibitions, output/rule/quality requirements and separate deployment/publication authority. It does not promise model identity, enforcement or Token savings.
+The Reader and dispatch guard now share supported model/effort pairs. Shipped Luna, Terra and Sol bindings are not rejected solely for being cheaper than Sol61. Known executor medium/high HOLD creation needs no redundant work-admission envelope. Actual binding and RELEASE remain required before writes.
 
-Switching an owned full installation directly to compat is refused, including with `--force`; legacy adoption and model-default switches are also refused in compat. Review the existing installation and use its explicit uninstall/restore lifecycle first if a different installation is intended. Existing roles, customized files, defaults, foreign Hooks and host protections are never silently removed to enable compat. A compat-to-full switch must be explicit and retains ownership/collision checks. Python 3.11+ is still needed by the installer/doctor; it is not a prerequisite for ordinary authorized work under the installed compat instructions.
+Exact continue/status/stop controls retain the original current-policy receipt and scope; they do not create a new worker or authorize new work. Additional instructions need fresh admission. The guard rejects control-labelled work. With the optional custom host, pass the Reader's returned `admitted_dispatch_arguments`, including model/effort, instead of inheriting Sol61/high defaults.
 
-## v0.8.5: explicit dispatch and bounded evidence
+Windows coverage includes UTF-8 BOM input, exact CRLF preservation, non-default CODEX_HOME with Unicode/spaces, PowerShell 7 and 5.1 launchers, interpreter rejection, and packaged installation/removal. See the actual commit's CI rather than inferring PASS from this feature list.
 
-An optional [pinned native host patch](docs/INSTALL.md#pinned-host-compatibility-patch) handles encrypted collaboration arguments through a separate plaintext admission entry. Native Windows tests cover Sol61/high success and denial of unadmitted/stale/continue/raw Astra reuse. It requires a matching host build, trusted hook and explicit activation; ordinary Skill installation alone does not enable it or change the parent model.
+## Native role presets
 
-The updated opt-in host also enforces Astra/unknown models' read-only execution at the common native tool dispatcher, including code-mode inner calls and terminal continuation. Use `read_only` for bounded filesystem pages and `prepare_agent_task` for a fresh Reader envelope through the required trusted hook, then `admitted_agent_task` for executor work. Two audited desktop reads are allowed on the native dynamic transport and the host-discovered bundled desktop MCP: `read_thread` requires explicit `turnLimit` 1..5 and `maxOutputCharsPerItem` 0..8000; `wait_threads` requires 1..8 targets and explicit `timeoutMs` 0..60000. The MCP grant requires native plugin provenance, the canonical bundled installation root, the expected local launcher and inherited desktop pipe; duplicate, remote or overridden pipe variables revoke it. Argument bounds are shared and checked again after Hook rewrites; cached grants are revoked when provenance changes. Manual same-name MCP registrations, arbitrary plugin IDs and `readOnlyHint` grant no authority. Arbitrary shell, patch/build/test and other third-party tools remain denied for those models; the bounded root-repair policy exception does not apply. Sol61 executors retain normal tools, and old Astra work still requires fresh admission. Updating Skill prose or the dispatch hook alone does not activate this boundary: rebuild the patched host and restart it.
-
-The host tool description now exposes the accepted child-name format, asks for separate dispatch/file reads, and limits tool discovery to matching names. Updating these descriptions requires a rebuilt host and desktop restart; it does not add a host-wide output filter.
-
-The checked entry supports persisted V1 conversations and V2, including code-mode discovery. Updating only the Skill does not repair an older host that blocks raw dispatch but exposes the checked entry only in V2; that host must be updated and the desktop restarted.
-
-Canonical `spawn_agent` preflight rejects unbound default/inherit, missing effort and inherited history before executor/coordination passthrough. Fixed roles and explicit exact model/effort pins remain valid; native host binding and user authority still need independent checks. The `Agent` parameter shape is unverified. This check only runs where the native Hook is registered; local tests do not prove host enforcement.
-
-Legacy reader `read/search/list/diff/status` CLI responses now page selected text within 4096 bytes including JSON, cursor and CRLF. Encoded small results retain their text format; large ones return a JSON page. Continue with the same request plus `cursor`; oversized batches fail and must be split. Git captures at most 128 KiB and reports PARTIAL even after the captured prefix is exhausted. File-read limits remain 16 MiB. Other tools need their own capture/projection budget.
-
-Load the core alone, then references only for the named phase; the fixed-role table lives in the dispatch-stage effort reference. `quality_reference.reuse_validation` checks supplied repo/commit, file/dependency hashes, commands, scope, environment and PASS receipt; unknown or changed inputs prevent reuse. `python -B scripts/canary.py inspect` reads minimal execution observations from stdin (16 KiB) and emits separate read/binding/output/backoff results (4 KiB), with caller-supplied evidence basis and host enforcement/task coverage UNKNOWN. See [Canary](docs/CANARY.md).
-
-## v0.8.4: large JSON projection
-
-Use `python -I -B <Skill>/scripts/readonly_reader.py json --root ABS --path FILE --pointer /path` for exact JSON value text, or add `--mode members` for direct child keys/indexes, types and pointers. Follow a non-null `next_cursor` with the same command/pointer/mode and `--cursor TOKEN`; check exit before parsing. Each page validates and hashes the whole UTF-8 source in 64 KiB reads (256 MiB scan limit), without a DOM or cache, so each page costs O(file size). Depth is limited to 64, keys to 16 KiB, and member directories to 16384 entries/1 MiB decoded keys. Responses including cursor and CRLF stay within 4096 bytes; old file-read limits stay at 16 MiB. Only string-form JSON Pointer is supported; changed sources and resource-limit violations fail explicitly.
-
-## v0.8.3: worker lifecycle and bounded tool results
-
-Keep workers available for remaining checks or corrections and close after parent acceptance. A real resume invalidates the old release: return read-only, verify the new host binding, then release separately; the model may change. Capture large tool results, select necessary fields and retain cursors before counting serialized output plus framing and emitting one page. Existing reader algorithms and instruction budgets are unchanged.
-
-First load SKILL alone in bounded pages. Use `page` for known files/rules, and `excerpt` only for current located lines (count 1–200); check exit status before parsing JSON. Invalid ranges retain nonzero exit and empty stdout, with limits/file line count and page/locate recovery guidance. v0.8.1 already introduced `page --root ABS --path FILE` without a cursor for the first page; the 4096-byte limit and changed-file rejection remain.
-
-## v0.8.0: GPT-6.1 Sol binding
-
-New ordinary Sol work defaults to `gpt-6.1-sol` with explicit high effort when difficulty is unknown; confirmed simple work may use medium. The separate `gpt-6-sol` role remains available for exact pins and evidence-backed fallback; neither an unavailable new alias nor an unknown catalog silently selects the older model. Standard API input/output prices are equal for these two models, while cached input is [$0.10 per million for 6.1](https://developers.openai.com/api/docs/models/gpt-6.1-sol) and [$0.20 for 6](https://developers.openai.com/api/docs/models/gpt-6-sol); actual task cost is unmeasured. The live host catalog may offer Ultra beyond the API page's listed effort settings, subject to the existing Ultra authorization gate.
-
-## v0.7.1: locate and excerpt
-
-For a known line range, call the installed reader directly with verified Python: `python -I -B <Skill>/scripts/readonly_reader.py excerpt --root ABS --path FILE --start N --lines N` (1–200 lines). If the location is unknown, use `locate --root ABS --path DIR --query LITERAL` first; it returns bounded path/line candidates, not source text. `--help` lists all options. Continue a long excerpt with `page` and its cursor. For complete rules, start with `page --root ABS --path FILE` and follow `next_cursor` only when non-null. Existing `index`/`page` cursors remain supported. Emit one page at a time; do not read whole files to slice a few lines or combine pages/files into an oversized response. `cer.ps1 read` remains a convenience. Locate respects rg's normal ignore/hidden rules, excludes common build directories and files over 16 MiB; PARTIAL means narrow the search. Only calls through this reader are bounded.
-
-## v0.7.0: installed bounded reader
-
-Ordinary Skill installs include `cer.ps1 read index/page` and its read-only Python adapter. Use a literal file path under an absolute root; optional `index --start N --lines N` locates source ranges. Follow `next_cursor` until null to read the selected range completely. Each CLI response fits 4096 UTF-8 bytes including JSON, cursor and line ending; files over 16 MiB fail clearly. The reader does not intercept other tools or activate Hooks.
-
-## v0.7.0-rc.17: bounded reads and evidence checks
-
-Unknown reads are indexed before content; captured output is paged within the total serialized byte budget, including its continuation cursor. The router also clarifies same-session write release reuse, reassessment after a capacity failure, and baseline/source evidence for reviews. These remain policy and offline examples, not live host enforcement.
-
-## v0.7.0-rc.16: parent release and output caps
-
-New or resumed child executors prepare read-only. The parent checks the current host-observed agent/session binding, then explicitly releases one repair unit for writes; a matching binding alone is insufficient. Large tool returns are captured and reduced to bounded fields or pages before emission. Inner and per-item limits do not replace the outer total cap. Mandatory rules are read completely in bounded chunks. These are policy instructions and offline checks, not live host enforcement.
-
-Choose a sufficient model and reasoning effort per bounded task. Ordinary install/update now selects **auto**: no routine fixed/adaptive mode switching. Quality and authorization remain constraints. Community project, not an OpenAI product or a guarantee of cheaper, faster, quality-equivalent execution.
-
-## v0.7.0-rc.15: GPT-6 routing and evidence-backed high effort
-
-Current routing prefers GPT-6.1 Sol/high when engineering difficulty is unknown, with medium for confirmed simple work, and GPT-6 Luna/high for focused low-risk code. Exact pins stay exact; legacy GPT-5.6 bindings remain explicit or evidenced fallbacks. XHigh/Max need reviewed task evidence, while Ultra also requires one authorized Sol/Astra coordinator and disjoint leaf work.
-
-
-## Windows Python preflight and acceptance boundaries
-
-Use `cer.ps1` below (the install/uninstall wrappers share it). It checks the actual
-Python version and `tomllib`, tries compatible PATH executables and `py -0p` listed
-runtimes, and rejects 3.10 **before** invoking any installer. A name such as `python`
-or `py -3` does not guarantee 3.11+. No downloads, PATH changes or global configuration edits occur.
-
-To use an already verified runtime, including an app-bundled Python, explicitly set
-its **actual full executable path** in this PowerShell session:
-
-```powershell
-$env:CER_PYTHON = 'C:\actual\Python312\python.exe'
-.\cer.ps1 doctor --scope user --json
-```
-
-An invalid explicit override stops; it does not silently fall back. The selected path
-and version go to stderr, leaving JSON stdout intact. Bundled runtimes can move after
-an app update. Standalone Guard installation binds the selected absolute executable;
-recheck/update the Guard and review its definition if that path changes. Portable
-Plugin hooks have separate runtime discovery requirements; this launcher does not verify them.
-
-**Skill installation is still policy-only unless a Guard is explicitly installed and
-validated.** CI success is offline evidence, not a native Canary or real-task savings
-claim. Keep `enforcement=NOT_VERIFIED` and loaded version `UNKNOWN` without corresponding
-host evidence. See [explicit Guard activation and Canary](docs/UPGRADE-v0.7.0-rc.1.md).
-
-## v0.7.0-rc.13: budget the enclosing output
-
-Before combining shell, web or nested-tool results, budget all of them plus headroom inside
-the smallest enclosing output cap. A line count alone does not bound content volume; unknown
-estimates are indexed, summarized or split first. Mandatory rules remain complete through
-separate bounded chunks. After truncation, recover only the missing cursor range without
-replaying effects. After two unchanged snapshots and one saved-offset delta, monitoring
-backs off while state remains unchanged.
-
-## v0.7.0-rc.12: bound every batched read
-
-Before reading an unknown-size report, log or source file, inspect its shape or index and fetch
-only relevant ranges. Every member of a batched command must be bounded; a small search result
-or tool output cap does not make an adjacent full-file read bounded. After truncation, resume only
-the missing relevant range. Offline tests cover this decision boundary without claiming live enforcement.
-
-## v0.7.0-rc.11: scoped repair and parent acceptance
-
-A host-observed writer binding is checked once and reused through a scoped repair unit,
-including implementation, source/build configuration, formatting and targeted checks.
-Identity, effort, role, permission, owner, session resume or contradictory evidence invalidates it.
-Binary copy, runtime/permission configuration, deployment and destructive recovery stay separate.
-An actual policy denial stops equivalent replay; `approval=never` alone is not a manual boundary.
-
-The Astra parent remains accountable for the whole result: it reviews every delivered diff and
-actual validation result, gives concrete corrections, rechecks affected areas, closes blocking
-findings and accepts final integration. A child PASS is unit evidence, not parent PASS.
-
-## v0.7.0-rc.10 (historical, superseded by rc.11): per-call mutation admission
-
-The policy now requires a parent check of the host-observed Terra/Sol binding before each write tool.
-Mutation calls use one exact manifest and one bounded action class; forward copies,
-configuration rewrites and destructive recovery stay separate. A host policy denial stops
-equivalent replay or repackaging until policy changes, including when approval is disabled.
-
-## v0.7.0-rc.9: fewer long-context round trips
-
-Known tool schemas are reused until invalidation. In long contexts, work proceeds on state
-changes or due checkpoints and batches only bounded independent checks. Worker monitoring
-uses compact waits with backoff; after two unchanged native snapshots it reads one bounded
-rollout delta from a saved offset, then waits for progress instead of polling both paths.
-Offline state-machine tests cover rediscovery, round-trip admission and delta-tail behavior.
-
-## v0.7.0-rc.8: bounded reads without repeated prefixes
-
-Mandatory rules are read in separate output envelopes. Other unknown-size files are indexed
-before relevant ranges are fetched; only known-small slices are batched. If output truncates,
-the next read resumes the missing range instead of rereading captured prefixes. The same
-contract is embedded in every role, with executable offline decision tests and unchanged
-instruction budgets. This is policy behavior, not proof that an existing task loaded it.
-
-## v0.7.0-rc.7: reconcile mismatches and retain critical context
-
-Confirmed model/effort mismatches pause continuation at a safe boundary for binding/effect
-reconciliation and review of affected checks. Preserve valid work and attempt history;
-later matching metadata cannot erase that review. UNKNOWN alone is not a confirmed failure.
-Compact handoffs include applicable rule paths, decision rationale and critical context;
-each role reads those rules and stops affected work when essential context is missing.
-The exclusive root owner can continue its qualified repair unit; other writers still block it.
-Requested cost/quality comparisons reuse existing task logs, without probes or polling.
-
-## v0.7.0-rc.6: repair admission and explicit task-based effort
-
-Root repair exceptions and owner reuse retain prerequisite, capability/effort, boundary and
-absolute retry-ceiling checks. One repair unit may contain multiple code/test patches;
-a reason string alone cannot renew attempts. Sol/Terra can deliver only with explicit handoff
-of existing user authority, exact repository/ref/destination and checks.
-
-Auto selects both model and effort: implementation Terra/medium; diagnosis Sol/medium;
-coupled or consequential reasoning Sol/high; exceptional judgment Astra/high. Use the unpinned
-alias, explicit effort and a compact contract with `fork_turns="none"`, avoiding root max
-inheritance. Reuse sufficient idle owners; preserve fixed/low preferences. Offline checks
-prove neither runtime loading nor savings. Badge eligibility needs host attribution evidence.
-These rules supersede rc.4's model-specific restriction and rc.5's single-patch limit;
-strict Guard still disables the root exception.
-
-## v0.7.0-rc.5 (historical): bounded root-Astra repair
-
-Astra remains the primary reasoner for hard diagnosis and arbitration. Astra leaves and
-read-only roles never write. A root Astra may apply one bounded local code patch only after
-qualified executor failure or when handoff would materially lose critical reasoning, with
-authorization, exact scope, current-workspace ownership, a safe boundary, defined checks,
-no active writer or prior exception, and no observed active strict Guard. Unknown Hook layers
-may still deny the patch at runtime. Shell/build/test and
-publish/deploy work remains with Sol/Terra. Missing evidence falls back to delegation or a
-blocked/deferred result. The optional native Guard deliberately remains stricter and denies
-all Astra writes.
-
-## v0.7.0-rc.4 (historical): native change-summary preflight
-
-Before write delegation, the Router now checks whether the target Git repository belongs
-to the current task workspace and whether the same write-capable parent will own the edits.
-This prevents Review fallback from being presented as a fix for the native changed-files
-badge. Mutation-heavy tasks that require the badge should use a Sol/Terra parent rooted at
-the target repository, with Astra reserved for read-only hard judgments.
-
-## v0.7.0-rc.3: explicit auto-effort dispatch
-
-Auto-generated roles now identify themselves in native role discovery as auto-effort
-bindings. When the host exposes both a matching `cer_auto_<role>` and an explicit effort
-field, the parent must use that alias and pass the selected effort. Fixed roles are an
-evidenced compatibility fallback only; selecting one while the auto path is available is
-reported as a mismatch. This remains policy-only and does not add model calls or a daemon.
-
-## v0.7.0-rc.2: smaller instructions
-
-This candidate compresses the loaded Skill and role text without changing routing
-or write permissions. References load once at explicit triggers while valid, not
-on every tool call. See [footprint and validation](docs/VALIDATION-v0.7.0-rc.2.md).
-Existing fixed/low settings and underlying installer arguments remain preserved;
-Windows entry-point preflight is described above.
-
-
-## v0.7.0-rc.1: verifiable state, not assumed enforcement
-
-The source remains a **release candidate, not a stable release**, based on v0.6.0. Existing fixed-mode
-installations and automatic-low opt-outs are preserved. No Write Lease, permanent
-background service, runtime concurrency ledger or model-driven installer is added.
-
-`policy-only` means policy text only; `guarded` means registered, not trusted or
-proven active; `live-verified` requires fresh, scoped **operator-witnessed native**
-Canary evidence. Disk version, static tests and an absent sentinel alone are not
-proof. Hosted paths and existing `write_stdin` sessions remain outside the guarantee.
-
-The candidate adds status/doctor JSON, version and digest checks, explicit guarded
-updates, a bounded `cer-read batch`, per-call three-arm accounting and reproducible
-Plugin/source packaging. The Plugin manifest validates offline; native Plugin role
-discovery/trust/Windows execution still require host acceptance. Existing users
-should keep the supported Skill installer plus explicit standalone Guard path until
-that acceptance is complete. Do not install duplicate Plugin and standalone Hooks.
-
-Git checkouts can use the fast-forward update below; record the actual commit.
-For a downloaded ZIP, extract and review it using the [RC upgrade instructions](docs/UPGRADE-v0.7.0-rc.1.md).
-See [Canary](docs/CANARY.md), [benchmark format](docs/BENCHMARKING-v0.7.md),
-[validation status](docs/VALIDATION-v0.7.0-rc.1.md) and [plan review](docs/REVIEW-v0.7.0.md).
-
-## v0.6 historical rule: read-only Astra, active diagnosis
-
-Write authority now precedes tiny/local shortcuts. Astra roots and leaves never patch,
-write checkpoints, format, build or run side-effecting tests. They still inspect evidence,
-solve hard decisions and diagnose repeated qualified unexplained failures. Executors
-apply the resulting plan; changing worker/model never renews repairs. Preserve existing
-edits for independent takeover review; wait when two writers are active. rc.5 supersedes
-the root-only part of this historical rule with the bounded exception above.
-
-A Skill cannot revoke root tools. A separately registered native synchronous PreToolUse
-guard blocks covered side-effect paths and provides bounded read access. **Normal Skill
-installation does not register or trust it.** Registration affects its Codex configuration
-scope, even outside this Skill, so consent/trust is explicit and project scope is preferred.
-This is not another routing mode. [Guard setup, removal and limits](docs/WRITE-GATE.md).
-
-For recipient-aware task admission alone, use the independent
-`python -B scripts/write_guard.py install --boundary dispatch --scope project --project-root <ROOT>`
-registration, then review its exact definition in `/hooks`. Remove it with the same
-command using `remove`. This preserves the strict write Guard and other hooks;
-it does not restrict parent Astra shell/patch tools. It checks recorded recipient
-identity using local read-only `~/.codex/state_5.sqlite` and requires current task
-admission, including both Astra reasons on every task and Astra HOLD spawn.
-Recorded DB fields do not prove a worker remains loaded or that a later host
-dispatch preserves identity. Native aliases, application messages, code-mode inner
-hooks, trust and failure/timeout behavior still require real host acceptance.
-See [dispatch setup and exact HOLD protocol](docs/INSTALL.md#optional-native-dispatch-admission).
-
-## One install, capability-aware execution
-
-After deciding capability and delegation benefit, the parent uses actual native schemas, loaded roles and supported model/effort pairs:
-
-| Available capability | Action |
-| --- | --- |
-| Explicit effort field and correctly loaded unpinned alias | Must request the selected effort using that alias |
-| Otherwise, a fixed role matches the exact same pair | Use the compatibility binding and record why auto was unavailable |
-| Neither route meets the requirement | Keep sufficient permitted work local; Astra mutations still require an executor, otherwise BLOCKED |
-
-Only one binding is selected per child. No model calls just to probe capability, no runtime configuration rewrites, hidden sessions or replay while another writer's state is uncertain. A compatibility route is not dynamic-effort success; missing runtime identity remains UNKNOWN.
-
-| Responsibility | Model | Fixed compatibility effort |
+| Role | Model | Fixed effort |
 | --- | --- | --- |
 | `luna_worker` | `gpt-6-luna` | `high` |
 | `terra_executor` | `gpt-5.6-terra` | `medium` |
-| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `sol_engineer` | `gpt-6-sol` | `medium` |
+| `sol61_engineer` | `gpt-6.1-sol` | `high` |
 | `astra_architect` | `gpt-6-astra` | `high` |
 
-Auto generates five `cer_auto_<role>` unpinned aliases alongside the five fixed bindings: **ten small TOML files, four responsibilities**, not ten running agents or extra capability tiers. Generated aliases add a short auto-effort discovery marker, change the name and remove the effort pin; model, instructions and permissions remain identical. The added discovery text has a small context cost rather than zero overhead.
-
-Engineering work uses GPT-6.1 Sol/high when difficulty is unknown, and medium for confirmed simple work; the parent selects effort explicitly before dispatch. Focused low-risk code uses Luna/high, while deterministic conversion may use Luna/medium. Automatic low stays opt-in. Parent-selected XHigh/Max requires reviewed bottleneck, High-limit and value evidence. Ultra also requires exact Sol/Astra support and one authorized coordinator for disjoint leaf work with shared bounds; explicit Ultra does not grant that authority. No mandatory ladder or silent substitute. Legacy GPT-5.6 Sol/Luna/Terra remain exact explicit/fallback options.
+Default routing mode is `auto`: five fixed compatibility bindings plus five `cer_auto_*` aliases with explicit effort selection. These are configuration files, not ten running agents. Actual model availability comes from the host. Automatic low stays disabled unless explicitly enabled. Current high defaults are retained during this repair so model tuning does not confound protocol fixes.
 
 ## Install and update
 
-The installed `scripts/readonly_reader.py` also provides `assignment`: a bounded stdin preflight before task-bearing sends to existing workers. It returns a short prefix and body hash, never the full work prompt; merge only the checked body into the actual tool message. Missing/unknown evidence yields no execution parameters. Pure matching continue/status/stop can retain the current receipt. New readonly reviews always route, even when cheap. This is a policy-consumed check, not a trusted host interceptor or recipient authentication; existing live roles do not hot-load the updated receiver instructions. Released writable executors may use already authorized bounded native reads within the same task/root/link/output rules; other roles retain their guarded read boundary. Reader calls retain strict preflight, parsing, cursors and total framing limits; native reads are not claimed equivalent. [Exact paths, input and limits](docs/INSTALL.md).
-
-Review source first. Ordinary installation only manages owned files. Optional `--set-subagent-defaults` adds missing `agents.default_subagent_model = "gpt-6.1-sol"` and `agents.default_subagent_reasoning_effort = "high"` to that scope's `config.toml`; parent model/effort, authentication, permissions, AGENTS.md and unrelated configuration remain unchanged. Updating an unchanged tool-owned medium default migrates it to high. Different user-owned values stop installation, even with `--force`; equal existing values remain user-owned. Keep the clone for lifecycle commands. Choose one installation scope.
-
-Preview with `.\cer.ps1 install --scope user --set-subagent-defaults --dry-run`, then remove `--dry-run` to apply. Updates retain these defaults; doctor checks their current values. Uninstall removes only inserted settings and preserves unrelated customization, including unowned medium values from older installs. Restore refuses any subsequent config change, including with `--force`. These settings express the intended child defaults; host loading and session behavior require live verification. They do not guarantee a running session adopts them. Engineering policy requires fresh `cer_auto_sol61_engineer` with explicit high for unknown difficulty or medium for confirmed simple work, `fork_turns=none`, and matching host evidence before RELEASE; bare `default` is prohibited for engineering by policy. Guard registration remains optional, so this is not a host-enforced tool prohibition. A full-history fork inherits its parent.
-
-### Windows / PowerShell
+Use a clean repository checkout and the same scope as the existing installation. Review changes and reach a safe boundary in active work first.
 
 ```powershell
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-.\cer.ps1 install --scope user --dry-run
-.\cer.ps1 install --scope user
-.\cer.ps1 doctor --scope user
-```
-
-### macOS / Linux
-
-```sh
-git clone https://github.com/fgokey/codex-efficiency-router.git
-cd codex-efficiency-router
-python3 scripts/install.py --scope user --dry-run
-python3 scripts/install.py --scope user
-python3 scripts/doctor.py --scope user
-```
-
-### Existing installation
-
-```powershell
+git switch main
 git pull --ff-only
 .\cer.ps1 install --scope user --dry-run
 .\cer.ps1 install --scope user
-.\cer.ps1 doctor --scope user
+.\cer.ps1 doctor --scope user --json
 ```
 
-On macOS/Linux, replace `./cer.ps1 <action>` with `python3 -B scripts/<action>.py` after checking Python is 3.11+. **No `--mode adaptive` is needed.** Ordinary updates migrate pre-v0.5 manifests to auto with a printed notice and backup, preserving the low choice. Old manifests did not record whether fixed/adaptive was deliberate or default; advanced users needing a previous policy can explicitly retain it. Later v0.5+ explicit overrides survive ordinary updates. Original unmanifested v0.1 installations still require safe `--adopt-v01` adoption. See [migration details](docs/INSTALL.md).
+First installation: clone `https://github.com/fgokey/codex-efficiency-router.git`, enter its directory, then run the install commands. The checked launcher locates Python 3.11+; it neither downloads Python nor changes PATH. For a particular installed interpreter, set `$env:CER_PYTHON` to its real executable path. Invalid explicit paths fail rather than silently switching interpreters. Do not disable PowerShell policy globally to install this project.
 
-Review customization/collision errors instead of blindly adding `--force`. STATIC PASS is installation integrity, not live model proof. Reload Codex after updates; an old conversation can retain old instructions. A Skill-only copy does not deploy the role bindings: use the full installer.
+macOS/Linux use `python3 scripts/install.py --scope user --dry-run`, then omit `--dry-run`; run `python3 scripts/doctor.py --scope user`. For project scope use `--scope project --project-root` with the real existing project path. Do not duplicate scopes. Keep the clone for uninstall/restore. Edited owned files and unowned collisions stop the operation; inspect instead of blindly adding `--force`.
 
-### Project scope
+Reload Codex after updating. Invoke `$codex-efficiency-router` explicitly for acceptance; implicit discovery remains allowed for matching substantial tasks. A disk version is not evidence that an old conversation loaded it.
 
-```powershell
-.\cer.ps1 install --scope project --project-root "C:/Work/my-project" --dry-run
-.\cer.ps1 install --scope project --project-root "C:/Work/my-project"
-.\cer.ps1 doctor --scope project --project-root "C:/Work/my-project"
-```
+## Permissions and host compatibility
 
-On macOS/Linux use `python3 -B scripts/<action>.py` and a real absolute project path. User Skills go to `~/.agents/skills/codex-efficiency-router`; bindings to `$CODEX_HOME/agents` or `~/.codex/agents`. Project scope uses `.agents/skills` and `.codex/agents`. The installer prints actual backup paths.
+Three independent layers exist: the Skill/roles, optional write/dispatch Hooks, and the experimental patched Codex host. Ordinary installation does not register/trust Hooks or replace a binary. `policy-only` means instructions, not native enforcement. Static doctor is not a live Canary.
 
-## Use
+Routing `auto/fixed/adaptive` is separate from host `full/compat`. Existing explicit choices are preserved; full remains the default. Full requires current trusted binding and authorization for affected work. A local `doctor --startup` can report BLOCKED because it cannot attest a live binding; do not repeatedly run it as a task prerequisite. Explicit compat provides planning/context/review within existing host permissions, not guaranteed model routing. It never removes sandbox/Hook restrictions or automatically replaces a full installation. See [installation and recovery](docs/INSTALL.md) before changing host mode.
 
-```text
-$codex-efficiency-router
-Complete this task using suitable model/effort choices and the required acceptance checks.
-```
+Existing Guard users must update their own registered boundary through its documented lifecycle and re-review changed commands in `/hooks`. Reinstalling the Skill alone does not update a separately registered Hook. The optional host patch is packaged as one explicitly allowlisted source file, not a custom binary. Its activation, V1/V2 compatibility and database assumptions remain separate acceptance items. This repair does not claim to rebuild or validate your running desktop host.
 
-Relevant substantial work may trigger implicitly; explicit invocation is clearer. The parent model remains unchanged. Simple permitted work stays local. Astra writes normally go to an executor; only the bounded root exception above applies. Do not stack routers. Disable/no-subagent/no-escalation requests remain authoritative. PASS/PARTIAL/BLOCKED depends on evidence for required outcomes; binding/model changes do not reset retries.
-
-The native changed-files badge belongs to the task workspace and its own file-change events. If required, use the target repository and the same parent for writes. Normally that parent is Sol/Terra; root Astra qualifies only for its bounded local-patch exception. A repository outside the task workspace or a host that does not aggregate child `fileChange` events cannot guarantee the badge. The Router detects this before writes instead of treating an unstaged Review as equivalent. Writers still return repository-rooted exact paths; the parent verifies each repository, lists paths and opens supported Reviews.
-
-## Uninstall and restore
-
-Use the same scope, project root and CODEX_HOME as installation.
+## Uninstall and recovery
 
 ```powershell
 .\cer.ps1 uninstall --scope user --dry-run
 .\cer.ps1 uninstall --scope user
-```
-
-```sh
-python3 scripts/uninstall.py --scope user --dry-run
-python3 scripts/uninstall.py --scope user
-```
-
-For project scope use `--scope project --project-root ...`. Only manifest-owned files are removed; untracked files, configuration and backups survive. Local modifications block removal by default. Uninstall does not automatically restore an old version; there is no `--no-restore` option. Restore explicitly from the printed backup directory:
-
-```powershell
+# Only when restoring a reviewed actual backup is intended:
 .\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH" --dry-run
-.\cer.ps1 install --scope user --restore "ACTUAL-BACKUP-PATH"
 ```
 
-Restore preserves the original selection without migrating it to auto. Reload Codex after uninstall; keep private customization backups out of public reports. [Full lifecycle and recovery](docs/INSTALL.md).
+Uninstall removes manifest-owned Skill/role files, preserves user additions and backups, and reverses only explicitly owned child defaults. It does not automatically restore an old version. Separately registered Hooks and a custom host need their own lifecycle; do not delete all `.codex` files or reset business changes. [Full instructions](docs/INSTALL.md).
 
-Doctor rejects incomplete current ownership inventories. Uninstall preserves the manifest and stops when a standard payload file exists without declared ownership, even with `--force`. Historical manifests missing later-added files can still upgrade when those paths are absent.
+## Validation
 
-## Validation and limits
+CI runs source regression, static checks, deterministic packaging and the full suite again from the extracted ZIP on Windows/macOS/Linux. A separate audit runs mutation tests and named-reference token budgets; no model task is launched. Native behavior and complete-task measurements remain [user-host acceptance](docs/ACCEPTANCE.md), with [paired accounting](docs/BENCHMARKING.md).
 
-```sh
-python3 -m unittest discover -s tests -v
-python3 scripts/doctor.py --source-tree .
-python3 evaluation/offline_audit.py --without-tokenizer
-```
-
-No model calls. CI also measures named reference token encodings. Pure helpers test declared conditions, not live enforcement. Actual binding/model/effort, task quality, all parent/child usage and elapsed time remain [user acceptance](docs/ACCEPTANCE.md). Historical failures are retained; do not equate static PASS with proven savings. [Benchmark method](docs/BENCHMARKING.md).
-
-[Architecture](docs/ARCHITECTURE.md) · [Sources](docs/PRIOR-ART.md) · [Changes](CHANGELOG.md) · [Contribute](CONTRIBUTING.md) · [Security](SECURITY.md) · [MIT](LICENSE)
-
-[Validation v0.6.0](docs/VALIDATION-v0.6.0.md)
+[Architecture](docs/ARCHITECTURE.md) · [Effort](docs/ADAPTIVE-EFFORT.md) · [Write gate](docs/WRITE-GATE.md) · [Sources](docs/PRIOR-ART.md) · [Changelog](CHANGELOG.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [License](LICENSE)

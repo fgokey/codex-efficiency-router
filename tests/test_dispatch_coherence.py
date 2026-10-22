@@ -216,7 +216,8 @@ class DispatchCoherenceTests(unittest.TestCase):
 
     def test_cli_accepts_utf8_bom_without_relaxing_duplicate_key_checks(self):
         target = self.root / '中文 file.txt'
-        target.write_text('你好\r\nsecond line', encoding='utf-8')
+        # Bytes are intentional: Windows text mode would turn CRLF into CRCRLF.
+        target.write_bytes('你好\r\nsecond line'.encode('utf-8'))
         items = json.dumps([{'op': 'page', 'path': target.name}], ensure_ascii=False).encode()
         args = [sys.executable, '-I', '-B', str(READER_PATH), 'batch', '--root', str(self.root),
                 '--requests', '-', '--max-bytes', '4096', '--framing-bytes', '0']
