@@ -92,11 +92,12 @@ class DocumentedContractTests(unittest.TestCase):
             skill = Path(tmp) / PROJECT
             shutil.copytree(SKILL, skill)
             path = skill / 'SKILL.md'; original = path.read_text(encoding='utf-8')
+            self.assertEqual(doctor.validate_tree(path, ROOT / 'agents'), [])
             for bad in (original.replace('description: ', 'description: malformed: ', 1),
                         original.replace('name: codex-efficiency-router', 'name: codex-efficiency-router\nname: duplicate'),
                         original.replace('description: ', 'description: # missing ', 1)):
                 self.assertNotEqual(bad, original); path.write_text(bad, encoding='utf-8')
-                self.assertTrue(any('frontmatter' in e for e in doctor.validate_tree(path, ROOT / 'SKILL.md')))
+                self.assertTrue(any('frontmatter' in e for e in doctor.validate_tree(path, ROOT / 'agents')))
 
     def test_core_safety_contract_survives_compression(self):
         self.requires('Unknown identity/effects grant no writes', 'NEVER write, build, test',
