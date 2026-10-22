@@ -71,9 +71,14 @@ class InstructionFootprintTests(unittest.TestCase):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
         for phrase in ('before dispatch/lane changes', 'for Astra admission',
-                       'before delegation, binding or delivery review',
-                       'for large evidence, semantic/lifecycle changes, failure or disputed validation'):
+                       'only for new delegation/binding or child delivery review',
+                       'Released routine leaf with complete scope/acceptance',
+                       'core+role+repo rules; skip parent procedures',
+                       '; all: complex/cross-component lifecycle', 'eviction/callback loss',
+                       'large/conflicting evidence', 'disputed validation'):
             self.assertIn(phrase, text)
+        self.assertNotIn('semantic/lifecycle changes, failure', text)
+        self.assertNotIn('Read dispatch before writes', contract_text())
 
     def test_parent_final_requires_objective_and_remaining_work_reconciliation(self):
         # Source-contract regression for the observed premature final, not live behavior proof.
@@ -156,6 +161,43 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('Report once:', text)
         self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
 
+    def test_native_reads_are_scoped_to_released_writers_without_new_authority(self):
+        core=SKILL.read_text(encoding='utf-8')
+        self.assertIn('Released writers: native scoped/bounded root/link/budget reads',core)
+        self.assertIn('else guarded',core)
+        self.assertIn('Astra leaves and read-only roles NEVER write',core)
+        self.assertIn('Unknown identity/effects grant no writes',core)
+        install=(ROOT/'docs/INSTALL.md').read_text(encoding='utf-8')
+        for phrase in ('already authorized bounded native reads','This grants no permission',
+                       'Astra, read-only and unknown roles keep their existing host allowlist/guarded-read boundary',
+                       'they cannot take the writable-executor path','claims no native/Reader contract equivalence',
+                       'full preflight, strict parsing, SHA-bound cursors and framing'):
+            self.assertIn(phrase,install)
+        from manage import source_files
+        from profiles import Profile,render_payload
+        source=source_files(ROOT)
+        models={tomllib.loads(source['agents/'+name].decode())['model'] for name in EXPECTED}
+        for mode in ('fixed','auto','adaptive'):
+            payload=render_payload(source,Profile(mode))
+            for key,raw in payload.items():
+                if not key.startswith('agents/') or not key.endswith('.toml'): continue
+                role=tomllib.loads(raw.decode()); instructions=role['developer_instructions']
+                self.assertIn(role['model'],models)
+                if role['model']=='gpt-6-astra':
+                    self.assertIn('Always read-only',instructions)
+                    self.assertNotIn('unless RELEASED writer',instructions)
+                else:
+                    self.assertIn('Python -I -B <reader> unless RELEASED writer',instructions)
+                    self.assertIn('aggregate+framing<=4KiB',instructions)
+                    self.assertIn('no full-file slicing/merging',instructions)
+                    self.assertIn('Parent releases current host binding before writes; invalidation/UNKNOWN stops',instructions)
+                name=key.removeprefix('agents/')
+                if name in EXPECTED:
+                    original=tomllib.loads(source[key].decode())
+                    self.assertEqual(role['model'],original['model'])
+                    if mode=='adaptive': self.assertNotIn('model_reasoning_effort',role)
+                    else: self.assertEqual(role['model_reasoning_effort'],original['model_reasoning_effort'])
+
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = contract_text()
         core = SKILL.read_text(encoding='utf-8')
@@ -172,7 +214,8 @@ class InstructionFootprintTests(unittest.TestCase):
                        'JSON+CRLF+framing <=4KiB',
                        'capture/select/serialize/count before emit',
                        'aggregate JSON', 'keep each cursor', 'no early member output',
-                       'batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N',
+                       'batch --root ABS --requests - --max-bytes N --framing-bytes N',
+                       'via UTF-8 stdin',
                        'retain successful results', 'disclose gaps'):
             self.assertIn(phrase, text)
         for name in EXPECTED:
@@ -206,8 +249,11 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertIn('Verify script paths before use', dispatch)
         self.assertNotIn('Run dispatch preflight.', dispatch)
         self.assertIn('Reads/checks: Reader `batch', contract_text())
-        self.assertIn('Router ROOT dev only:', contract_text())
-        self.assertIn('ROOT/scripts/doctor.py --source-tree ROOT --preflight', contract_text())
+        self.assertNotIn('ROOT/scripts/doctor.py', contract_text())
+        install_docs = (ROOT / 'docs/INSTALL.md').read_text(encoding='utf-8')
+        self.assertIn('ROOT/scripts/doctor.py --source-tree ROOT --preflight', install_docs)
+        self.assertIn('only for Router development', install_docs)
+        self.assertIn('source doctor', (ROOT / 'AGENTS.md').read_text(encoding='utf-8'))
         from manage import source_files
         scripts = {key for key in source_files(ROOT) if key.startswith('skill/scripts/')}
         self.assertEqual(scripts, {'skill/scripts/readonly_reader.py'})

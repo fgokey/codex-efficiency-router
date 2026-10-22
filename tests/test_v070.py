@@ -893,6 +893,17 @@ class AccountingV070(unittest.TestCase):
         self.assertEqual(result['measurements']['total_tokens']['guarded'], 175)
         self.assertEqual(result['measurements']['elapsed_seconds']['guarded'], 8)
 
+    def test_dimension_claims_preserve_legacy_money_gate(self):
+        rows=self.rows(3)
+        for row in rows:
+            for call in row['calls']:
+                call.pop('actual_cost'); call['effort']='ultra'
+        result=compare_three(rows)
+        self.assertFalse(result['efficiency_claim_eligible'])
+        self.assertTrue(result['claim_eligibility']['total_tokens'])
+        self.assertTrue(result['claim_eligibility']['elapsed_seconds'])
+        self.assertFalse(result['claim_eligibility']['monetary_cost'])
+
     def test_single_trial_not_formal_efficiency_claim(self):
         self.assertFalse(compare_three(self.rows())['efficiency_claim_eligible'])
 

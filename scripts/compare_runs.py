@@ -18,6 +18,9 @@ METRICS = ("total_tokens", "expensive_model_tokens", "elapsed_seconds")
 def compare(rows: list[dict]) -> dict:
     if not isinstance(rows, list) or not rows:
         raise ValueError("expected a nonempty array of paired run records")
+    if any(isinstance(row, dict) and row.get("variant") in ("off", "on") for row in rows):
+        from compare_v2 import compare_two
+        return compare_two(rows)
     if any(isinstance(row, dict) and row.get("variant") in ("policy-only", "guarded") for row in rows):
         from compare_v2 import compare_three
         return compare_three(rows)
@@ -88,7 +91,7 @@ def main() -> int:
     try:
         result = compare(json.loads(args.runs.read_text(encoding="utf-8")))
         print(json.dumps(result, indent=2, allow_nan=False))
-        if result.get("schema") in (2, 3):
+        if result.get("schema") in (2, 3, 4):
             return 0 if result["quality_status"] == "pass" else 1
         return 0 if result["quality_status"] == "no_observed_regression" and result["router_acceptance"] == "pass" else 1
     except (OSError, ValueError, TypeError) as exc:

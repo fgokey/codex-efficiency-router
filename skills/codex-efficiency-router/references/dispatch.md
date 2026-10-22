@@ -1,16 +1,16 @@
 # Dispatch/guard
 
-authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Read dispatch before writes. Preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
+authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
 
-Reader `assignment --help`: schema. Wait exempt; spawn explicit role/effort, HOLD.
+Reader `assignment --help` if needed. Wait exempt; only ready work: spawn explicit role/effort, HOLD; bind then assign.
 
-Reader help: checked-body `CER execution` effects/permission/role_read_only/parent_released; unchanged signals, legacy compatible. Static checks.
+Reader: checked-body `CER execution` effects/permission/role_read_only/parent_released; unchanged signals; legacy compatible.
 
-When exposed, use `admitted_agent_task`: `spawn_hold`, bind, `assign` fresh envelope in `body`; no raw dispatch.
+Use `admitted_agent_task` when exposed: `spawn_hold`, bind, fresh `assign` envelope in `body`; no raw dispatch.
 
 Root Astra: `read_only` files; `prepare_agent_task` envelopes. Capacity never grants writes.
 
-Parent-assigned Ultra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: exact repo/ref/destination/checks; grants none. Count handoff/review costs.
+Parent-assigned Ultra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: exact repo/ref/destination/checks; grants none.
 
 Compare roots before writes. Requested native parent file-change attribution: verify/report; model/review/open-review prove none. Missing/unknown blocks badge; authorized work proceeds unless user requires it first. No fake badge/ID.
 

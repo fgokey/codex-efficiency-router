@@ -32,6 +32,95 @@ class AutomaticInstallTests(unittest.TestCase):
                 for p in d.rglob('*') if p.is_file()}
     def backup(self):return sorted(p for p in self.backups.iterdir() if p.is_dir())[-1]
     def manifest(self):return json.loads((self.skill/MANIFEST).read_text())
+
+    def test_compat_install_is_explicit_skill_only_and_idempotent(self):
+        self.install(host_mode='compat',dry_run=True)
+        self.assertFalse(self.skill.exists());self.assertFalse(self.backups.exists())
+        self.install(host_mode='compat')
+        manifest=self.manifest();before=self.state();backup=self.backup()
+        self.assertEqual(manifest['host_mode'],'compat')
+        self.assertFalse(self.agents.exists())
+        self.assertTrue(all(k.startswith('skill/') for k in manifest['files']))
+        self.assertNotIn('subagent_defaults',manifest)
+        self.assertEqual(doctor.validate_tree(self.skill/'SKILL.md',self.agents,
+                         from_manifest(manifest)),[])
+        self.install();self.assertEqual(self.state(),before);self.assertEqual(self.backup(),backup)
+        self.assertIn('Host mode: compat.',(self.skill/'SKILL.md').read_text())
+        self.assertFalse((self.root/'.codex/config.toml').exists())
+        self.assertFalse((self.root/'.codex/hooks.json').exists())
+        text=(self.skill/'SKILL.md').read_text()
+        self.assertNotIn('Root Astra defaults read-only',text)
+        self.assertNotIn('Unknown identity/effects grant no writes',text)
+        self.assertIn("does not block the current executor's already authorized work",text)
+        self.assertIn('Python/Reader/completion_check are optional',text)
+        for mode in ('fixed','adaptive'):
+            self.install(mode=mode)
+            profile=from_manifest(self.manifest())
+            self.assertEqual(profile.host_mode,'compat')
+            self.assertEqual(doctor.validate_tree(self.skill/'SKILL.md',self.agents,profile),[])
+            footprint=doctor.instruction_footprint(self.skill/'SKILL.md',self.agents,profile)
+            self.assertLessEqual(footprint['full_skill_bytes'],10800)
+            self.assertEqual(footprint['role_developer_instruction_bytes'],{})
+
+    def test_compat_never_removes_full_protection_or_sets_defaults(self):
+        self.install();before=self.state();backup=self.backup()
+        with self.assertRaisesRegex(ValueError,'full installation'):
+            self.install(host_mode='compat',force=True)
+        self.assertEqual(self.state(),before);self.assertEqual(self.backup(),backup)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError,'compat.*defaults'):
+                manage.install(ROOT,'project',Path(tmp),host_mode='compat',set_subagent_defaults=True)
+            self.assertFalse((Path(tmp)/'.codex/config.toml').exists())
+            with self.assertRaisesRegex(ValueError,'legacy full installation'):
+                manage.install(ROOT,'project',Path(tmp),host_mode='compat',adopt_v01=True)
+
+    def test_host_mode_schema_requires_explicit_compat_and_retains_legacy_full(self):
+        self.assertEqual(from_manifest({'mode':'auto','allow_low':False,'profile_schema':2}).host_mode,'full')
+        self.assertEqual(from_manifest({}).host_mode,'full')
+        for fields in ({'host_mode':'compat','profile_schema':2},
+                       {'profile_schema':3},
+                       {'host_mode':'unknown','profile_schema':3},
+                       {'host_mode':'compat','profile_schema':3,'subagent_defaults':{}},
+                       {'host_mode':'compat','profile_schema':3,'allow_low':True}):
+            with self.assertRaises(ValueError):
+                from_manifest(dict(mode='auto',allow_low=False)|fields)
+        with self.assertRaises(ValueError):self.install(host_mode='unknown')
+        self.assertFalse(self.skill.exists())
+
+    def test_compat_manifest_cannot_take_ownership_of_full_roles(self):
+        self.install(host_mode='compat');manifest=self.manifest()
+        manifest['files']['agents/sol61-engineer.toml']='0'*64
+        (self.skill/MANIFEST).write_text(json.dumps(manifest))
+        with self.assertRaisesRegex(ValueError,'cannot own roles'):
+            manage.uninstall('project',self.root,force=True)
+
+    def test_compat_preserves_foreign_roles_hooks_and_restores_owned_changes(self):
+        self.agents.mkdir(parents=True)
+        foreign=self.agents/'sol61-engineer.toml';foreign.write_text('private role')
+        hooks=self.root/'.codex/hooks.json';hooks.write_text('{"hooks":{}}')
+        self.install(host_mode='compat')
+        core=self.skill/'SKILL.md';core.write_bytes(core.read_bytes()+b'\nprivate')
+        with self.assertRaisesRegex(ValueError,'managed file'):
+            self.install()
+        customized=self.state();self.install(force=True);backup=self.backup()
+        manage.restore(backup,'project',self.root)
+        self.assertEqual(self.state(),customized)
+        self.install(force=True)
+        manage.uninstall('project',self.root)
+        self.assertEqual(foreign.read_text(),'private role')
+        self.assertEqual(hooks.read_text(),'{"hooks":{}}')
+
+    def test_compat_to_full_requires_explicit_selection_and_checks_collisions(self):
+        self.install(host_mode='compat');before=self.state()
+        self.agents.mkdir(parents=True)
+        role=self.agents/'sol61-engineer.toml';role.write_text('private')
+        with self.assertRaisesRegex(ValueError,'unowned'):
+            self.install(host_mode='full')
+        self.assertEqual((self.skill/MANIFEST).read_bytes(),before[str(self.skill/MANIFEST)])
+        role.unlink();self.install(host_mode='full')
+        self.assertEqual(from_manifest(self.manifest()).host_mode,'full')
+        self.assertEqual(len(list(self.agents.glob('*.toml'))),10)
+
     def prior_sol_inventory(self):
         # Model the 0.7.1-owned 16 paths without depending on Git history.
         self.install()
@@ -62,7 +151,8 @@ class AutomaticInstallTests(unittest.TestCase):
 
     def test_071_inventory_adds_both_sol61_roles_with_backup_and_restore(self):
         self.prior_sol_inventory()
-        self.assertEqual(self.manifest()['profile_schema'], 2)
+        self.assertEqual(self.manifest()['profile_schema'], 3)
+        self.assertEqual(self.manifest()['host_mode'], 'full')
         before=self.state();old_backup=self.backup()
         self.assertEqual(len(self.manifest()['files']),16)
         self.install(dry_run=True)

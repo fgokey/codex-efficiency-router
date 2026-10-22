@@ -12,6 +12,16 @@
 
 **v0.8.5 · 仅面向 Codex · MIT · Python 3.11+ · Windows / macOS / Linux**
 
+## 宿主启动检查与显式兼容模式
+
+`--host-mode full|compat` 与路由档位 `--mode auto|fixed|adaptive` 独立。新装和旧安装默认 **full**；缺能力绝不自动降为 compat。用户显式安装的选择在普通更新时保留。
+
+任务开始时先检查宿主工具、当前真实绑定、权限/RELEASE 和 Guard 证据。在本仓库运行 `python scripts/doctor.py --startup --source-tree .` 可得到廉价本地报告，不跑测试、不调用模型、不安装。改用 `--scope user` 可读取已安装档位和本地 Guard 注册。可选 `--host-context FILE` 最多接收 16 KiB 的不可信声明，包括自报接口；这些 JSON、配置、目录或旧凭据均不能证明实际当前模型、effort 或权限。CLI 无法认证当前绑定，因此 full 报 BLOCKED（退出 1），等待当前可信宿主/工具证据；原 full 准入和 RELEASE 门仍适用，报告不授予写权。`--preflight` 继续只做源码和测试检查。
+
+显式兼容安装先预演：`python scripts/install.py --scope user --host-mode compat --dry-run`，有安装授权后才移除 `--dry-run`。`doctor.py --startup --host-mode compat` 仅选择本次报告，不改变安装。compat 提供规划、上下文精简和复核；当前执行者可在已有宿主/用户权限内使用原生工具完成工作，缺模型元数据或可选 Python/Reader/completion 辅助不构成额外停工条件。它不强制派发模型、不改父模型、不注册 Guard、不安装或接管角色、不创建模型默认值。真实只读角色、沙箱/Hook 禁令、输出/必要规则/质量要求和独立的部署发布授权仍有效；不承诺模型身份、强制生效或 Token 收益。
+
+已有完整安装直接切 compat 会被拒绝，`--force` 也不能绕过；compat 同时拒绝旧版接管和模型默认值开关。若确需更换安装，应先核对原安装，再使用明确的卸载/恢复流程；不会为启用 compat 静默删除角色、定制文件、默认值、其他 Hook 或宿主保护。compat 切回 full 必须显式选择，并继续检查所有权和路径碰撞。安装器/doctor 仍需 Python 3.11+，但已安装 compat 规则下的正常授权工作不依赖这些辅助程序。
+
 ## v0.8.5：明确委派与有界证据
 
 canonical `spawn_agent` 预检查在执行者/协调白名单放行前拒绝未绑定的 default/inherit、缺 effort 和历史继承。固定角色及明确的模型/effort pin 保留；实际宿主绑定和用户授权仍须独立核验。`Agent` 参数形状尚未验证。只有已注册的原生 Hook 才会执行此检查，本地测试不证明宿主强制。
@@ -234,7 +244,7 @@ Skill 规则不能撤回根代理工具权限。仓库另提供可安装的 Code
 
 ## 安装与更新
 
-安装包的 `scripts/readonly_reader.py assignment` 通过有界 stdin 在给现有子任务发送工作前检查准入，只返回短前缀和正文哈希；实际消息必须合并同哈希正文。缺失/未知证据不给执行参数。纯同范围 continue/status/stop 可缓存当前凭据；廉价只读审查仍须派发检查。这是调用方必须消费的策略检查，不是宿主拦截或接收者身份认证；既有 live 角色不会因安装而热更新接收规则。Reader page 不拼接，也不混入 `Get-Content`/查询。[输入、入口和限制](docs/INSTALL.md)。
+安装包的 `scripts/readonly_reader.py assignment` 通过有界 stdin 在给现有子任务发送工作前检查准入，只返回短前缀和正文哈希；实际消息必须合并同哈希正文。缺失/未知证据不给执行参数。纯同范围 continue/status/stop 可缓存当前凭据；廉价只读审查仍须派发检查。这是调用方必须消费的策略检查，不是宿主拦截或接收者身份认证；既有 live 角色不会因安装而热更新接收规则。已释放的可写执行者可在既有授权内使用有界原生读取，仍须遵守同一任务、根目录、链接和输出限制；其他角色保留受保护的读取边界。Reader 的完整预检、严格解析、续页和总包装限制不变，不声称原生读取与 Reader 等价。[输入、入口和限制](docs/INSTALL.md)。
 
 先审查源码。普通安装只操作清单拥有的文件。显式 `--set-subagent-defaults` 仅在所选范围的 `config.toml` 补齐 `agents.default_subagent_model = "gpt-6.1-sol"` 和 `agents.default_subagent_reasoning_effort = "high"`；更新时把工具拥有且未改动的旧 medium 迁移到 high。父模型/推理等级、认证、权限、AGENTS.md 和其他配置保持原样。已有不同的用户自有值时停止，即使带 `--force`；已有相同值仍归用户所有。用户级/项目级二选一，保留克隆用于更新卸载。
 

@@ -23,7 +23,7 @@ from package import (AUTO_DESCRIPTION_PREFIX, EXPECTED, AUTO_EXPECTED, INSTRUCTI
 from profiles import Profile, MARKER
 from catalog import parse_catalog
 
-HEADINGS = ("Routing", "Delegate", "Handoff", "Recovery", "Context and reporting")
+HEADINGS = ("Completion", "Routing", "Delegate")
 
 
 def validate_agent(path: Path, expected: tuple[str, str, str], profile: Profile = Profile()) -> list[str]:
@@ -105,9 +105,14 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
     expected_marker = (profile.mode, "enabled" if profile.allow_low else "disabled")
     if MARKER.findall(text) != [expected_marker]:
         errors.append("Skill installation marker does not match manifest/source profile")
+    if ('Host mode: compat.' in text) != (profile.host_mode == 'compat'):
+        errors.append('Skill host mode does not match manifest/source profile')
     core_bytes = len(text.encode("utf-8"))
-    for required in ("Root Astra defaults read-only", "Astra leaves and read-only roles NEVER write",
-                     "Unknown identity/effects grant no writes"):
+    boundaries = (("Actual sandbox/read-only/Hook restrictions prevail", "no new write authority",
+                   "deployment/publication needs separate authority") if profile.host_mode == 'compat' else
+                  ("Root Astra defaults read-only", "Astra leaves and read-only roles NEVER write",
+                   "Unknown identity/effects grant no writes"))
+    for required in boundaries:
         if required not in text:
             errors.append(f"missing entry authority boundary: {required}")
     if core_bytes > INSTRUCTION_BUDGETS["core_skill_bytes"]:
@@ -134,19 +139,20 @@ def validate_tree(skill_file: Path, agent_dir: Path, profile: Profile = Profile(
                 errors.append(f"reference not packaged with Skill: {link}")
     try:
         chain = instruction_chain(skill_file)
-        for name in ("dispatch", "effort", "quality", "routing"):
+        for name in (() if profile.host_mode == "compat" else
+                     ("dispatch", "effort", "quality", "routing")):
             if f"references/{name}.md" not in chain:
                 errors.append(f"required policy reference is unreachable: {name}")
     except (OSError, ValueError) as exc:
         errors.append(str(exc))
-    if not has_astra_preset:
+    if profile.host_mode == "full" and not has_astra_preset:
         errors.append("missing Astra preset")
     metadata = skill_file.parent / "agents/openai.yaml"
     if not metadata.is_file():
         errors.append("missing UI/invocation metadata")
-    for filename, expected in EXPECTED.items():
+    for filename, expected in (EXPECTED.items() if profile.host_mode == "full" else ()):
         errors.extend(validate_agent(agent_dir / filename, expected, profile))
-    if profile.mode == "auto":
+    if profile.host_mode == "full" and profile.mode == "auto":
         for filename, expected in AUTO_EXPECTED.items():
             errors.extend(validate_agent(agent_dir / filename, expected, Profile("adaptive")))
     return errors
@@ -165,8 +171,8 @@ def instruction_footprint(skill_file: Path, agent_dir: Path, profile: Profile = 
         p.relative_to(skill_file.parent).as_posix(): len(p.read_text(encoding="utf-8").encode("utf-8"))
         for p in sorted((skill_file.parent / "references").rglob("*.md"))
     }
-    roles = dict(EXPECTED)
-    if profile.mode == "auto":
+    roles = dict(EXPECTED) if profile.host_mode == "full" else {}
+    if profile.host_mode == "full" and profile.mode == "auto":
         roles.update(AUTO_EXPECTED)
     role_bytes = {
         name: len(tomllib.loads((agent_dir / name).read_text(encoding="utf-8"))[
@@ -195,7 +201,7 @@ def validate_catalog(data: object, profile: Profile = Profile()) -> list[str]:
     except ValueError as exc:
         return [str(exc)]
     errors = []
-    for role, model, effort in EXPECTED.values():
+    for role, model, effort in (EXPECTED.values() if profile.host_mode == "full" else ()):
         required = {effort}
         if profile.mode == "adaptive" and role != "astra_architect":
             required = {"medium", "high"}
@@ -272,6 +278,40 @@ def preflight(root: Path) -> dict:
     return report
 
 
+def startup_report(profile: Profile, claims: object = None, *, guard: dict | None = None,
+                   dispatch_guard: dict | None = None) -> dict:
+    """Cheap local facts only. No caller JSON can authenticate a live host binding."""
+    if claims is not None and not isinstance(claims, dict):
+        raise ValueError('host context must be a JSON object of untrusted claims')
+    claims = claims or {}
+    declarations = {key: value[:24] if isinstance(value, str) else value
+                    if type(value) is bool else 'UNKNOWN'
+                    for key in ('model', 'effort', 'permission', 'role_read_only', 'parent_released')
+                    for value in (claims.get(key, 'UNKNOWN'),)}
+    interfaces = claims.get('interfaces', [])
+    if not isinstance(interfaces, list):
+        raise ValueError('declared interfaces must be a list')
+    declared = [name for name in ('admitted_agent_task', 'prepare_agent_task', 'read_only')
+                if name in interfaces]
+    def registration(value):
+        state = (value or {}).get('registration', 'UNKNOWN')
+        return state if state in ('ABSENT', 'PRESENT', 'OUTDATED', 'BROKEN') else 'UNKNOWN'
+    return {'status': 'COMPAT' if profile.host_mode == 'compat' else 'BLOCKED',
+            'host_mode': profile.host_mode, 'routing_mode': profile.mode,
+            'claim_basis': 'CALLER_SUPPLIED_NOT_AUTHENTICATED', 'declarations': declarations,
+            'interfaces': {'declared': declared, 'live_availability': 'UNKNOWN'},
+            'current_binding': 'UNKNOWN', 'current_permission': 'UNKNOWN', 'release': 'UNKNOWN',
+            'write_authority': 'NOT_GRANTED',
+            'guard': {'registration': registration(guard), 'dispatch_registration': registration(dispatch_guard),
+                      'basis': 'LOCAL_CONFIG_ONLY', 'trust': 'UNKNOWN', 'coverage': 'NOT_LIVE_VERIFIED'},
+            'required': ('Current trusted host/tool binding and authorized RELEASE before affected full work.'
+                         if profile.host_mode == 'full' else
+                         'Compat policy provides planning/context/review; the current executor can continue already '
+                         'authorized work within existing host/user authority. Missing model metadata adds no restriction. '
+                         'Read-only/Hook restrictions and separate publication authority still apply.'),
+            'enforcement': 'NOT_VERIFIED'}
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--json", action="store_true", dest="as_json")
@@ -279,6 +319,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--project-root", type=Path)
     parser.add_argument("--source-tree", type=Path)
     parser.add_argument("--preflight", action="store_true", help="source profiles and related contract tests; no models/install")
+    parser.add_argument("--startup", action="store_true", help="cheap local host capability gaps; no models/tests or write grant")
+    parser.add_argument("--host-mode", choices=("full", "compat"), help="explicit startup selection only; does not alter installation")
+    parser.add_argument("--host-context", type=Path, help="optional bounded JSON claims, never authenticated host evidence")
     parser.add_argument("--catalog", type=Path, help="exported, fully paginated model/list JSON; no live probing")
     return parser
 
@@ -287,6 +330,36 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if args.startup:
+            if args.preflight or args.catalog:
+                parser.error('--startup cannot be combined with --preflight or --catalog')
+            profile = Profile()
+            guard = dispatch_guard = None
+            if not args.source_tree:
+                from manage import installed_profile
+                from write_guard import inspect_status
+                skill_dir, agents, _ = resolve_targets(args.scope, args.project_root)
+                profile = installed_profile(skill_dir, agents)
+                guard = inspect_status(args.scope, args.project_root)
+                dispatch_guard = inspect_status(args.scope, args.project_root, 'dispatch')
+            persisted = profile.host_mode
+            if args.host_mode:
+                from dataclasses import replace
+                profile = replace(profile, host_mode=args.host_mode, allow_low=False
+                                  if args.host_mode == 'compat' else profile.allow_low)
+            claims = None
+            if args.host_context:
+                with args.host_context.open('rb') as stream:
+                    raw = stream.read(16385)
+                if len(raw) > 16384:
+                    raise ValueError('host context exceeds 16 KiB')
+                claims = json.loads(raw)
+            report = startup_report(profile, claims, guard=guard, dispatch_guard=dispatch_guard)
+            report['persisted_host_mode'] = persisted
+            print(json.dumps(report, ensure_ascii=True))
+            return int(report['status'] == 'BLOCKED')
+        if args.host_mode is not None or args.host_context is not None:
+            parser.error('--host-mode/--host-context require --startup')
         if args.preflight:
             if not args.source_tree or args.catalog:
                 parser.error("--preflight requires --source-tree and no --catalog")
@@ -336,6 +409,7 @@ def main() -> int:
             print(json.dumps({"policy": "FAIL" if errors else "PASS", "errors": errors,
                               "instruction_footprint": footprint,
                               "profile": profile.mode, "automatic_low": profile.allow_low,
+                              "host_mode": profile.host_mode,
                               "source_identity": identity, "guard": guard, "dispatch_guard": dispatch_guard,
                               "enforcement": "NOT_VERIFIED", "runtime_loaded_version": "UNKNOWN",
                               "parent_completion": {"router_policy": "INSTRUCTION_ONLY", "native_gate": "UNKNOWN"},

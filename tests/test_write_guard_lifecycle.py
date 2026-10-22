@@ -14,6 +14,27 @@ import write_guard as wg
 
 
 class GuardLifecycleTests(unittest.TestCase):
+    def test_compat_preserves_existing_guard_but_cannot_register_or_update_one(self):
+        import manage
+        self.runop()
+        manage.install(ROOT,'project',self.root,host_mode='compat')
+        before={str(p):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        for boundary in ('writes','dispatch'):
+            for action in ('install','update'):
+                with self.assertRaisesRegex(ValueError,'compat cannot register/update Guard'):
+                    wg.lifecycle(action,'project',self.root,boundary=boundary,force=True)
+        after={str(p):p.read_bytes() for p in self.root.rglob('*') if p.is_file()}
+        self.assertEqual(after,before)
+        boundary=json.loads((self.directory/'manifest.json').read_text())['boundary']
+        report=wg.inspect_status('project',self.root,boundary)
+        self.assertEqual(report['host_mode'],'compat')
+        self.assertEqual(report['installation_mode'],'compat')
+        self.assertEqual(report['registration'],'PRESENT')
+        self.assertEqual(report['trust'],'UNKNOWN')
+        self.runop('remove')
+        skill,_,_=manage.resolve_targets('project',self.root)
+        self.assertTrue((skill/'SKILL.md').exists())
+
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
         self.root=Path(self.tmp.name).resolve()

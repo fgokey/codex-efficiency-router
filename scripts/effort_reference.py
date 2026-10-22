@@ -263,6 +263,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     evidence-backed effort change, not an identical-configuration retry. Model
     and effort rankings are guardrails, not a universal quality/cost ordering.
     """
+    if isinstance(profile, Profile) and profile.host_mode != 'full':
+        raise ValueError('full-mode admission is not used in compat; preserve existing host authority')
     if not isinstance(context, Context):
         raise ValueError("execution Context required")
     context.validate()

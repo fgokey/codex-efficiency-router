@@ -16,6 +16,85 @@ from package import EXPECTED, PROJECT
 
 
 class DoctorTests(unittest.TestCase):
+    def test_compat_startup_report_retains_authorized_work_without_model_metadata(self):
+        from profiles import Profile
+        report=doctor.startup_report(Profile(host_mode='compat'),{'permission':'workspace-write'})
+        self.assertEqual(report['status'],'COMPAT')
+        self.assertEqual(report['current_binding'],'UNKNOWN')
+        self.assertEqual(report['write_authority'],'NOT_GRANTED')
+        scope=report['required']
+        self.assertNotIn('planning/context/review only',scope)
+        self.assertNotIn('Unknown identity/effects grant no writes',scope)
+        self.assertIn('current executor can continue already authorized work',scope)
+        self.assertIn('Missing model metadata adds no restriction',scope)
+        self.assertIn('Read-only/Hook restrictions',scope)
+        self.assertIn('separate publication authority',scope)
+
+    def test_startup_never_authenticates_claimed_bindings_or_grants_writes(self):
+        from profiles import Profile
+        claimed={'model':'gpt-6.1-sol','effort':'high','permission':'full-access',
+                 'role_read_only':False,'parent_released':True,
+                 'interfaces':['admitted_agent_task','prepare_agent_task'],
+                 'binding':{'status':'VERIFIED','session':'old'}}
+        with patch.object(doctor,'source_profiles',side_effect=AssertionError('not cheap')):
+            full=doctor.startup_report(Profile(),claimed)
+            compat=doctor.startup_report(Profile(host_mode='compat'),claimed)
+        self.assertEqual(full['host_mode'],'full')
+        self.assertEqual(full['status'],'BLOCKED')
+        for report in (full,compat):
+            self.assertEqual(report['current_binding'],'UNKNOWN')
+            self.assertEqual(report['write_authority'],'NOT_GRANTED')
+            self.assertEqual(report['claim_basis'],'CALLER_SUPPLIED_NOT_AUTHENTICATED')
+            self.assertEqual(report['guard']['trust'],'UNKNOWN')
+            self.assertLessEqual(len(json.dumps(report).encode())+2,3072)
+        self.assertEqual(compat['status'],'COMPAT')
+        self.assertEqual(doctor.startup_report(Profile())['host_mode'],'full')
+        missing_model=doctor.startup_report(Profile(host_mode='compat'),{'permission':'workspace-write'})
+        self.assertEqual(missing_model['status'],'COMPAT')
+        self.assertEqual(missing_model['current_binding'],'UNKNOWN')
+        readonly=doctor.startup_report(Profile(host_mode='compat'),{'permission':'read-only','parent_released':False})
+        self.assertEqual(readonly['write_authority'],'NOT_GRANTED')
+        self.assertIn('Read-only/Hook restrictions',readonly['required'])
+
+    def test_startup_claims_are_bounded_and_cannot_authenticate_hook_trust(self):
+        from profiles import Profile
+        huge=dict.fromkeys(('model','effort','permission','role_read_only','parent_released'),'\U0001f600'*10000)
+        huge['interfaces']=['admitted_agent_task']*10000
+        report=doctor.startup_report(Profile(host_mode='compat'),huge,
+                 guard={'registration':'PRESENT','trust':'VERIFIED'},dispatch_guard={'registration':'BROKEN'})
+        self.assertLessEqual(len(json.dumps(report).encode())+2,3072)
+        self.assertEqual(report['guard']['registration'],'PRESENT')
+        self.assertEqual(report['guard']['dispatch_registration'],'BROKEN')
+        self.assertEqual(report['guard']['trust'],'UNKNOWN')
+        with self.assertRaises(ValueError):doctor.startup_report(Profile(),[])
+
+    def test_compat_does_not_bypass_existing_execution_admission(self):
+        import runpy
+        check=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))['execution_admission']
+        baseline={'effects':['write'],'permission':'workspace-write','role_read_only':False,'parent_released':True}
+        self.assertEqual(check(baseline,'gpt-6.1-sol'),'VERIFIED')
+        self.assertEqual(check(dict(baseline,permission='read-only'),'gpt-6.1-sol'),'MISMATCH')
+        self.assertEqual(check(dict(baseline,role_read_only=True),'gpt-6.1-sol'),'MISMATCH')
+        self.assertEqual(check(dict(baseline,parent_released=False),'gpt-6.1-sol'),'UNKNOWN')
+        self.assertEqual(check(dict(baseline,host_mode='compat'),'gpt-6.1-sol'),'UNKNOWN')
+        self.assertEqual(check(dict(baseline,effects=['publish']),'gpt-6.1-sol'),'UNKNOWN')
+        from effort_reference import plan
+        from profiles import Profile
+        with self.assertRaisesRegex(ValueError,'full-mode admission is not used'):
+            plan(None,None,Profile(host_mode='compat'))
+
+    def test_startup_cli_is_cheap_and_mode_override_does_not_change_installation(self):
+        command=[sys.executable,'-B',str(ROOT/'scripts/doctor.py'),
+                 '--source-tree',str(ROOT),'--startup']
+        full=subprocess.run(command,capture_output=True,text=True)
+        compat=subprocess.run(command+['--host-mode','compat'],capture_output=True,text=True)
+        self.assertEqual(full.returncode,1,full.stderr)
+        self.assertEqual(compat.returncode,0,compat.stderr)
+        self.assertEqual(json.loads(full.stdout)['current_binding'],'UNKNOWN')
+        report=json.loads(compat.stdout)
+        self.assertEqual(report['host_mode'],'compat')
+        self.assertEqual(report['persisted_host_mode'],'full')
+
     def test_real_cli_does_not_present_policy_pass_as_parent_completion_enforcement(self):
         # Diagnostic regression only: this does not replay model finalization.
         command = [sys.executable, '-B', str(ROOT / 'scripts/doctor.py'),
@@ -129,7 +208,7 @@ class DoctorTests(unittest.TestCase):
             skill = Path(tmp) / "skill"
             shutil.copytree(ROOT / "skills" / PROJECT, skill)
             p = skill / "SKILL.md"
-            p.write_text(p.read_text(encoding="utf-8").split("## Handoff")[0], encoding="utf-8")
+            p.write_text(p.read_text(encoding="utf-8").split("## Delegate")[0], encoding="utf-8")
             self.assertTrue(doctor.validate_tree(p, ROOT / "agents"))
 
     def test_valid_export_and_raw_result(self):

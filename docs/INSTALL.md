@@ -8,7 +8,17 @@ Desktop session verification on 2026-10-12, before the high-default update: afte
 
 The complete Skill directory, including four progressive references and UI metadata, plus five canonical roles and, in default auto, five generated native aliases. A `.cer-install.json` manifest records owner, schema, version and exact installed hashes. The clone's scripts, documentation and tests are not loaded into the model as runtime context.
 
-The installed `scripts/` directory contains only `readonly_reader.py`, including its pure-stdlib `assignment` preflight. Run each Reader invocation alone in its tool call; use one Reader `batch` for independent checks under one total output budget. Do not concatenate page calls or mix `Get-Content`/queries into their output. Verify any script's real path before use. `ROOT/scripts/doctor.py --source-tree ROOT --preflight` is only for Router development, with `ROOT` the Router source repository; it is not an installed helper or a prerequisite for unrelated repository work.
+The installed `scripts/` directory contains only `readonly_reader.py`, including its pure-stdlib `assignment` preflight. A current admitted and RELEASED writable executor may use already authorized bounded native reads in its task scope, preserving physical-root/link checks and aggregate output limits. This grants no permission and claims no native/Reader contract equivalence. Astra, read-only and unknown roles keep their existing host allowlist/guarded-read boundary; they cannot take the writable-executor path. The role's Python Reader clause governs that helper when used, not every ordinary executor read. Reader requests still require full preflight, strict parsing, SHA-bound cursors and framing; use its `batch` for independent checks and never concatenate file pages. Reuse verified CLI syntax and current locations unless stale/error. Verify any script's real path before use. `ROOT/scripts/doctor.py --source-tree ROOT --preflight` is only for Router development, with `ROOT` the Router source repository; it is not an installed helper or a prerequisite for unrelated repository work.
+
+For PowerShell, send the batch request through UTF-8 stdin to preserve JSON quotes and non-ASCII paths. Reuse this syntax; `--help` is needed only when syntax is unknown. Replace the sample root and framing allowance with the actual values:
+
+```powershell
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$cerRequests = '[{"op":"page","path":"AGENTS.md"}]'
+$cerRequests | python -I -B '<Skill>/scripts/readonly_reader.py' batch --root '<repo>' --requests - --max-bytes 3072 --framing-bytes 256
+```
+
+Check `$LASTEXITCODE` before parsing JSON, and retain each result's status, error and cursor. The existing encoded `ROOT BASE64_URLSAFE_JSON` entry also accepts padded or unpadded URL-safe Base64; its input, path and schema limits remain strict.
 
 Before a task-bearing send to an existing worker, run verified Python `-I -B <Skill>/scripts/readonly_reader.py assignment` with UTF-8 JSON on stdin (at most 16 KiB). Supply `unit_id`, `purpose` (`new_unit`, `continue`, `status`, `stop`), concise `scope`, exact work `message`, and `recipient` with observed `id`, `model`, `effort`, and a bounded `evidence_ref` naming the actual session/turn evidence. `signals` must explicitly set `spec_complete`, `authority_ready`, `environment_ready`, `observability_ready` to true. Engineering/review defaults to Sol61/high; confirmed simple medium needs `confirmed_simple=true` and current low-risk signals. Higher effort needs `effort_supported=true` and a concrete `effort_reason`. The existing-send entry does not establish a new spawn's identity: spawn with explicit role/effort, then verify actual binding before release.
 

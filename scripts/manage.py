@@ -194,7 +194,9 @@ def load_manifest(skill: Path, agents: Path) -> dict[str, str]:
     data = json.loads(raw)
     if not isinstance(data, dict) or data.get("owner") != PROJECT or data.get("schema") != 1 or not isinstance(data.get("files"), dict):
         raise ValueError("invalid ownership manifest")
-    from_manifest(data)  # Validate persisted mode before any lifecycle operation.
+    profile = from_manifest(data)  # Validate persisted mode before any lifecycle operation.
+    if profile.host_mode == 'compat' and set(data['files']) - required_ownership(profile):
+        raise ValueError('compat manifest cannot own roles, defaults or full-only files')
     for key, value in data["files"].items():
         target(key, skill, agents)
         if key in (f"skill/{MANIFEST}", CONFIG_KEY) or not isinstance(value, str) or len(value) != 64:
@@ -212,11 +214,15 @@ def installed_profile(skill: Path, agents: Path) -> Profile:
 
 
 def required_ownership(profile: Profile) -> set[str]:
+    if profile.host_mode == 'compat':
+        return {'skill/' + name for name in ('SKILL.md', 'agents/openai.yaml',
+                'scripts/readonly_reader.py')}
     required = {'skill/' + name for name in ('SKILL.md', 'agents/openai.yaml', 'cer.ps1',
                 'scripts/readonly_reader.py', 'references/dispatch.md', 'references/effort.md',
                 'references/quality.md', 'references/routing.md')}
-    required.update('agents/' + name for name in
-                    (MANAGED_AGENT_FILES if profile.mode == 'auto' else AGENT_FILES))
+    if profile.host_mode == 'full':
+        required.update('agents/' + name for name in
+                        (MANAGED_AGENT_FILES if profile.mode == 'auto' else AGENT_FILES))
     return required
 
 
@@ -345,7 +351,7 @@ def apply(changes: dict[str, bytes | None], skill: Path, agents: Path, backup_ro
 def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = False,
             force: bool = False, adopt_v01: bool = False, *,
             mode: str | None = None, allow_low: bool | None = None,
-            set_subagent_defaults: bool = False) -> int:
+            set_subagent_defaults: bool = False, host_mode: str | None = None) -> int:
     skill, agents, backup_root = resolve_targets(scope, project_root)
     canonical = source_files(root)
     version = (root / "VERSION").read_text(encoding="utf-8").strip()
@@ -354,11 +360,18 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
         manifest_exists = (skill / MANIFEST).exists()
         owned = load_manifest(skill, agents)
         previous = installed_profile(skill, agents) if manifest_exists else None
-        profile = select_profile(previous, mode, allow_low)
+        profile = select_profile(previous, mode, allow_low, host_mode)
+        if profile.host_mode == 'compat':
+            if previous is not None and previous.host_mode == 'full':
+                raise ValueError('full installation must be explicitly uninstalled/restored before compat; existing protection is preserved')
+            if set_subagent_defaults:
+                raise ValueError('compat cannot set model defaults')
+            if adopt_v01:
+                raise ValueError('compat cannot adopt a legacy full installation; reconcile it explicitly first')
         if previous is not None and previous.legacy and mode is None:
             print(f"migration: legacy {previous.mode} -> auto; existing managed bytes will be backed up")
         payload = render_payload(canonical, profile)
-        print(f"profile: {profile.mode}; automatic low: {profile.allow_low}; no live capability probe")
+        print(f"profile: {profile.mode}; host mode: {profile.host_mode}; automatic low: {profile.allow_low}; no live capability probe")
         if adopt_v01 and not manifest_exists:
             owned = legacy_files(skill, agents)
         for key in set(owned) | set(payload):
@@ -371,7 +384,7 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
         changes = {key: None for key in owned if key not in payload}
         changes.update(payload)
         defaults = installed_defaults(skill, agents, allow_legacy=True)
-        if set_subagent_defaults or defaults is not None:
+        if profile.host_mode == 'full' and (set_subagent_defaults or defaults is not None):
             config, defaults = subagent_defaults(read_bytes(target(CONFIG_KEY, skill, agents)), defaults, migrate=True)
             changes[CONFIG_KEY] = config
         from release_identity import source_identity, sha, canonical as canonical_json
@@ -381,7 +394,8 @@ def install(root: Path, scope: str, project_root: Path | None, dry_run: bool = F
         manifest = {"schema": 1, "owner": PROJECT, "version": version,
                     "base_commit": identity["base_commit"],
                     "policy_sha256": sha(canonical_json(policy_parts)),
-                    "mode": profile.mode, "allow_low": profile.allow_low, "profile_schema": 2,
+                    "mode": profile.mode, "allow_low": profile.allow_low,
+                    "profile_schema": 3, "host_mode": profile.host_mode,
                     "files": {key: digest(value) for key, value in sorted(payload.items())}}
         if defaults is not None:
             manifest["subagent_defaults"] = defaults

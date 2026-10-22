@@ -103,7 +103,8 @@ HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
     Example: batch --root ABS --requests '[{"op":"page","path":"a.txt"},{"op":"page","path":"b.txt"}]' --max-bytes 3072 --framing-bytes 256
     Declare actual host framing; the example's 256 is not a host measurement.
     Budget too small for member metadata: narrow batch. Retry only failed/pending items.
-    Shell JSON quoting: existing ROOT BASE64_URLSAFE_JSON form accepts the same batch object.
+    PowerShell: pipe UTF-8 JSON_ARRAY to --requests -; avoids native argument quote removal.
+    ROOT BASE64_URLSAFE_JSON also accepts the batch object; padding is optional.
     Use physical roots/paths; symlink and reparse checks remain strict.
   read|search|list|diff|status --root ABS --path PATH [--cursor TOKEN] [--max-bytes N]
     Pages retain selected-request semantics; read/search keep line numbers. search needs --query.
@@ -876,15 +877,26 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
     structured = request['op'] == 'batch' and 'framing_bytes' in request
     if structured:
         cap = request['max_bytes'] - request['framing_bytes']
+        captured = {}
         def packed():
-            return {'op':'batch','results':results,'status':'COMPLETE'}
+            return {'op':'batch','results':[captured[i] for i in sorted(captured)],'status':'COMPLETE'}
         overhead = len(envelope(packed(), cap).encode('utf-8')) + 2
         if (cap - overhead - len(checked) + 1) // len(checked) + 2 < 256:
             raise ValueError('batch budget cannot reserve 256 bytes per request; narrow batch')
-        for index, (item, path) in enumerate(checked):
-            count = len(checked) - index
+        # Capture known-small complete files first; emit in the caller's order.
+        def priority(entry):
+            item, path = entry[1]
+            if item['op'] == 'page' and 'cursor' not in item:
+                try:
+                    return path.stat().st_size
+                except OSError:
+                    pass  # one() retains this item's error alongside other evidence.
+            return READ_LIMIT
+        pending = sorted(enumerate(checked), key=priority)
+        for position, (index, (item, path)) in enumerate(pending):
+            count = len(checked) - position
             used = len(envelope(packed(), cap).encode('utf-8')) + 2
-            commas = count if results else count - 1
+            commas = count if captured else count - 1
             member = {**item, 'max_bytes':min(item.get('max_bytes', PAGE_BYTES),
                                              (cap - used - commas) // count + 2)}
             try:
@@ -907,11 +919,11 @@ def run(root: Path, request: dict, *, json_output: bool = False) -> str:
                             value['error'] = value['error'][:len(value['error']) // 2]
                         else:
                             raise
-            results.append(value)
+            captured[index] = value
             envelope(packed(), cap)  # Capture and budget every member before emitting anything.
         value = packed()
         if any(row.get('next_cursor') is not None or row.get('complete') is False
-               or row.get('status') in ('PARTIAL', 'ERROR') for row in results):
+               or row.get('status') in ('PARTIAL', 'ERROR') for row in captured.values()):
             value['status'] = 'PARTIAL'
         return envelope(value, cap)
     size = 0
@@ -944,11 +956,17 @@ def cli_request(args: list[str]) -> tuple[Path, dict]:
     if args[0] == 'batch':
         if set(values) != {'--root','--requests','--max-bytes','--framing-bytes'}:
             raise ValueError('JSON batch needs root/requests/max-bytes/framing-bytes')
-        if len(values['--requests'].encode('utf-8')) > INPUT_LIMIT:
+        request_text = values['--requests']
+        if request_text == '-':
+            raw = sys.stdin.buffer.read(INPUT_LIMIT + 1)
+            if len(raw) > INPUT_LIMIT:
+                raise ValueError('reader input exceeds 16 KiB')
+            request_text = raw.decode('utf-8')
+        if len(request_text.encode('utf-8')) > INPUT_LIMIT:
             raise ValueError('reader input exceeds 16 KiB')
         root = Path(values['--root'])
         if not root.is_absolute(): raise ValueError('root must be an absolute directory')
-        request = {'op':'batch','requests':json.loads(values['--requests'], object_pairs_hook=unique,
+        request = {'op':'batch','requests':json.loads(request_text, object_pairs_hook=unique,
                                                      parse_constant=reject_constant),
                    'max_bytes':int(values['--max-bytes']), 'framing_bytes':int(values['--framing-bytes'])}
         validate(request)
@@ -1025,9 +1043,26 @@ def assignment_policy_sha256(skill_root: Path | None = None) -> str:
     skill = skill_root if skill_root is not None else here.parents[1]
     if skill_root is None and not (skill / 'SKILL.md').is_file():
         skill = skill / 'skills/codex-efficiency-router'
+    manifest = skill / '.cer-install.json'
+    if manifest.is_file():
+        with manifest.open('rb') as stream:
+            raw = stream.read(INPUT_LIMIT + 1)
+        if len(raw) > INPUT_LIMIT:
+            raise ValueError('installed policy manifest exceeds input limit')
+        installed = json.loads(raw, object_pairs_hook=unique)
+        if not isinstance(installed, dict):
+            raise ValueError('installed policy manifest must be an object')
+        schema = installed.get('profile_schema')
+        host = installed.get('host_mode', 'full')
+        if (host != 'full' or schema is not None and (type(schema) is not int or schema not in (2, 3))
+                or schema == 3 and 'host_mode' not in installed):
+            raise ValueError('full admission requires full host mode; compat grants no full routing')
     digest = hashlib.sha256(here.read_bytes())
     for path in (skill / 'SKILL.md', *sorted((skill / 'references').glob('*.md'))):
-        digest.update(path.read_bytes())
+        rules = path.read_bytes()
+        if path.name == 'SKILL.md' and b'Host mode: compat.' in rules:
+            raise ValueError('compat does not provide full admission')
+        digest.update(rules)
     return digest.hexdigest()
 
 
@@ -1228,7 +1263,8 @@ def main() -> int:
         else:
             if len(sys.argv) != 3 or len(sys.argv[2]) > (INPUT_LIMIT + 2) // 3 * 4:
                 raise ValueError('expected workspace and bounded encoded request')
-            raw = base64.b64decode(sys.argv[2], altchars=b'-_', validate=True)
+            token = sys.argv[2]
+            raw = base64.b64decode(token + '=' * (-len(token) % 4), altchars=b'-_', validate=True)
             request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
             root = Path(sys.argv[1])
             validate(request)

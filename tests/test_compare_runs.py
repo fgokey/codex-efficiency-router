@@ -1,10 +1,182 @@
 import copy
+import json
+import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from compare_runs import compare
+from compare_v2 import compare_two
+
+
+class PairedAccountingTests(unittest.TestCase):
+    def rows(self, trials=3, families=3):
+        rows=[]
+        for family in range(families):
+            for trial in range(trials):
+                for n,variant in enumerate(('off','on')):
+                    scope=f'{family}/{variant}-{trial}'
+                    rows.append(dict(task_id=f'family-{family}',trial_id=str(trial),environment_id='env',
+                        input_id=f'input-{family}',acceptance_id=f'oracle-{family}',variant=variant,outcome='pass',
+                        elapsed_seconds=10-n,critical_path_seconds=5,waiting_seconds=1,
+                        calls_complete=True,run_order=(trial+n)%2+1,randomized_order=True,
+                        skills_enabled=variant=='on',isolation_evidence=f'checked:{scope}',
+                        parent_call_id='parent',owned_scope_ids=[scope],
+                        astra_writes=0,duplicate_writers=0,retry_replays=0,
+                        calls=[dict(call_id='parent',scope_id=scope,usage_semantics='per_call',model='gpt-6.1-sol',effort='ultra',
+                            attempt=1,status='completed',input_tokens=100,cached_input_tokens=80,
+                            output_tokens=20,reasoning_tokens=10)]))
+        return rows
+
+    def test_two_arms_separate_token_wall_quality_from_unknown_money(self):
+        result=compare(self.rows())
+        self.assertTrue(result['claim_eligibility']['total_tokens'])
+        self.assertTrue(result['claim_eligibility']['elapsed_seconds'])
+        self.assertFalse(result['claim_eligibility']['monetary_cost'])
+        self.assertEqual(result['measurements']['total_tokens']['on'],1080)
+        self.assertEqual(result['measurements']['cached_input_tokens']['off'],720)
+        self.assertEqual(result['measurements']['monetary_cost']['status'],'UNKNOWN')
+
+    def test_paired_controls_and_ownership_fail_closed(self):
+        for key,value in (('environment_id','other'),('input_id','other'),('acceptance_id','other'),
+                          ('skills_enabled',False),('isolation_evidence',''),('owned_scope_ids',[])):
+            rows=self.rows(); rows[1][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError): compare_two(rows)
+        for key,value in (('model','gpt-6-astra'),('effort','high'),('scope_id','unowned')):
+            rows=self.rows(); rows[1]['calls'][0][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError): compare_two(rows)
+
+    def test_missing_counter_does_not_invent_zero_or_erase_wall_measurement(self):
+        rows=self.rows(); rows[1]['calls'][0].pop('input_tokens')
+        result=compare_two(rows)
+        self.assertFalse(result['claim_eligibility']['total_tokens'])
+        self.assertTrue(result['claim_eligibility']['elapsed_seconds'])
+        self.assertEqual(result['measurements']['total_tokens']['status'],'UNKNOWN')
+        rows[1]['calls_complete']=False
+        self.assertFalse(compare_two(rows)['claim_eligibility']['elapsed_seconds'])
+
+    def test_retries_and_shared_parent_are_included_once(self):
+        rows=self.rows(); row=rows[1]
+        row['calls'].append(dict(row['calls'][0],call_id='retry',attempt=2,status='failed'))
+        row['shared_parent_scope_ids']=list(row['owned_scope_ids'])
+        row['shared_parent_attribution']='entire shared preparation belongs to this run'
+        result=compare_two(rows)
+        self.assertEqual(result['measurements']['total_tokens']['on'],1200)
+        self.assertEqual(result['runs'][1]['shared_parent_scope_ids'],row['owned_scope_ids'])
+        rows[3]['owned_scope_ids']=list(row['owned_scope_ids'])
+        rows[3]['calls'][0]['scope_id']=row['owned_scope_ids'][0]
+        with self.assertRaises(ValueError): compare_two(rows)
+
+    def test_cumulative_repeated_snapshots_use_final_totals(self):
+        rows=self.rows(); call=rows[1]['calls'][0]
+        snapshots=[dict(sequence=1,input_tokens=50,cached_input_tokens=40,output_tokens=10),
+                   dict(sequence=2,input_tokens=100,cached_input_tokens=80,output_tokens=20,final=True)]
+        call['usage_snapshots']=[snapshots[0],copy.deepcopy(snapshots[0]),snapshots[1]]
+        self.assertEqual(compare_two(rows)['measurements']['total_tokens']['on'],1080)
+        call['usage_snapshots'][-1]['final']=False
+        self.assertFalse(compare_two(rows)['claim_eligibility']['total_tokens'])
+        call['usage_snapshots'][1]['input_tokens']=51
+        with self.assertRaises(ValueError): compare_two(rows)
+
+    def test_invalid_counters_labels_and_adverse_trials_are_retained(self):
+        for key,value in (('cached_input_tokens',101),('reasoning_tokens',21),('effort','imaginary')):
+            rows=self.rows(); rows[1]['calls'][0][key]=value
+            with self.subTest(key=key),self.assertRaises(ValueError): compare_two(rows)
+        rows=self.rows(); rows[1]['variant']='router'
+        with self.assertRaises(ValueError): compare_two(rows)
+        rows=self.rows(); rows[1]['outcome']='fail'
+        self.assertFalse(compare_two(rows)['claim_eligibility']['total_tokens'])
+        self.assertFalse(compare_two(self.rows(1))['claim_eligibility']['total_tokens'])
+
+    def test_cli_accepts_two_arms_and_rejects_failed_acceptance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'runs.json'; rows=self.rows()
+            for expected in (0,1):
+                path.write_text(json.dumps(rows),encoding='utf-8')
+                proc=subprocess.run([sys.executable,'-B',str(Path(__file__).resolve().parents[1]/'scripts/compare_runs.py'),
+                                     str(path)],capture_output=True,text=True,timeout=10)
+                self.assertEqual(proc.returncode,expected,proc.stderr)
+                self.assertEqual(json.loads(proc.stdout)['schema'],4)
+                rows[1]['outcome']='fail'
+
+    def test_unpaired_missing_parent_and_changed_frozen_controls_are_rejected(self):
+        for change in ('unpaired','parent','control','duplicate'):
+            rows=self.rows()
+            if change=='unpaired': rows.pop()
+            elif change=='parent': rows[1]['parent_call_id']='missing'
+            elif change=='control': rows[2]['input_id']='different'
+            else: rows[1]['calls'].append(copy.deepcopy(rows[1]['calls'][0]))
+            with self.subTest(change=change),self.assertRaises(ValueError): compare_two(rows)
+
+    def test_snapshot_regressions_and_counter_conflicts_fail_closed(self):
+        for change in ('regression','subset','after-final','conflict'):
+            rows=self.rows(); call=rows[1]['calls'][0]
+            call['usage_snapshots']=[dict(sequence=1,input_tokens=50,cached_input_tokens=40,output_tokens=10),
+                dict(sequence=2,input_tokens=100,cached_input_tokens=80,output_tokens=20,final=True)]
+            if change=='regression': call['usage_snapshots'][1]['input_tokens']=49
+            elif change=='subset': call['usage_snapshots'][0]['cached_input_tokens']=51
+            elif change=='after-final': call['usage_snapshots'][0]['final']=True
+            else: call['input_tokens']=101
+            with self.subTest(change=change),self.assertRaises(ValueError): compare_two(rows)
+
+    def test_scope_cumulative_counters_cannot_double_count_calls(self):
+        rows=self.rows(); call=rows[1]['calls'][0]
+        call['usage_semantics']='scope_cumulative'
+        call['usage_snapshots']=[dict(sequence=2,input_tokens=100,cached_input_tokens=80,output_tokens=20,final=True)]
+        self.assertEqual(compare_two(rows)['measurements']['total_tokens']['on'],1080)
+        rows[1]['calls'].append(dict(call,call_id='retry',attempt=2))
+        with self.assertRaises(ValueError): compare_two(rows)
+        rows=self.rows(); rows[1]['calls'][0].pop('usage_semantics')
+        with self.assertRaises(ValueError): compare_two(rows)
+
+    def test_distinct_per_call_invocations_share_scope_and_attempt_one(self):
+        rows=self.rows(); row=rows[1]
+        row['calls'].append(dict(row['calls'][0],call_id='second-call',status='failed'))
+        result=compare_two(rows)
+        self.assertEqual(result['measurements']['total_tokens']['on'],1200)
+        self.assertEqual([call['attempt'] for call in result['runs'][1]['calls']],[1,1])
+        self.assertEqual(result['runs'][1]['per_model']['gpt-6.1-sol']['statuses'],{'completed':1,'failed':1})
+        self.assertTrue(result['claim_eligibility']['total_tokens'])
+
+    def test_per_call_id_and_scope_cumulative_guards_remain_distinct(self):
+        rows=self.rows(); row=rows[1]
+        row['calls'].append(dict(row['calls'][0],call_id='child',attempt=2))
+        row['calls'].append(dict(row['calls'][0],call_id='child',attempt=3))
+        with self.assertRaisesRegex(ValueError,'duplicate call_id'): compare_two(rows)
+        for reverse in (False,True):
+            rows=self.rows(); row=rows[1]
+            row['calls'].append(dict(row['calls'][0],call_id='scope-total',usage_semantics='scope_cumulative',
+                usage_snapshots=[dict(sequence=1,input_tokens=100,cached_input_tokens=80,output_tokens=20,final=True)]))
+            if reverse: row['calls'].reverse()
+            with self.subTest(reverse=reverse),self.assertRaisesRegex(ValueError,'cumulative scope totals'):
+                compare_two(rows)
+
+    def test_formal_sampling_requires_three_families_with_three_pairs_each(self):
+        for families,trials in ((1,3),(2,3),(3,2)):
+            result=compare_two(self.rows(trials=trials,families=families))
+            with self.subTest(families=families,trials=trials):
+                self.assertFalse(result['formal_sampling_ready'])
+                self.assertFalse(result['claim_eligibility']['total_tokens'])
+                self.assertFalse(result['claim_eligibility']['elapsed_seconds'])
+                self.assertEqual(result['measurements']['total_tokens']['status'],'measured')
+                self.assertEqual(result['matched_trials'],families*trials)
+        self.assertTrue(compare_two(self.rows())['formal_sampling_ready'])
+
+    def test_missing_or_invalid_paired_order_is_controlled_cli_input_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'runs.json'
+            for value in ('missing',None,False,True,0,3,1.0,'1'):
+                rows=self.rows()
+                if value=='missing': rows[0].pop('run_order')
+                else: rows[0]['run_order']=value
+                path.write_text(json.dumps(rows),encoding='utf-8')
+                proc=subprocess.run([sys.executable,'-B',str(Path(__file__).resolve().parents[1]/'scripts/compare_runs.py'),
+                                     str(path)],capture_output=True,text=True,timeout=10)
+                with self.subTest(value=value):
+                    self.assertEqual(proc.returncode,2,proc.stderr)
+                    self.assertNotIn('Traceback',proc.stderr)
 
 
 class ComparisonTests(unittest.TestCase):

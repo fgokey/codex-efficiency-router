@@ -242,6 +242,8 @@ def inspect_status(scope='project', project_root=None, boundary='writes'):
         skill, _, _ = resolve_targets(scope, project_root)
         skill_raw = read_bytes(skill / MANIFEST)
         installed = loads(skill_raw) if skill_raw else {}
+        from profiles import from_manifest
+        result['host_mode'] = from_manifest(installed).host_mode if installed else 'UNINSTALLED'
         result['skill_version'] = installed.get('version', 'UNKNOWN')
         result['routing_mode'] = installed.get('mode', 'UNKNOWN')
         result['automatic_low'] = installed.get('allow_low', 'UNKNOWN')
@@ -269,6 +271,9 @@ def inspect_status(scope='project', project_root=None, boundary='writes'):
         result['errors'].append(str(exc))
     if result['registration'] in ('ABSENT', 'BROKEN'):
         result['installation_mode'] = 'policy-only'
+    if result.get('host_mode') == 'compat':
+        result['installation_mode'] = 'compat'
+        result['warnings'].append('compat does not enable full routing/Guard; existing host protections remain in force')
     return result
 
 
@@ -283,6 +288,11 @@ def lifecycle(action, scope, project_root=None, *, dry_run=False, force=False, b
             print('- ' + message)
         return result
     directory, config, backups = targets(scope, project_root, boundary)
+    if action in ('install', 'update'):
+        from manage import installed_profile
+        skill, agents, _ = resolve_targets(scope, project_root)
+        if installed_profile(skill, agents).host_mode == 'compat':
+            raise ValueError('compat cannot register/update Guard; existing protection is preserved')
     for path in (directory, config, backups):
         reject_links(path)
 

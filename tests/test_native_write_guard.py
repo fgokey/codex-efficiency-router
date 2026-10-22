@@ -25,6 +25,44 @@ MODULE=runpy.run_path(str(GUARD))
 
 
 class NativeDispatchTests(unittest.TestCase):
+    def test_installed_schema3_full_policy_admits_sol61_high_and_rechecks_actual_effort(self):
+        import contextlib, io, sys
+        sys.path.insert(0,str(ROOT/'scripts'))
+        import manage
+        from package import resolve_targets, MANIFEST
+        project=self.root/'installed'
+        project.mkdir()
+        with contextlib.redirect_stdout(io.StringIO()):
+            manage.install(ROOT,'project',project)
+        self.policy,_,_=resolve_targets('project',project)
+        manifest=json.loads((self.policy/MANIFEST).read_text())
+        self.assertEqual((manifest['profile_schema'],manifest['host_mode']),(3,'full'))
+        reader=runpy.run_path(str(self.policy/'scripts/readonly_reader.py'))
+        execution={'effects':['write'],'permission':'workspace-write','role_read_only':False,'parent_released':True}
+        request=self.request(message=reader['EXECUTION_PREFIX']+json.dumps(execution)+'\nRELEASE current unit. Update owned fixture')
+        result=reader['assignment_preflight'](request,policy_sha256=reader['assignment_policy_sha256'](self.policy))
+        self.assertEqual(result['status'],'VERIFIED',result)
+        message=reader['assignment_message'](result,request['message'])
+        self.assertEqual(self.hook(text=message),{})
+        with self.connect() as db:db.execute("UPDATE threads SET reasoning_effort='medium' WHERE id='sol'")
+        self.assertEqual(self.hook(text=message)['hookSpecificOutput']['permissionDecision'],'deny')
+
+    def test_compat_policy_cannot_provide_full_native_admission(self):
+        import contextlib, io, sys
+        sys.path.insert(0,str(ROOT/'scripts'))
+        import manage
+        from package import resolve_targets
+        message=self.text(self.request())
+        project=self.root/'compat'
+        project.mkdir()
+        with contextlib.redirect_stdout(io.StringIO()):
+            manage.install(ROOT,'project',project,host_mode='compat')
+        self.policy,_,_=resolve_targets('project',project)
+        reader=runpy.run_path(str(self.policy/'scripts/readonly_reader.py'))
+        with self.assertRaisesRegex(ValueError,'full admission'):
+            reader['assignment_policy_sha256'](self.policy)
+        self.assertEqual(self.hook(text=message)['hookSpecificOutput']['permissionDecision'],'deny')
+
     def setUp(self):
         import sqlite3
         self.sql = sqlite3
@@ -685,6 +723,62 @@ class NativeGuardTests(unittest.TestCase):
         self.assertEqual(p.returncode,0,p.stderr)
         return json.loads(p.stdout) if p.stdout.strip() else {}
 
+    def test_structured_batch_small_files_free_budget_without_reordering_results(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        contents={'large.txt':'L'*1200,'small.txt':'S'*40}
+        for name,body in contents.items(): (self.root/name).write_text(body,encoding='utf-8')
+        for names in (list(contents),list(reversed(contents))):
+            request={'op':'batch','requests':[{'op':'page','path':name} for name in names],
+                     'max_bytes':2400,'framing_bytes':300}
+            raw=reader['run'](self.root,request); result=json.loads(raw)
+            self.assertLessEqual(len(raw.encode())+2+300,2400)
+            self.assertEqual(result['status'],'COMPLETE')
+            self.assertEqual([row['data'] for row in result['results']],[contents[name] for name in names])
+            self.assertTrue(all(row['next_cursor'] is None for row in result['results']))
+        def calls_to_finish():
+            request={'op':'batch','requests':[{'op':'page','path':name} for name in contents],
+                     'max_bytes':2400,'framing_bytes':300}
+            for calls in range(1,10):
+                result=json.loads(reader['run'](self.root,request))
+                pending=[{**item,'cursor':page['next_cursor']}
+                         for item,page in zip(request['requests'],result['results']) if page['next_cursor']]
+                if not pending: return calls
+                request={**request,'requests':pending}
+            self.fail('continuations did not finish')
+        natural_sorted=sorted
+        # Replay the previous capture order with the same current bounds/cursors.
+        with mock.patch.dict(reader['run'].__globals__,sorted=lambda values,**kw:
+                             list(values) if kw else natural_sorted(values)):
+            previous=calls_to_finish()
+        self.assertEqual((previous,calls_to_finish()),(2,1))
+
+    def test_native_reads_keep_executor_and_astra_unknown_policy_contrast(self):
+        # Guard pass-through is not admission, role permission or a new tool grant.
+        for model in ('gpt-6.1-sol','gpt-6-sol','gpt-6-luna'):
+            self.assertEqual(self.hook(tool='Bash',model=model,data={'command':'rg --files'}),{})
+        for model in ('gpt-6-astra','UNKNOWN','gpt-6.1-sol-unverified'):
+            result=self.hook(tool='Bash',model=model,data={'command':'rg --files'})
+            self.assertEqual(result['hookSpecificOutput']['permissionDecision'],'deny')
+
+    def test_small_first_stat_error_retains_other_evidence_and_original_index(self):
+        reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
+        (self.root/'vanished.txt').write_text('gone',encoding='utf-8')
+        request={'op':'batch','requests':[{'op':'page','path':'vanished.txt'},
+                 {'op':'page','path':'sentinel.txt'}],'max_bytes':3000,'framing_bytes':400}
+        original_preflight=reader['preflight']; original_stat=Path.stat; ready=[False]
+        def preflight(root,request):
+            checked=original_preflight(root,request); ready[0]=True
+            return checked
+        def stat(path,*args,**kwargs):
+            if ready[0] and path.name=='vanished.txt': raise FileNotFoundError('vanished after preflight')
+            return original_stat(path,*args,**kwargs)
+        with mock.patch.dict(reader['run'].__globals__,preflight=preflight),mock.patch.object(Path,'stat',stat):
+            result=json.loads(reader['run'](self.root,request))
+        self.assertEqual(result['status'],'PARTIAL')
+        self.assertEqual(result['results'][0]['request_index'],1)
+        self.assertEqual(result['results'][0]['status'],'ERROR')
+        self.assertEqual(result['results'][1]['data'],'before')
+
     def test_structured_batch_default_caps_share_budget_without_losing_evidence(self):
         reader=runpy.run_path(str(ROOT/'hooks/readonly_reader.py'))
         contents={'sentinel.txt':'A界\\"\r\n'*500,'second.txt':'B🙂\\"\r\n'*500}
@@ -796,6 +890,53 @@ class NativeGuardTests(unittest.TestCase):
                  'max_bytes':512,'framing_bytes':128}
         with mock.patch.dict(reader['run'].__globals__,one=mock.Mock(side_effect=AssertionError('capture before budget preflight'))):
             with self.assertRaisesRegex(ValueError,'budget'): reader['run'](self.root,request)
+
+    def test_reader_batch_stdin_preserves_unicode_and_rejects_invalid_input(self):
+        name='读取 界.txt'
+        (self.root/name).write_text('界 "quoted"',encoding='utf-8')
+        args=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),'batch',
+              '--root',str(self.root),'--requests','-','--max-bytes','3072','--framing-bytes','256']
+        request=json.dumps([{'op':'page','path':name}],ensure_ascii=False).encode('utf-8')
+        p=subprocess.run(args,input=request,capture_output=True,timeout=10)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(json.loads(p.stdout)['results'][0]['data'],'界 "quoted"')
+        self.assertLessEqual(len(p.stdout)+1+256,3072)
+        for bad in (b' '*16385,b'[{"op":"page","op":"read","path":"sentinel.txt"}]',b'\xff'):
+            with self.subTest(bad=bad[:40]):
+                p=subprocess.run(args,input=bad,capture_output=True,timeout=10)
+                self.assertNotEqual(p.returncode,0)
+                self.assertEqual(p.stdout,b'')
+                self.assertIn(b'CER read failed:',p.stderr)
+
+    def test_reader_batch_powershell_stdin_avoids_native_json_quoting(self):
+        shell=shutil.which('pwsh') or shutil.which('powershell')
+        if not shell: self.skipTest('PowerShell unavailable')
+        name='读取 界.txt'
+        (self.root/name).write_text('界 "quoted"',encoding='utf-8')
+        env=dict(os.environ,CER_READER_REQUEST=json.dumps([{'op':'page','path':name}],ensure_ascii=False),
+                 CER_READER=str(ROOT/'hooks/readonly_reader.py'),CER_PYTHON=sys.executable,CER_ROOT=str(self.root))
+        command='$OutputEncoding = New-Object System.Text.UTF8Encoding($false)\n$env:CER_READER_REQUEST | & $env:CER_PYTHON -I -B $env:CER_READER batch --root $env:CER_ROOT --requests - --max-bytes 3072 --framing-bytes 256\nexit $LASTEXITCODE'
+        p=subprocess.run([shell,'-NoProfile','-NonInteractive','-Command',command],env=env,
+                         capture_output=True,timeout=20)
+        self.assertEqual(p.returncode,0,p.stderr)
+        self.assertEqual(json.loads(p.stdout)['results'][0]['data'],'界 "quoted"')
+        self.assertEqual(json.loads(p.stdout)['status'],'COMPLETE')
+        self.assertLessEqual(len(p.stdout)+1+256,3072)
+
+    def test_reader_encoded_requests_accept_optional_padding_and_reject_bad_encoding(self):
+        args=[sys.executable,'-I','-B',str(ROOT/'hooks/readonly_reader.py'),str(self.root)]
+        for length in range(3):
+            request={'op':'search','path':'sentinel.txt','query':'x'*(length+1)}
+            # A literal search permits all three Base64 padding lengths.
+            encoded=base64.urlsafe_b64encode(json.dumps(request).encode()).decode()
+            padded=subprocess.run(args+[encoded],capture_output=True,timeout=10)
+            plain=subprocess.run(args+[encoded.rstrip('=')],capture_output=True,timeout=10)
+            self.assertEqual(padded.returncode,0,padded.stderr)
+            self.assertEqual((plain.returncode,plain.stdout),(padded.returncode,padded.stdout),plain.stderr)
+        for bad in ('a','!!!!','eyJvcCI6'):
+            p=subprocess.run(args+[bad],capture_output=True,timeout=10)
+            self.assertNotEqual(p.returncode,0)
+            self.assertEqual(p.stdout,b'')
 
     def test_structured_batch_cli_counts_complete_json_and_framing(self):
         self.file.write_text('界\\"\r\n'*30,encoding='utf-8',newline='')

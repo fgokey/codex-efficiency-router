@@ -17,9 +17,10 @@ def source_root() -> Path:
 def install(scope: str, project_root: Path | None, dry_run: bool, *,
             force: bool = False, adopt_v01: bool = False,
             mode: str | None = None, allow_low: bool | None = None,
-            set_subagent_defaults: bool = False) -> int:
+            set_subagent_defaults: bool = False, host_mode: str | None = None) -> int:
     return manage.install(source_root(), scope, project_root, dry_run, force, adopt_v01,
-                          mode=mode, allow_low=allow_low, set_subagent_defaults=set_subagent_defaults)
+                          mode=mode, allow_low=allow_low, set_subagent_defaults=set_subagent_defaults,
+                          host_mode=host_mode)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,6 +35,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--restore", type=Path, metavar="BACKUP", help="restore a backup for the same scope")
     parser.add_argument("--mode", choices=("auto", "fixed", "adaptive"), default=None,
                         help="advanced override; ordinary install/update uses auto (explicit v0.5+ overrides are preserved)")
+    parser.add_argument("--host-mode", choices=("full", "compat"), default=None,
+                        help="explicit host contract; new/legacy installs default full, never auto-downgrade")
     low = parser.add_mutually_exclusive_group()
     low.add_argument("--allow-low", dest="allow_low", action="store_true", default=None,
                      help="opt in to tightly gated automatic low (off by default)")
@@ -47,11 +50,12 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.restore:
-            if args.adopt_v01 or args.mode is not None or args.allow_low is not None or args.set_subagent_defaults:
+            if args.adopt_v01 or args.mode is not None or args.host_mode is not None or args.allow_low is not None or args.set_subagent_defaults:
                 parser.error("--restore cannot be combined with install profile/default switches")
             return manage.restore(args.restore, args.scope, args.project_root, args.dry_run, args.force)
         return install(args.scope, args.project_root, args.dry_run, force=args.force, adopt_v01=args.adopt_v01,
-                       mode=args.mode, allow_low=args.allow_low, set_subagent_defaults=args.set_subagent_defaults)
+                       mode=args.mode, allow_low=args.allow_low, set_subagent_defaults=args.set_subagent_defaults,
+                       host_mode=args.host_mode)
     except (OSError, ValueError) as exc:
         print(f"install: FAILED: {exc}", file=sys.stderr)
         return 2

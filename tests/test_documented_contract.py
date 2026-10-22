@@ -195,8 +195,13 @@ class DocumentedContractTests(unittest.TestCase):
         for phrase in ('Policy denial', 'equivalent replay/repackaging',
                        'approval=never', 'no manual boundary'):
             self.assertIn(phrase, dispatch)
-        self.assertIn('Read dispatch before writes', core)
-        self.assertIn('before delegation, binding or delivery review', core)
+        self.assertIn('only for new delegation/binding or child delivery review', core)
+        self.assertIn('Released routine leaf with complete scope/acceptance', core)
+        role = tomllib.loads((ROOT / 'agents/sol61-engineer.toml').read_text(encoding='utf-8'))['developer_instructions']
+        for phrase in ('Pre-write: platform/macros/consumers/validation',
+                       'write scope; requirements win',
+                       'Parent releases current host binding before writes; invalidation/UNKNOWN stops'):
+            self.assertIn(phrase, role)
 
     def test_first_authorized_assignment_contains_the_current_unit_release(self):
         dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
