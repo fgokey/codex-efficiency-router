@@ -1,8 +1,6 @@
-# Effort/binding
+# Model and effort
 
-Keep requirement/unit IDs/prerequisites. same-model needs contextual value AND net benefit. Two writers max; no agent per file/permission bypass.
-
-Dispatch/completion/readiness/blocking change: check dependencies/owners/free slots, not polls. Two substantial ready disjoint units: two engineers within slots; coupled/dependent/shared writes one; tiny checks local. Review overlaps unrelated work only with current scoped hashes/applicability; scope changes invalidate receipts.
+Select model AND effort from actual host support. Prefer `cer_auto_<role>` with explicit effort and no inherited history. Use a fixed role only when it supplies the exact selected pair and dynamic binding is unavailable. Do not label a fixed fallback as adaptive success.
 
 |Role|Model/effort|
 |---|---|
@@ -12,16 +10,10 @@ Dispatch/completion/readiness/blocking change: check dependencies/owners/free sl
 |`sol_engineer`|gpt-6-sol/medium|
 |`astra_architect`|gpt-6-astra/high|
 
-High: coupling/lifetime/ambiguity/conflict.
+Use Luna for focused low-risk work; deterministic transformations may use medium. Terra fits settled, bounded implementation. Default uncertain engineering/review to Sol61/high; confirmed simple work may use medium. Honor exact pins and evidenced legacy fallbacks, never silently remap unavailable pairs. Low requires opt-in, deterministic Luna work, strong checks and no unresolved risk/failure.
 
-Select model AND effort: `cer_auto_<role>`+explicit effort; avoidable base role is MISMATCH. higher efforts need evidence/support. Fallback: observed unavailability/exact role/catalog pair/locks/floors/history; no remap.
+High addresses coupling, conflicting evidence and deeper reasoning, not missing prerequisites. XHigh/Max require a reviewed high-limit bottleneck, expected benefit and support. Ultra additionally requires an authorized Sol/Astra coordinator, disjoint leaves, capacity and retained retry limits. No forced ladder or effort token guarantee.
 
-Default engineering: also review; `agent_type="cer_auto_sol61_engineer",reasoning_effort="high",fork_turns="none"`; parent may explicitly select medium for confirmed simple work. Owned task_name/message. Exact pins prevail. No default/inherit/hot-load; verify host binding before RELEASE. Preflight params!=identity. `gpt-5.6-sol/luna`: explicit/fallback. No blacklist; recheck stale unavailability. Capability failure: adequate; others fix prerequisites. Keep attempts; no probes/replay/ladder; High cannot replace capability.
+Two writers max. Dispatch independent substantial units only when benefits exceed context/review costs; otherwise retain one owner. Same-model copies need contextual value AND net benefit. Recheck readiness after actual changes, not repeated polls.
 
-Luna: low-risk mechanical; confirmed transform medium. Auto-low: opt-in deterministic Luna/strong checks/no novelty/conflict/failure. Low: floors; Astra medium explicit-only.
-
-Auto XHigh/Max: reviewed bottleneck/High-limit/value; no lower trial. Ultra: exact Sol/Astra support/one authorized coordinator/2+ disjoint units/capacity/benefit/retry bounds; owns unit. Role conflict blocks; no effort token cap/guarantee.
-
-Reconcile binding/effects at safe boundary; review affected checks. Retain work/attempts/limits. Later VERIFIED does not erase review; UNKNOWN is not failure.
-
-Resolve MISMATCH before continuation. UNKNOWN/MISMATCH suspends auto-low. Honor disable/no-subagent/no-escalation.
+Compare requested and host-observed model/effort. UNKNOWN is not MISMATCH; neither permits unverified writes. Resolve MISMATCH at a safe boundary and review affected work. Later VERIFIED does not erase that review or reset attempts. Suspend auto-low after either status. Honor disable/no-subagent/no-escalation; no in-flight changes.

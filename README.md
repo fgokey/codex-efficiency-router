@@ -1,8 +1,21 @@
 # Codex Efficiency Router
 
+## v0.8.6: repair the normal execution path
+
+Normal Codex routing does not require a custom host build, an admission envelope on every message, or repeated doctor runs. Check actual tools once, select an exact supported model/effort, verify the worker binding and release one complete work unit. Reuse that live owner for implementation, checks and scoped fixes; add a reviewer only when independent judgment is useful. Astra remains read-only and participates directly in difficult diagnosis.
+
+A configured native dispatch Guard is a separate, stricter boundary and is never bypassed or removed by this update. Its Reader and Hook now share the model registry, so documented Luna, Terra and both Sol roles are reachable as well as Astra. Cheap roles still need a confirmed bounded low-risk task; automatic low still requires its owned opt-in. Identity/owner/policy/body mismatches, read-only mutations and missing release remain rejected. An identity-only medium HOLD no longer needs fake business-task evidence; it grants no work authority.
+
+Use native wait/status/interrupt/close for control rather than paying for a new worker turn saying "status" or "stop". Ordinary native follow-up reuses the authorized scope. **Strict admission still requires fresh checked task text:** a caller-made receipt is not a reusable authenticated grant, and bare continue/resume is not newly allowed. Keep the live worker until acceptance instead of closing and recreating it. No persistent authorization ledger or hidden model process was added.
+
+The full/compat choices introduced in the preceding commit are preserved, not switched automatically. `doctor --startup` remains a local, non-authenticating diagnostic; its full BLOCKED result means it cannot attest live binding, not that the business task must keep rerunning the doctor. Safe inspection and identity-only setup precede write release. Missing capabilities are disclosed once; do not repeatedly probe or silently weaken a configured boundary.
+
+The source ZIP now includes the documented pinned host patch. That patch is still experimental, optional and unchanged; it is not built or activated by Skill installation. Cross-platform fixtures use canonical temporary paths without weakening production symlink rejection. Text-contract tests check the revised workflow; positive native-admission tests cover every shipped executor and retain contradictory-identity/authority controls. See [validation](docs/VALIDATION-v0.8.6.md) for executed results and remaining live acceptance.
+
+
 [简体中文](README.zh-CN.md) · [Automatic adaptation](docs/ADAPTIVE-EFFORT.md) · [Quality protocol](docs/QUALITY-PROTOCOL.md) · [Acceptance](docs/ACCEPTANCE.md)
 
-**v0.8.5 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
+**v0.8.6 · Codex only · MIT · Python 3.11+ · Windows / macOS / Linux**
 
 ## Host startup check and explicit compatibility
 

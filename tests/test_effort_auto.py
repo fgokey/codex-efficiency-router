@@ -156,6 +156,14 @@ class AutomaticBindingTests(unittest.TestCase):
         c=replace(c,unavailable_roles=frozenset(('cer_auto_sol61_engineer','sol61_engineer')))
         self.assertEqual(plan(S(),c,AUTO,explicit_effort='medium').action,'blocked')
 
+    def test_failed_fixed_role_is_not_retried_with_its_exact_supported_effort(self):
+        context = host(current=C('luna','high'), current_sufficient=False,
+                       unavailable_roles=frozenset(('cer_auto_sol61_engineer',)))
+        self.assertEqual(plan(S(), context, AUTO).requested_role, 'sol61_engineer')
+        context = replace(context, unavailable_roles=context.unavailable_roles | {'sol61_engineer'})
+        # Do not request medium here: that would fail on the pin before exercising this guard.
+        self.assertEqual(plan(S(), context, AUTO).action, 'blocked')
+
     def test_unknown_active_worker_prevents_replay_to_other_binding(self):
         d=plan(S(),host(worker_active=True,unavailable_roles=frozenset(('cer_auto_sol61_engineer',))),AUTO)
         self.assertEqual(d.action,'defer');self.assertIsNone(d.requested_role)
@@ -252,7 +260,10 @@ class AutomaticBindingTests(unittest.TestCase):
                unavailable_models={'gpt-6.1-sol':'unavailable','gpt-6-sol':'unavailable',
                                    'gpt-5.6-sol':'unavailable'})
         catalog=dict(c.catalog);catalog['gpt-5.6-terra']=frozenset(('medium','high','ultra'))
-        self.assertEqual(plan(S(),replace(c,catalog=catalog),AUTO,
+        simple = S(uncertainty=0, novelty=0, verifiability=3)
+        # Leave a usable Terra/ultra route so only the post-fallback Ultra gate rejects it.
+        roles = {'cer_auto_terra_executor': RoleBinding('gpt-5.6-terra', None)}
+        self.assertEqual(plan(simple,replace(c,catalog=catalog,roles=roles),AUTO,
                               automatic_effort='ultra',effort_evidence=evidence).action,'blocked')
 
 if __name__=='__main__':unittest.main()

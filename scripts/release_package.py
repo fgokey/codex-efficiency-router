@@ -78,6 +78,10 @@ def source_payload(root=ROOT):
                 if p.is_symlink():
                     raise ValueError('distribution refuses symlinks')
                 payload[p.relative_to(root).as_posix()] = p.read_bytes()
+    host_patch = root / 'host/required-agent-admission.patch'
+    if host_patch.is_symlink() or not host_patch.is_file():
+        raise ValueError('missing or linked pinned host patch')
+    payload['host/required-agent-admission.patch'] = host_patch.read_bytes()
     for name in ('VERSION', 'LICENSE', 'README.md', 'README.zh-CN.md', 'CHANGELOG.md', 'AGENTS.md',
                  'CONTRIBUTING.md', 'SECURITY.md', 'SUPPORT.md', 'CODE_OF_CONDUCT.md',
                  '.editorconfig', '.gitattributes', '.gitignore', 'plugin.json',

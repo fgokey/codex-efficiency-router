@@ -5,6 +5,7 @@ No model call, transcript read, state file, event logging or permission grants.
 """
 from __future__ import annotations
 import base64
+from functools import lru_cache
 from contextlib import closing
 import hashlib
 import json
@@ -16,15 +17,18 @@ import shlex
 import sqlite3
 import sys
 
-VERSION = '0.8.5'
+VERSION = '0.8.6'
 
 # Exact local read/orchestration tools only, never guess MCP semantics by its name.
-READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
-COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan', 'completion_check'))
-EXECUTOR_FAMILIES = ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
-SPAWN_ROLES = {'luna_worker': ('gpt-6-luna', 'high'), 'terra_executor': ('gpt-5.6-terra', 'medium'),
-               'sol_engineer': ('gpt-6-sol', 'medium'), 'sol61_engineer': ('gpt-6.1-sol', 'high'),
-               'astra_architect': ('gpt-6-astra', 'high')}
+READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread', 'read_only'))
+COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'interrupt_agent', 'list_agents', 'update_plan', 'completion_check',
+                               'prepare_agent_task', 'admitted_agent_task'))
+@lru_cache(maxsize=1)
+def reader_policy():
+    # Definitions only. Reuse within this process, never cache host binding or authority.
+    return runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+
+
 PREFIX = 'cer-read '
 HOLD_MESSAGE = 'HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.'
 ASSIGNMENT_PREFIX = 'CER assignment (caller evidence): '
@@ -44,7 +48,7 @@ DISPATCH_ALIASES.update({name: 'send_message_to_thread' for name in (
     'send_message_to_thread', 'mcp__codex_app__send_message_to_thread', 'mcp__codex_app.send_message_to_thread',
     'functions.mcp__codex_app__send_message_to_thread')})
 DISPATCH_MATCHER = '^(?:' + '|'.join(re.escape(name) for name in sorted(DISPATCH_ALIASES)) + ')$'
-HOST_DIRECTORY = Path.home() / '.codex'
+HOST_DIRECTORY = Path(os.environ.get('CODEX_HOME', str(Path.home() / '.codex'))).expanduser().absolute()
 REASON = ('CER strict Guard: Astra/unknown identity cannot write, build, format or run tests. '
           'Reuse an authorized exact-model executor owner or wait. Continue read-only diagnosis; '
           'for source inspection use cer-read {"op":"read","path":"..."}.')
@@ -84,8 +88,9 @@ def validate_spawn(data: object) -> tuple[str, str]:
     base = role.removeprefix('cer_auto_') if isinstance(role, str) else None
     if data.get('fork_turns') != 'none':
         raise ValueError('spawn requires fork_turns=none; hand off only necessary unit context')
-    if base in SPAWN_ROLES:
-        model, fixed_effort = SPAWN_ROLES[base]
+    roles = reader_policy()['SPAWN_ROLES']
+    if base in roles:
+        model, fixed_effort = roles[base]
         if 'model' in data and data['model'] != model:
             raise ValueError('spawn role/model mismatch')
         effort = data.get('reasoning_effort') if automatic else fixed_effort
@@ -93,9 +98,9 @@ def validate_spawn(data: object) -> tuple[str, str]:
             raise ValueError('spawn fixed-role effort mismatch')
     else:
         model, effort = data.get('model'), data.get('reasoning_effort')
-        if model not in EXECUTOR_FAMILIES + ('gpt-6-astra',):
+        if not isinstance(model, str) or model not in reader_policy()['MODEL_LANES']:
             raise ValueError('spawn default/inherit requires an explicit exact model pin')
-    if effort not in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra'):
+    if not reader_policy()['supported_admission_pair'](model, effort):
         raise ValueError('spawn requires a bound reasoning_effort')
     return model, effort
 
@@ -137,8 +142,7 @@ def host_recipient(session_id: object, target: object, directory: Path) -> dict:
         identifier, model, effort, source, archived = rows[0]
         if archived != 0 or recipient_owner(source) != session_id:
             raise ValueError('recipient is archived or belongs to another parent')
-        if model not in ('gpt-6.1-sol', 'gpt-6-astra') or effort not in (
-                'medium', 'high', 'xhigh', 'max', 'ultra'):
+        if not reader_policy()['supported_admission_pair'](model, effort):
             raise ValueError('recipient model/effort UNKNOWN or outside current admission policy')
         return {'id': identifier, 'model': model, 'effort': effort,
                 'evidence_ref': 'native state_5.sqlite threads; current direct-parent ownership'}
@@ -191,11 +195,7 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
                        'confirmed_simple', 'effort_supported', 'effort_reason'}:
         raise ValueError('unsupported current admission fields')
     signals = request.get('signals')
-    if not isinstance(signals, dict) or set(signals) - {
-            'spec_complete', 'authority_ready', 'environment_ready', 'observability_ready',
-            'force_astra', 'cheap_check_available', 'very_complex', 'reasoning_bound',
-            'sol61_unsuitable_reason', 'uncertainty', 'risk', 'coupling', 'evidence_conflict',
-            'capability_failure', 'irreversibility', 'novelty'}:
+    if not isinstance(signals, dict) or set(signals) - reader_policy()['ADMISSION_SIGNAL_KEYS']:
         raise ValueError('unsupported current admission signals')
     if request.get('purpose') != 'new_unit' or 'receipt' in request:
         raise ValueError('native task messages require fresh purpose=new_unit admission')
@@ -211,7 +211,7 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
         if not body.startswith(judgment):
             raise ValueError('Astra readable reasons differ from current admission')
         body = body[len(judgment):]
-    reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+    reader = reader_policy()
     if policy_root is None or not policy_root.is_absolute():
         raise ValueError('registered policy root UNKNOWN')
     policy = reader['assignment_policy_sha256'](policy_root)
@@ -223,7 +223,8 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
         raise ValueError('assignment target/body/identity/policy mismatch')
     request.update(purpose='new_unit', message=body, recipient=receiver)
     request.pop('receipt', None)
-    result = reader['assignment_preflight'](request, policy_sha256=policy)
+    result = reader['assignment_preflight'](request, policy_sha256=policy,
+                                          allow_low=reader['low_enabled'](policy_root))
     if result['status'] != 'VERIFIED':
         raise ValueError('current task admission ' + result['status'])
     return body
@@ -251,9 +252,10 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                 raise ValueError('native preparation requires fresh purpose=new_unit')
             if policy_root is None or not policy_root.is_absolute():
                 raise ValueError('registered policy root UNKNOWN')
-            reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+            reader = reader_policy()
             result = reader['assignment_preflight'](request,
-                policy_sha256=reader['assignment_policy_sha256'](policy_root))
+                policy_sha256=reader['assignment_policy_sha256'](policy_root),
+                allow_low=reader['low_enabled'](policy_root))
             if result.get('status') != 'VERIFIED':
                 raise ValueError('Reader assignment ' + result.get('status', 'UNKNOWN'))
             context = json.dumps(result, ensure_ascii=False, separators=(',', ':'))
@@ -278,12 +280,11 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
             if 'task_name' in data and (not isinstance(data['task_name'], str)
                     or re.fullmatch('[a-z][a-z0-9_]{0,63}', data['task_name']) is None):
                 raise ValueError('spawn task name must be an identifier')
-            if model not in ('gpt-6.1-sol', 'gpt-6-astra') or effort not in (
-                    'medium', 'high', 'xhigh', 'max', 'ultra'):
+            if not reader_policy()['supported_admission_pair'](model, effort):
                 raise ValueError('spawn outside current model/effort admission policy')
             text = data.get('message')
             # Astra is admitted even for HOLD creation; requested identity is not a host binding.
-            if model == 'gpt-6-astra' or effort != 'high' or text != HOLD_MESSAGE:
+            if model == 'gpt-6-astra' or effort not in ('medium', 'high') or text != HOLD_MESSAGE:
                 if not isinstance(text, str):
                     raise ValueError('spawn requires the fixed identity HOLD')
                 receiver = {'id': 'unbound-spawn', 'model': model, 'effort': effort,
@@ -323,7 +324,8 @@ def decide(event: object, *, dispatch_only: bool = False,
         return deny('CER: missing canonical tool identity.')
     # Transported fields are trusted only when sent by the native host, not a worker.
     model = event.get('model')
-    executor = isinstance(model, str) and model in EXECUTOR_FAMILIES
+    executor = (isinstance(model, str) and reader_policy()['MODEL_LANES'].get(model)
+                in ('luna', 'terra', 'sol'))
     # Snapshot aliases require an explicit audited addition, never prefix matching.
     data = event.get('tool_input')
     if name == 'resume_agent':
@@ -340,7 +342,7 @@ def decide(event: object, *, dispatch_only: bool = False,
         try:
             request = json.loads(data['command'][len(PREFIX):], object_pairs_hook=duplicate_checked, parse_constant=reject_constant)
             reader = Path(__file__).resolve().with_name('readonly_reader.py')
-            runpy.run_path(str(reader))['validate'](request)
+            reader_policy()['validate'](request)
             cwd = event.get('cwd')
             if not isinstance(cwd, str) or not Path(cwd).is_absolute() or any(c in cwd for c in '\x00\r\n'):
                 raise ValueError('invalid host workspace')

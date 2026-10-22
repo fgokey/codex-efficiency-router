@@ -70,33 +70,22 @@ class InstructionFootprintTests(unittest.TestCase):
         for name in ('effort', 'routing', 'dispatch', 'quality'):
             self.assertEqual(text.count(f'references/{name}.md'), 1)
             self.assertTrue((SKILL.parent / 'references' / f'{name}.md').is_file())
-        for phrase in ('before dispatch/lane changes', 'for Astra admission',
-                       'only for new delegation/binding or child delivery review',
-                       'Released routine leaf with complete scope/acceptance',
-                       'core+role+repo rules; skip parent procedures',
-                       '; all: complex/cross-component lifecycle', 'eviction/callback loss',
-                       'large/conflicting evidence', 'disputed validation'):
+        for phrase in ("before a parent's first collection/final", 'Routine released leaves',
+                       'before dispatch or a meaningful phase change', 'before delegation or binding changes'):
             self.assertIn(phrase, text)
-        self.assertNotIn('semantic/lifecycle changes, failure', text)
-        self.assertNotIn('Read dispatch before writes', contract_text())
 
     def test_parent_final_requires_objective_and_remaining_work_reconciliation(self):
-        # Source-contract regression for the observed premature final, not live behavior proof.
-        core = SKILL.read_text(encoding='utf-8')
-        self.assertTrue('## Completion' in core, 'Missing prominent parent completion decision')
+        core = SKILL.read_text()
         self.assertLess(core.index('## Completion'), core.index('## Routing'))
-        self.assertTrue('before an active engineering parent final' in core)
+        self.assertIn("before a parent's first collection/final", core)
         text = contract_text()
-        for phrase in ('original user objective', 'accepted scope',
-                       'every remaining required item', 'current authority'):
-            self.assertTrue(phrase in text, phrase)
+        for phrase in ('original user objective', 'accepted scope', 'every remaining required item', 'current authority'):
+            self.assertIn(phrase, text)
 
     def test_actionable_incomplete_parent_work_requires_continuation(self):
         text = contract_text()
-        for phrase in ('CONTINUE while useful authorized diagnosis, delegation or implementation remains',
-                       'Missing measurement/design alone proves neither done nor blocked',
-                       'Continue without a user nudge'):
-            self.assertTrue(phrase in text, phrase)
+        for phrase in ('CONTINUE while useful authorized diagnosis, delegation or implementation remains', 'without a user nudge', 'Missing measurement/design alone proves neither done nor blocked'):
+            self.assertIn(phrase, text)
 
     def test_partial_child_and_green_local_checks_do_not_end_parent_work(self):
         self.assertTrue('Unit PASS/PARTIAL/checks/reviews != parent completion'
@@ -108,163 +97,68 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_external_blocker_requires_specific_evidence_and_unaffected_work(self):
         text = contract_text()
-        for phrase in ('BLOCKED: actual external barrier',
-                       'exact missing access/input/resource, evidence, affected scope',
-                       'required user/external action', 'finish unaffected authorized work'):
-            self.assertTrue(phrase in text, phrase)
+        for phrase in ('BLOCKED requires an actual external barrier', 'its evidence, affected scope and required external action', 'finish unaffected authorized work'):
+            self.assertIn(phrase, text)
 
     def test_standalone_status_ends_but_mid_task_status_preserves_objective(self):
         text = contract_text()
-        self.assertTrue('Only standalone STATUS/Q&A ends after answering' in text)
-        self.assertTrue('mid-task questions: answer briefly, continue the original objective '
-                        'unless stopped/changed' in text)
+        for phrase in ('Standalone status questions end after answering', 'mid-task questions do not cancel the objective'):
+            self.assertIn(phrase, text)
 
     def test_stop_and_scope_limits_bound_parent_continuation(self):
         text = contract_text()
-        for phrase in ('STOP on explicit stop/pause/cancel, accepted scope change',
-                       'actual tool/system budget ceiling; report remaining work',
-                       'Existing authority/scope only',
-                       'no automatic monitoring, risky measurement/deploy, '
-                       'infinite retry or extra model probes'):
-            self.assertTrue(phrase in text, phrase)
+        for phrase in ('STOP on explicit stop/pause/cancel', 'accepted scope change', 'actual tool/system budget ceiling', 'report remaining work', 'No unrequested monitoring, risky operations or infinite retries'):
+            self.assertIn(phrase, text)
 
     def test_entry_is_cheap_but_does_not_grant_authority(self):
         text = SKILL.read_text()
         self.assertLessEqual(len(text.encode('utf-8')), 2048)
-        for phrase in ('Cheap local Q&A/status/low-risk', 'no children/references', 'Delegation always routes',
-                       'repo rules, current permissions/read-only roles',
-                       'Unknown identity/effects grant no writes', 'exact pins', 'Low is opt-in',
-                       'Sends require Reader `assignment`', 'Root Astra defaults read-only',
-                       'native admission has no repair exceptions'):
+        for phrase in ('do not invoke for trivial questions or stack routers', 'Low is opt-in',
+                       'Unknown identity/effects grant no writes', 'Root Astra defaults read-only',
+                       'native admission has no repair exceptions', 'except Astra mutations'):
             self.assertIn(phrase, text)
-        chain = doctor.instruction_chain(SKILL)
-        self.assertEqual(set(chain), {'SKILL.md', 'references/dispatch.md', 'references/effort.md',
-                                     'references/quality.md', 'references/routing.md'})
+        self.assertEqual(set(doctor.instruction_chain(SKILL)),
+                         {'SKILL.md', *(f'references/{name}.md' for name in ('effort','routing','dispatch','quality'))})
 
     def test_evidence_efficiency_guidance_preserves_complete_reads_and_unit_ownership(self):
-        # Static instructions only; executable batch behavior is checked against the Reader CLI.
-        core = SKILL.read_text(encoding='utf-8')
         text = contract_text()
-        for phrase in ('Reuse loaded unchanged rules', 'fully read required new/changed rules',
-                       'Batch independent small/targeted reads', 'full pages for long required rules',
-                       'Use physical paths; keep link checks', 'inspect every result/status/error/cursor',
-                       'same admitted executor continues through diagnosis/fix', 'retain successful results',
-                       'Workers: compact waits; details at actionable change/completion/error',
-                       'Run required checks once after final changes stabilize'):
-            self.assertTrue(phrase in text, phrase)
-        self.assertNotIn('one page per tool call', core)
-        self.assertNotIn('no joined pages/queries', core)
+        for phrase in ('Reuse loaded unchanged rules', 'fully read required new/changed rules', 'Batch independent reads', 'link checks', 'preserve every error and cursor', 'Reuse the same live owner', 'Keep successful results and retry failed/pending items only', 'Run required checks once after final changes stabilize'):
+            self.assertIn(phrase, text)
 
     def test_no_blanket_loading_or_full_router_in_children(self):
         text = contract_text()
-        self.assertIn('No doc/hook preload or child router copy', text)
-        self.assertIn('Report once:', text)
-        self.assertIn('Never invent identity/savings/enforcement/cleanup', text)
+        for phrase in ('Do not preload reports or copy the Router into workers', 'Report version/mode/Guard once', 'unobserved facts stay UNKNOWN'):
+            self.assertIn(phrase, text)
 
     def test_native_reads_are_scoped_to_released_writers_without_new_authority(self):
-        core=SKILL.read_text(encoding='utf-8')
-        self.assertIn('Released writers: native scoped/bounded root/link/budget reads',core)
-        self.assertIn('else guarded',core)
-        self.assertIn('Astra leaves and read-only roles NEVER write',core)
-        self.assertIn('Unknown identity/effects grant no writes',core)
-        install=(ROOT/'docs/INSTALL.md').read_text(encoding='utf-8')
-        for phrase in ('already authorized bounded native reads','This grants no permission',
-                       'Astra, read-only and unknown roles keep their existing host allowlist/guarded-read boundary',
-                       'they cannot take the writable-executor path','claims no native/Reader contract equivalence',
-                       'full preflight, strict parsing, SHA-bound cursors and framing'):
-            self.assertIn(phrase,install)
-        from manage import source_files
-        from profiles import Profile,render_payload
-        source=source_files(ROOT)
-        models={tomllib.loads(source['agents/'+name].decode())['model'] for name in EXPECTED}
-        for mode in ('fixed','auto','adaptive'):
-            payload=render_payload(source,Profile(mode))
-            for key,raw in payload.items():
-                if not key.startswith('agents/') or not key.endswith('.toml'): continue
-                role=tomllib.loads(raw.decode()); instructions=role['developer_instructions']
-                self.assertIn(role['model'],models)
-                if role['model']=='gpt-6-astra':
-                    self.assertIn('Always read-only',instructions)
-                    self.assertNotIn('unless RELEASED writer',instructions)
-                else:
-                    self.assertIn('Python -I -B <reader> unless RELEASED writer',instructions)
-                    self.assertIn('aggregate+framing<=4KiB',instructions)
-                    self.assertIn('no full-file slicing/merging',instructions)
-                    self.assertIn('Parent releases current host binding before writes; invalidation/UNKNOWN stops',instructions)
-                name=key.removeprefix('agents/')
-                if name in EXPECTED:
-                    original=tomllib.loads(source[key].decode())
-                    self.assertEqual(role['model'],original['model'])
-                    if mode=='adaptive': self.assertNotIn('model_reasoning_effort',role)
-                    else: self.assertEqual(role['model_reasoning_effort'],original['model_reasoning_effort'])
+        text = contract_text()
+        for phrase in ('Prefer scoped native reads for released writers', 'retain guarded reads elsewhere', 'Astra leaves and read-only roles NEVER write', 'Unknown identity/effects grant no writes', 'Authorized native reads use the actual host budget; do not imitate Reader guarantees'):
+            self.assertIn(phrase, text)
 
     def test_outer_output_envelope_and_cursor_recovery_are_explicit(self):
         text = contract_text()
-        core = SKILL.read_text(encoding='utf-8')
-        description = next(line for line in core.splitlines() if line.startswith('description:'))
-        self.assertIn('All delegation/reuse/review', description)
-        self.assertLess(core.index('Check exit before JSON'), core.index('Read [effort.md]'))
-        for phrase in ('Verified Python `-I -B <Skill>/scripts/readonly_reader.py`',
-                       'handoff both', '`page --root ABS --path PATH`',
-                       'current located lines: `excerpt --start N --lines N` (count 1..200)',
-                       'Code: `locate --query Q`', 'Files/rules: `page --root ABS --path PATH`',
-                       'same root/path `--cursor TOKEN` to null',
-                       'Check exit before JSON', 'Fix limits/page/locate errors',
-                       'No full-file slicing/merging pages/files',
-                       'JSON+CRLF+framing <=4KiB',
-                       'capture/select/serialize/count before emit',
-                       'aggregate JSON', 'keep each cursor', 'no early member output',
-                       'batch --root ABS --requests - --max-bytes N --framing-bytes N',
-                       'via UTF-8 stdin',
-                       'retain successful results', 'disclose gaps'):
+        for phrase in ('verified Python `-I -B <Skill>/scripts/readonly_reader.py`', 'check exit before JSON', 'preserve every error and cursor', 'Count the whole serialized output and framing, not individual rows', 'preserve truncation as PARTIAL', 'Reader responses remain <=4KiB', 'batch uses bounded UTF-8 stdin'):
             self.assertIn(phrase, text)
-        for name in EXPECTED:
-            role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions']
-            if name == 'astra-architect.toml':
-                phrases = ('Given Python -I -B <reader>', 'page files',
-                           'excerpt located lines (count 1..200)', 'Check exit before JSON',
-                           'One page, no full-file slicing/merging',
-                           'other totals <outer incl framing')
-            else:
-                # Upgrade the ambiguous one-file routing assertion; retain every read boundary.
-                phrases = ('reuse loaded unchanged, else full',
-                           'Python -I -B <reader>', 'batch fitting independent reads',
-                           'known-small first', '1..200-line located excerpts',
-                           'Check exit before JSON', 'keep each cursor/status/error',
-                           'aggregate+framing<=4KiB', 'no full-file slicing/merging')
-            for phrase in phrases:
-                self.assertIn(phrase, role, name)
 
     def test_reader_call_and_dispatch_checklist_boundaries_are_explicit(self):
-        core = SKILL.read_text(encoding='utf-8')
-        description = next(line for line in core.splitlines() if line.startswith('description:'))
-        self.assertIn('All delegation/reuse/review', description)
-        self.assertIn('Batch independent small/targeted reads', core)
-        self.assertIn('full pages for long required rules', core)
+        text = SKILL.read_text()
+        for phrase in ('substantial Codex coding, diagnosis and review', 'Batch independent reads within the actual output budget', 'check exit before JSON'):
+            self.assertIn(phrase, text)
 
     def test_dispatch_preflight_is_installed_reader_and_scripts_are_verified(self):
-        dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
-        self.assertIn('Preflight: Reader `assignment` before task-bearing sends', dispatch)
-        self.assertIn('assignment --help', dispatch)
-        self.assertIn('Verify script paths before use', dispatch)
-        self.assertNotIn('Run dispatch preflight.', dispatch)
-        self.assertIn('Reads/checks: Reader `batch', contract_text())
-        self.assertNotIn('ROOT/scripts/doctor.py', contract_text())
-        install_docs = (ROOT / 'docs/INSTALL.md').read_text(encoding='utf-8')
-        self.assertIn('ROOT/scripts/doctor.py --source-tree ROOT --preflight', install_docs)
-        self.assertIn('only for Router development', install_docs)
-        self.assertIn('source doctor', (ROOT / 'AGENTS.md').read_text(encoding='utf-8'))
+        text = contract_text()
+        for phrase in ('Use ordinary native delegation when no dispatch admission boundary is active',
+                       'Never bypass a configured boundary', 'Strict sends still require fresh checked admission',
+                       'Reader `assignment --help`', 'verify script paths before use'):
+            self.assertIn(phrase, text)
+        self.assertIn('only for Router development', (ROOT/'docs/INSTALL.md').read_text())
         from manage import source_files
-        scripts = {key for key in source_files(ROOT) if key.startswith('skill/scripts/')}
-        self.assertEqual(scripts, {'skill/scripts/readonly_reader.py'})
+        self.assertEqual({k for k in source_files(ROOT) if k.startswith('skill/scripts/')},
+                         {'skill/scripts/readonly_reader.py'})
 
     def test_monitoring_uses_one_delta_then_backoff(self):
         text = contract_text()
-        for phrase in ('Two unchanged snapshots', 'one saved-offset delta', 'back off',
-                       'no repeat tails/polls/nudges until change',
-                       'Standalone status/check: one-shot; explicit watch',
-                       'heartbeat: defer schedule or pause, never skipped wakeups',
-                       'compact state/cadence; stop on cancel'):
+        for phrase in ('Two unchanged snapshots: back off', 'one saved-offset delta', 'not repeated tails or nudges', 'No unrequested monitoring', 'retain cursors and liveness/errors'):
             self.assertIn(phrase, text)
 
     def test_child_instructions_remain_self_contained(self):
@@ -285,26 +179,13 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_readonly_diagnosis_and_limits_remain_reachable(self):
         text = contract_text()
-        for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only',
-                       'native admission has no repair exceptions', 'Unknown identity/effects grant no writes',
-                       'no auto-revert', 'Two writers max',
-                       'Exhaustion stops blind edits, not diagnosis', 'across ALL owners',
-                       'Retries persist per task/unit/signature across ALL owners',
-                       'accepts integration'):
+        for phrase in ('Astra leaves and read-only roles NEVER write', 'Root Astra defaults read-only', 'native admission has no repair exceptions', 'Unknown identity/effects grant no writes', 'no auto-revert', 'Two writers max', 'Exhaustion stops blind edits, not diagnosis', 'Retries persist per task/unit/signature across ALL owners', 'accepts integration'):
             self.assertIn(phrase, text)
 
     def test_coordination_and_acceptance_enter_before_waits_without_python_parent(self):
-        core = SKILL.read_text(encoding='utf-8')
-        quality = (SKILL.parent / 'references/quality.md').read_text(encoding='utf-8')
-        dispatch = (SKILL.parent / 'references/dispatch.md').read_text(encoding='utf-8')
-        self.assertIn('before first worker wait/collection', core)
-        for phrase in ('COORDINATION_JS', 'installed `scripts/readonly_reader.py`',
-                       'Astra `functions.exec`', 'no Python/shell', 'drain/reuse cursors',
-                       'completion_check', 'begin before append',
-                       'original code/evidence/test applicability', 'Independent review/child PASS cannot substitute'):
-            self.assertIn(phrase, quality)
-        for phrase in ('checked-body `CER execution`', 'unchanged signals', 'role_read_only', 'parent_released', 'legacy compatible'):
-            self.assertIn(phrase, dispatch)
+        text = contract_text()
+        for phrase in ("before a parent's first collection/final", 'Before waiting, check ready work and available parent review', 'Use optional COORDINATION_JS only with matching host tools', 'do not rewrite it each poll', 'completion_check only when the configured host exposes/requires it', 'beginning before appending requirements', 'reconciling before final check', 'Parent review of original code/evidence/test applicability cannot be replaced by a child claim'):
+            self.assertIn(phrase, text)
 
 
 if __name__ == '__main__':

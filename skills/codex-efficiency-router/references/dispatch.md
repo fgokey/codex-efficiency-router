@@ -1,29 +1,13 @@
-# Dispatch/guard
+# Delegate a complete work unit
 
-authority/ownership/capacity gaps BLOCK/defer; full: wait. Keep edits; no auto-revert. Preflight: Reader `assignment` before task-bearing sends. Verify script paths before use.
+Check authority, unique ownership and capacity first. Keep edits; no auto-revert. Give the owner the goal, revision/dirt, relevant files and rule paths, facts versus assumptions, rationale/invariants, allowed changes, prohibited actions, checks and remaining attempts. Use `fork_turns=none` or the actual equivalent, not the parent transcript.
 
-Reader `assignment --help` if needed. Wait exempt; only ready work: spawn explicit role/effort, HOLD; bind then assign.
+Create only ready work with explicit model/effort. Initially HOLD when host identity cannot be confirmed before execution. The parent verifies current host-observed model/effort/role/permission/owner, then explicitly releases unit for writes: RELEASE current unit. Configuration, self-description and old logs are not identity. UNKNOWN/MISMATCH blocks writes. Read-only roles never become writers.
 
-Reader: checked-body `CER execution` effects/permission/role_read_only/parent_released; unchanged signals; legacy compatible.
+Use ordinary native delegation when no dispatch admission boundary is active. Do not require a patched host, Python or Reader envelopes for that path. Never bypass a configured boundary: if admitted dispatch is required, use `prepare_agent_task` and `admitted_agent_task` with the exact checked body. Reader `assignment --help` documents its schema; verify script paths before use. Strict sends still require fresh checked admission. Caller receipts are not authenticated reusable grants.
 
-Use `admitted_agent_task` when exposed: `spawn_hold`, bind, fresh `assign` envelope in `body`; no raw dispatch.
+Reuse the same live owner for diagnosis, implementation, build configuration, formatting, targeted tests and fixes within its released unit. Follow-up within that scope does not create another worker or reset retries. Use native wait/status/interrupt/close for control, not a new model task saying “status” or “stop”. Do not use native `resume_agent` under the strict guard; closed/restarted workers need fresh binding and release. Keep workers until acceptance, then close only this task's finished workers.
 
-Root Astra: `read_only` files; `prepare_agent_task` envelopes. Capacity never grants writes.
+Astra inspects evidence and coordinates; executors own builds, tests and terminal continuation. Capacity never grants writes. Policy denial stops equivalent replay/repackaging; `approval=never` provides no manual bypass. Publication, deployment, binary replacement and destructive recovery need separate authority.
 
-Parent-assigned Ultra only: disjoint non-Ultra children; Astra subtrees read-only; no duplicates. Handoff: exact repo/ref/destination/checks; grants none.
-
-Compare roots before writes. Requested native parent file-change attribution: verify/report; model/review/open-review prove none. Missing/unknown blocks badge; authorized work proceeds unless user requires it first. No fake badge/ID.
-
-Return all roots/exact paths/status/owned/prior dirt. Parent checks all diffs/status, opens unstaged review; never edit for attribution.
-
-Handoff: outcome/revision/dirt/rule paths/rationale/invariants/scope/checks/binding/attempts; `fork_turns=none`. Read rules; gaps block affected work; contrary evidence reopens decisions.
-
-Parent accepts integration; one executor/unit.
-
-Spawn read-only; parent checks current session host-observed model/effort/role/permission/owner and explicitly releases unit for writes: first authorized assign checked body: RELEASE current unit. ID/config/claims/old logs fail. Bounded `session_meta`/`turn_context`; no tails/scans. UNKNOWN/MISMATCH blocks writes. Same-session turns reuse release: same admitted unit continue/status/stop; new work needs core admission. contradiction rechecks. Closed/unloaded/restarted: handoff; explicit role/model/effort fresh spawn, host binding, RELEASE. Reject native `resume_agent` for every model: cannot pin model/effort. Live follow-up/task-evidence `resume()` differ.
-
-Unit: same admitted executor continues through diagnosis/fix/source/build config/format/targeted tests/self-check. Binary copy/runtime config/deploy/destructive recovery: separate authority.
-
-Policy denial stops equivalent replay/repackaging until supported permission change; `approval=never`: no manual boundary.
-
-Strict Guard denies Astra/unknown shell/patch/tools; UNKNOWN may deny. Astra never uses write_stdin. Executors own long commands/continuation; Astra: bounded saved evidence/permitted reads. Read-only leaves/cer-read only read. Hosted UNPROTECTED; specialized UNKNOWN.
+Return actual roots, paths, diff, checks, prior dirt and gaps. The parent accepts integration against the current workspace; child PASS is not parent completion. Optional UI attribution must not block authorized work unless required by the user; never fake it. Host-specific tools and hooks need their own verified coverage.

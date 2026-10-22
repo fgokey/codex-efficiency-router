@@ -18,7 +18,102 @@ import subprocess
 import sys
 import threading
 
-VERSION = '0.8.5'
+VERSION = '0.8.6'
+# The native guard consumes this registry, rather than maintaining a narrower list.
+# Source tests compare it with package.py, role TOMLs and the routing policy.
+SPAWN_ROLES = {
+    'luna_worker': ('gpt-6-luna', 'high'),
+    'terra_executor': ('gpt-5.6-terra', 'medium'),
+    'sol_engineer': ('gpt-6-sol', 'medium'),
+    'sol61_engineer': ('gpt-6.1-sol', 'high'),
+    'astra_architect': ('gpt-6-astra', 'high'),
+}
+MODEL_LANES = {
+    'gpt-6-luna': 'luna', 'gpt-5.6-luna': 'luna',
+    'gpt-5.6-terra': 'terra', 'gpt-6-sol': 'sol',
+    'gpt-6.1-sol': 'sol', 'gpt-5.6-sol': 'sol', 'gpt-6-astra': 'astra',
+}
+ADMISSION_SIGNAL_KEYS = frozenset((
+    'spec_complete', 'authority_ready', 'environment_ready', 'observability_ready',
+    'force_astra', 'cheap_check_available', 'very_complex', 'reasoning_bound',
+    'sol61_unsuitable_reason', 'uncertainty', 'risk', 'coupling', 'evidence_conflict',
+    'capability_failure', 'irreversibility', 'novelty', 'mechanical',
+    'verifiability', 'failed_attempts',
+))
+
+
+def supported_admission_pair(model, effort):
+    """Policy support only; a catalog/request is not an observed host binding."""
+    return (isinstance(model, str) and model in MODEL_LANES
+            and effort in ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
+            and (effort != 'low' or MODEL_LANES[model] == 'luna')
+            and (effort != 'ultra' or MODEL_LANES[model] in ('sol', 'astra')))
+
+
+def low_enabled(skill_root=None):
+    """Only the owned installation profile may enable automatic low; never a request."""
+    skill = skill_root or Path(__file__).resolve().parents[1]
+    manifest = skill / '.cer-install.json'
+    if not manifest.is_file():
+        return False
+    with manifest.open('rb') as stream:
+        raw = stream.read(16385)
+    if len(raw) > 16384:
+        raise ValueError('installed policy manifest exceeds input limit')
+    data = json.loads(raw, object_pairs_hook=unique, parse_constant=reject_constant)
+    return (isinstance(data, dict) and data.get('host_mode', 'full') == 'full'
+            and data.get('mode') in ('auto', 'adaptive') and data.get('allow_low') is True)
+
+
+def admission_configuration(request, model, effort, *, allow_low=False):
+    """Apply the same model floor at preparation and native dispatch; no model calls."""
+    if not supported_admission_pair(model, effort):
+        return 'UNKNOWN'
+    signals = request.get('signals')
+    if not isinstance(signals, dict) or set(signals) - ADMISSION_SIGNAL_KEYS:
+        return 'UNKNOWN'
+    scores = ('uncertainty', 'risk', 'coupling', 'irreversibility', 'novelty', 'verifiability')
+    for key, value in signals.items():
+        if key in scores:
+            if type(value) is not int or not 0 <= value <= 3:
+                return 'UNKNOWN'
+        elif key == 'failed_attempts':
+            if type(value) is not int or value < 0:
+                return 'UNKNOWN'
+        elif key == 'sol61_unsuitable_reason':
+            if not isinstance(value, str):
+                return 'UNKNOWN'
+        elif type(value) is not bool:
+            return 'UNKNOWN'
+    prerequisites = ('spec_complete', 'authority_ready', 'environment_ready', 'observability_ready')
+    if not all(signals.get(key) is True for key in prerequisites):
+        return 'UNKNOWN'
+    simple = (request.get('confirmed_simple') is True
+              and all(signals.get(k, 1) <= 1 for k in ('uncertainty', 'risk', 'coupling'))
+              and not signals.get('evidence_conflict', False)
+              and not signals.get('capability_failure', False)
+              and signals.get('failed_attempts', 0) == 0
+              and signals.get('irreversibility', 0) <= 1 and signals.get('novelty', 0) <= 1)
+    lane = MODEL_LANES[model]
+    if lane in ('luna', 'terra') and not simple:
+        return 'MISMATCH'
+    if effort == 'medium' and (not simple or lane == 'astra'):
+        return 'MISMATCH'
+    if effort == 'low' and not (allow_low is True and simple
+            and signals.get('mechanical') is True and signals.get('uncertainty') == 0
+            and signals.get('novelty') == 0 and signals.get('verifiability') == 3):
+        return 'MISMATCH'
+    if effort in ('xhigh', 'max', 'ultra') and not (
+            request.get('effort_supported') is True
+            and isinstance(request.get('effort_reason'), str) and request['effort_reason'].strip()):
+        return 'UNKNOWN'
+    if lane == 'astra':
+        if not assignment_astra_admitted(dict(signals, force_astra=False)):
+            return 'MISMATCH'
+        if not isinstance(request.get('complexity_reason'), str) or not request['complexity_reason'].strip():
+            return 'UNKNOWN'
+    return 'VERIFIED'
+
 LIMIT = 131072
 INPUT_LIMIT = 16384
 READ_LIMIT = 16 * 1024 * 1024
@@ -1131,7 +1226,8 @@ def execution_admission(execution: object, model: str) -> str:
     return 'VERIFIED'
 
 
-def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> dict:
+def assignment_preflight(request: dict, *, policy_sha256: str | None = None,
+                         allow_low: bool = False) -> dict:
     """Installed pre-dispatch entry; never authenticates supplied recipient evidence."""
     if not isinstance(request, dict):
         raise ValueError('assignment object required')
@@ -1148,8 +1244,7 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
             or not isinstance(receiver.get('evidence_ref'), str) or not receiver['evidence_ref']):
         result['status'] = 'UNKNOWN'
         return result
-    if (receiver.get('model') not in ('gpt-6.1-sol', 'gpt-6-astra')
-            or receiver.get('effort') not in ('medium', 'high', 'xhigh', 'max', 'ultra')):
+    if not supported_admission_pair(receiver.get('model'), receiver.get('effort')):
         result['status'] = 'UNKNOWN'
         return result
     if boundary['status'] not in ('READY', 'VERIFIED'):
@@ -1157,6 +1252,9 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
     signals = request.get('signals', {})
     # The current native guard rejects additional signals. Bind capability metadata
     # to the existing checked message body instead; never broaden its allowlist.
+    if not isinstance(signals, dict):
+        result['status'] = 'UNKNOWN'
+        return result
     if 'execution' in signals:
         result['status'] = 'MISMATCH'
         return result
@@ -1174,36 +1272,10 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
             result['status'] = execution
             return result
     if boundary['status'] == 'READY':
-        model, effort = receiver['model'], receiver['effort']
-        prerequisites = ('spec_complete', 'authority_ready', 'environment_ready', 'observability_ready')
-        if not all(signals.get(key) is True for key in prerequisites):
-            result['status'] = 'UNKNOWN'
+        status = admission_configuration(request, receiver['model'], receiver['effort'], allow_low=allow_low)
+        if status != 'VERIFIED':
+            result['status'] = status
             return result
-        if model not in ('gpt-6.1-sol', 'gpt-6-astra'):
-            result['status'] = 'UNKNOWN'
-            return result
-        simple = (request.get('confirmed_simple') is True
-                  and all(type(signals.get(key, 1)) is int and 0 <= signals.get(key, 1) <= 1
-                          for key in ('uncertainty', 'risk', 'coupling'))
-                  and all(signals.get(key, False) is False for key in ('evidence_conflict', 'capability_failure'))
-                  and signals.get('irreversibility', 0) == 0 and signals.get('novelty', 0) <= 1)
-        if effort == 'medium' and (not simple or model == 'gpt-6-astra'):
-            result['status'] = 'MISMATCH'
-            return result
-        if effort in ('xhigh', 'max', 'ultra') and not (
-                request.get('effort_supported') is True and isinstance(request.get('effort_reason'), str)
-                and request['effort_reason'].strip()):
-            result['status'] = 'UNKNOWN'
-            return result
-        if model == 'gpt-6-astra':
-            reason = request.get('complexity_reason')
-            # A self-reported pin is not evidence of an actual user instruction.
-            if not assignment_astra_admitted(dict(signals, force_astra=False)):
-                result['status'] = 'MISMATCH'
-                return result
-            if not isinstance(reason, str) or not reason.strip():
-                result['status'] = 'UNKNOWN'
-                return result
     receipt = {'recipient_id': receiver['id'], 'unit_id': request['unit_id'],
                'model': receiver['model'], 'effort': receiver['effort'], 'evidence_ref': receiver['evidence_ref'],
                'scope_sha256': hashlib.sha256(scope.encode('utf-8')).hexdigest(),
@@ -1246,7 +1318,7 @@ def main() -> int:
             if len(raw) > INPUT_LIMIT:
                 raise ValueError('assignment input exceeds limit')
             request = json.loads(raw.decode('utf-8'), object_pairs_hook=unique, parse_constant=reject_constant)
-            result = assignment_preflight(request)
+            result = assignment_preflight(request, allow_low=low_enabled())
             output = json.dumps(result, ensure_ascii=False, separators=(',', ':')).encode('utf-8') + b'\n'
             if len(output) > PAGE_BYTES:
                 raise ValueError('assignment result exceeds limit')

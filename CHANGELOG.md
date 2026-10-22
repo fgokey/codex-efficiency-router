@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.6 — 2026-10-22
+
+- Align native preparation, spawn and recipient admission for every documented executor; share the Reader registry and test its agreement with role and offline policy definitions. Preserve exact host binding, authority, effect, owner and body checks.
+- Permit medium/high identity-only executor HOLD without a fake task envelope; Astra and unusual effort still require admission. Low remains an owned opt-in with deterministic evidence, and Ultra never reaches a non-coordinator model.
+- Separate ordinary native routing from explicitly configured strict admission, preserving the preceding full/compat implementation and every installed protection. Reuse one live work-unit owner; use native controls for status/wait/cancel instead of task-bearing messages.
+- Rewrite runtime guidance around one implementation path and on-demand review; retain Astra diagnosis, read-only enforcement, required validation, current evidence, retry history and output bounds. Do not require optional patched tools or doctor calls on ordinary tasks.
+- Include the pinned host patch in source archives. Fix macOS fixture path canonicalization without weakening production link protections. Make known surviving mutation cases causal and add positive cross-layer tests.
+- Native Codex task-quality, end-to-end token/cost/latency and unchanged experimental host patch execution remain separate acceptance; no model probes are run by this update.
+
+
 ## 0.8.5 — 2026-10-05
 
 - Validate canonical spawn bindings before executor/coordination passthrough; preserve fixed roles and explicit exact pins. Host identity and authority still require independent verification; unregistered Hooks do not enforce this preflight.

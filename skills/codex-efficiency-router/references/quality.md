@@ -1,35 +1,17 @@
-# Quality
+# Validate and finish
 
-## Completion
+Reconcile the original user objective, accepted scope, every remaining required item and current authority. COMPLETE only when every required item is satisfied by current evidence. Unit PASS/PARTIAL/checks/reviews != parent completion.
 
-Reconcile the original user objective, accepted scope, every remaining required item and current authority.
+CONTINUE while useful authorized diagnosis, delegation or implementation remains, without a user nudge. Missing measurement/design alone proves neither done nor blocked. BLOCKED requires an actual external barrier, its evidence, affected scope and required external action; finish unaffected authorized work. STOP on explicit stop/pause/cancel, accepted scope change or actual tool/system budget ceiling; report remaining work. Standalone status questions end after answering; mid-task questions do not cancel the objective. No unrequested monitoring, risky operations or infinite retries.
 
-- CONTINUE while useful authorized diagnosis, delegation or implementation remains. Unit PASS/PARTIAL/checks/reviews != parent completion. Missing measurement/design alone proves neither done nor blocked. Continue without a user nudge.
-- COMPLETE only when every required item is satisfied by current evidence.
-- BLOCKED: actual external barrier; exact missing access/input/resource, evidence, affected scope and required user/external action; finish unaffected authorized work.
-- STOP on explicit stop/pause/cancel, accepted scope change or actual tool/system budget ceiling; report remaining work.
-- Only standalone STATUS/Q&A ends after answering; mid-task questions: answer briefly, continue the original objective unless stopped/changed.
+Reuse unchanged evidence and checks only when code, dependencies, command, scope and environment still match. Inspect the actual diff, consumers, platform/macros and behavior; investigate disagreements. A test model or static score is not proof of production semantics. Loss/eviction/coalescing must preserve effects or have justified discard/replay/rebuild behavior. Keep preexisting hazards separate from new defects. Findings need a requirement or before/after evidence; label hypotheses.
 
-Existing authority/scope only; no automatic monitoring, risky measurement/deploy, infinite retry or extra model probes.
+Never weaken assertions. Use applicable negative and integration checks. Unrun checks are UNKNOWN; required gaps remain PARTIAL/BLOCKED. Run required checks once after final changes stabilize; repeat changed/failed checks only. Parent review of original code/evidence/test applicability cannot be replaced by a child claim.
 
-Files/rules: `page --root ABS --path PATH`; same root/path `--cursor TOKEN` to null. Code: `locate --query Q` -> current located lines: `excerpt --start N --lines N` (count 1..200). Fix limits/page/locate errors.
+Use one checkpoint only when recovery is needed. Retain scope, owner, evidence locations, state, unresolved issues and retry history. Exhaustion stops blind edits, not diagnosis. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction. Patch mismatch: inspect context/encoding/line endings; repair once before diagnosing.
 
-Reads/checks: Reader `batch --root ABS --requests - --max-bytes N --framing-bytes N` via UTF-8 stdin; aggregate JSON; keep each cursor; no early member output. ERROR/PARTIAL: retain successful results; retry failed/pending only; disclose gaps. Other: capture/select/serialize/count before emit. No doc/hook preload or child router copy. Never invent identity/savings/enforcement/cleanup.
+Read relevant ranges; do not repeatedly load whole reports. Reader pages preserve fingerprints and cursors; batch uses bounded UTF-8 stdin. Keep successful results and retry failed/pending items only. Count the whole serialized output and framing, not individual rows; preserve truncation as PARTIAL. Reader responses remain <=4KiB. Authorized native reads use the actual host budget; do not imitate Reader guarantees.
 
-Workers: compact waits; details at actionable change/completion/error. Before passive wait: readiness (effort), then available parent review/integration. Merge <=8 targets; retain cursors/liveness/progress/errors. Commentary/tools/queries/waits/rewrites keep backoff. Two unchanged snapshots: back off; one saved-offset delta for diagnostic evidence; no repeat tails/polls/nudges until change.
+Before waiting, check ready work and available parent review. Merge bounded native waits, retain cursors and liveness/errors. Two unchanged snapshots: back off; one saved-offset delta for diagnosis, not repeated tails or nudges. Use optional COORDINATION_JS only with matching host tools; do not rewrite it each poll. Use completion_check only when the configured host exposes/requires it, beginning before appending requirements and reconciling before final check.
 
-`COORDINATION_JS` in installed `scripts/readonly_reader.py`: Astra `functions.exec`, no Python/shell; drain/reuse cursors. `parentReady`: caller contract.
-
-Validate semantics/platforms/macros/consumers. Loss/eviction/coalescing: preserve effects or supported discard/replay/rebuild in affected states; else PARTIAL/BLOCKED.
-
-Exhaustion stops blind edits, not diagnosis. Patch mismatch: inspect context/encoding/line endings; repair once. Retries persist per task/unit/signature across ALL owners/models/efforts/compaction.
-
-Never weaken assertions. Unrun: UNKNOWN; required gaps: PARTIAL/BLOCKED.
-
-Contract: requirement/check/state/PASS/FAIL/UNKNOWN. Findings cite before/after or requirement violation; label hypotheses. P1/P2: HEAD/line endings/callee/gray path; preexisting hazards open. Callback/gray/static score cannot prove event loss safe; unchanged baseline != diff.
-
-Parent: original code/evidence/test applicability, disagreements, objective/open work. Reread changed/failed only. Independent review/child PASS cannot substitute. `completion_check`: begin before append; reconcile before check.
-
-Red/green: production/exact extraction+named stubs/handwritten MODEL; text identity/full affected baseline required; half-old/claimed extraction/whole-project stubs only illustrate.
-
-Standalone status/check: one-shot; explicit watch: compact state/cadence; stop on cancel. BACKOFF: in-turn wait; heartbeat: defer schedule or pause, never skipped wakeups. Child cost != task cost; cached input separate; usage/prices UNKNOWN. Run required checks once after final changes stabilize; repeat changed/failed.
+Account for parent, children, failures and retries. Separate cached input and avoid double-counting reasoning included in output. Missing usage/prices remain UNKNOWN; text size is not whole-task savings.

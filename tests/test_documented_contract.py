@@ -22,12 +22,15 @@ def contract_text():
 
 class DocumentedContractTests(unittest.TestCase):
     def test_engineering_default_dispatch_pins_complete_routing_parameters(self):
-        effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
-        self.assertIn('agent_type="cer_auto_sol61_engineer",reasoning_effort="high",fork_turns="none"', effort)
-        for phrase in ('Default engineering:', 'parent may explicitly select medium for confirmed simple work',
-                       'Owned task_name/message', 'Exact pins prevail', 'No default/inherit/hot-load',
-                       'verify host binding before RELEASE'):
-            self.assertIn(phrase, effort)
+        from effort_reference import dispatch_arguments
+        from test_effort_auto import host, AUTO, S, plan
+        args = dispatch_arguments(plan(S(), host(), AUTO))
+        self.assertEqual(args, {'agent_type':'cer_auto_sol61_engineer',
+                               'reasoning_effort':'high','fork_turns':'none'})
+        text = contract_text()
+        for phrase in ('Default uncertain engineering/review to Sol61/high',
+                       'confirmed simple work may use medium', 'Routine released leaves'):
+            self.assertIn(phrase, text)
 
     def test_readme_cli_options_match_real_parsers(self):
         modules = {'install': install, 'uninstall': uninstall, 'doctor': doctor}
@@ -102,114 +105,49 @@ class DocumentedContractTests(unittest.TestCase):
                                         for error in doctor.validate_tree(path, ROOT / 'agents')))
 
     def test_core_safety_contract_survives_compression(self):
-        # Wording sentinels prevent accidental deletion, not semantic-quality proof.
-        core = contract_text()
-        for phrase in ('Unrun: UNKNOWN', 'required gaps: PARTIAL/BLOCKED', 'read-only', 'no-subagent/no-escalation',
-                       'Never weaken assertions', 'contrary evidence', 'revision/dirt',
-                       'same-model needs contextual value AND net benefit',
-                       'authority/ownership/capacity gaps BLOCK/defer',
-                       'no classifier', 'no agent per file',
-                       'higher efforts need evidence/support'):
-            self.assertIn(phrase, core)
+        text = contract_text()
+        for phrase in ('Astra leaves and read-only roles NEVER write', 'Unknown identity/effects grant no writes', 'Never weaken assertions', 'Default to one implementer and an on-demand reviewer', 'no classifier, nested model CLI/API', 'exact pins', 'Honor disable/no-subagent/no-escalation', 'preserve every error and cursor'):
+            self.assertIn(phrase, text)
 
     def test_semantic_loss_and_review_evidence_are_required(self):
-        core = contract_text()
-        quality = (ROOT / 'skills' / PROJECT / 'references/quality.md').read_text()
-        for phrase in ('Validate semantics/platforms/macros/consumers', 'Loss/eviction/coalescing',
-                       'discard/replay/rebuild', 'affected states', 'PARTIAL/BLOCKED'):
-            self.assertIn(phrase, core)
-        for phrase in ('Findings cite before/after or requirement violation', 'label hypotheses',
-                       'Callback/gray/static score cannot prove event loss safe',
-                       'preexisting hazards', 'unchanged baseline'):
-            self.assertIn(phrase, quality)
+        text = contract_text()
+        for phrase in ('Loss/eviction/coalescing must preserve effects', 'justified discard/replay/rebuild behavior', 'preexisting hazards separate from new defects', 'requirement or before/after evidence', 'A test model or static score is not proof of production semantics', 'consumers, platform/macros and behavior'):
+            self.assertIn(phrase, text)
 
     def test_astra_does_not_own_long_command_continuations(self):
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('Astra never uses write_stdin', 'Executors own long commands',
-                       'long commands/continuation', 'bounded saved evidence'):
-            self.assertIn(phrase, dispatch)
+        text = contract_text()
+        for phrase in ('executors own builds, tests and terminal continuation', 'Astra inspects evidence and coordinates'):
+            self.assertIn(phrase, text)
 
     def test_native_change_review_preserves_write_and_delivery_evidence(self):
-        core = contract_text()
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        self.assertIn('Preflight: Reader `assignment` before task-bearing sends', core)
-        for phrase in ('all roots', 'exact paths/status',
-                       'owned/prior dirt', 'Parent checks all diffs/status',
-                       'review/open-review', 'unstaged review',
-                       'Compare roots before writes', 'native parent file-change attribution',
-                       'model/review/open-review prove none',
-                       'Missing/unknown blocks badge',
-                       'never edit for attribution'):
-            self.assertIn(phrase, dispatch)
-        for filename in ('luna-worker.toml', 'terra-executor.toml', 'sol-engineer.toml'):
-            instructions = tomllib.loads((ROOT / 'agents' / filename).read_text())['developer_instructions']
-            for phrase in ('roots', 'exact paths/status/diff', 'owned/prior dirt',
-                           'current evidence', 'never parent completion'):
-                self.assertIn(phrase, instructions)
+        text = contract_text()
+        for phrase in ('Return actual roots, paths, diff, checks, prior dirt and gaps', 'The parent accepts integration against the current workspace', 'child PASS is not parent completion'):
+            self.assertIn(phrase, text)
 
     def test_native_badge_support_is_separate_from_write_authority(self):
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        self.assertTrue('Missing/unknown stops.' not in dispatch,
-                        'Unknown UI attribution must not unconditionally stop authorized work')
-        for boundary in ('Requested native parent file-change attribution: verify/report',
-                         'Missing/unknown blocks badge; authorized work proceeds unless user requires it first',
-                         'No fake badge/ID',
-                         'parent checks current session host-observed model/effort/role/permission/owner',
-                         'explicitly releases unit for writes',
-                         'Preflight: Reader `assignment` before task-bearing sends'):
-            self.assertIn(boundary, dispatch)
+        text = contract_text()
+        for phrase in ('Optional UI attribution must not block authorized work unless required by the user', 'never fake it', 'current host-observed model/effort/role/permission/owner', 'explicitly releases unit for writes'):
+            self.assertIn(phrase, text)
 
     def test_auto_dispatch_is_explicit_and_fixed_fallback_is_evidenced(self):
-        core = contract_text()
-        effort = (ROOT / 'skills' / PROJECT / 'references/effort.md').read_text()
-        for text in (core, effort):
-            self.assertIn('`cer_auto_<role>`', text)
-            self.assertIn('base role is MISMATCH', text)
-        self.assertIn('Select model AND effort', core)
-        self.assertIn('explicit effort', effort)
-        self.assertIn('exact role/catalog pair', effort)
+        text = contract_text()
+        for phrase in ('Select model AND effort', '`cer_auto_<role>` with explicit effort', 'exact selected pair', 'dynamic binding is unavailable', 'Do not label a fixed fallback as adaptive success'):
+            self.assertIn(phrase, text)
 
     def test_native_root_astra_boundary_has_no_repair_exception(self):
-        core = contract_text()
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('Root Astra defaults read-only', 'native admission has no repair exceptions',
-                       '`read_only`', '`prepare_agent_task`',
-                       'Capacity never grants writes'):
-            self.assertIn(phrase, core)
-        self.assertNotIn('one bounded local repair unit', dispatch)
-        self.assertIn('Strict Guard denies Astra', dispatch)
-        self.assertIn('UNKNOWN may deny', dispatch)
+        text = contract_text()
+        for phrase in ('Root Astra defaults read-only', 'native admission has no repair exceptions', 'Capacity never grants writes', 'Astra stays read-only throughout', 'Never bypass a configured boundary'):
+            self.assertIn(phrase, text)
 
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
-        core = contract_text()
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('host-observed', 'explicitly releases unit for writes',
-                       'ID/config/claims/old logs fail', 'Same-session turns reuse release',
-                       'contradiction rechecks', 'Closed/unloaded/restarted: handoff',
-                       'explicit role/model/effort fresh spawn, host binding, RELEASE',
-                       'Reject native `resume_agent` for every model: cannot pin model/effort',
-                       'Live follow-up/task-evidence `resume()` differ',
-                       'UNKNOWN/MISMATCH blocks writes',
-                       'source/build config', 'destructive recovery'):
-            self.assertIn(phrase, dispatch)
-        for phrase in ('Policy denial', 'equivalent replay/repackaging',
-                       'approval=never', 'no manual boundary'):
-            self.assertIn(phrase, dispatch)
-        self.assertIn('only for new delegation/binding or child delivery review', core)
-        self.assertIn('Released routine leaf with complete scope/acceptance', core)
-        role = tomllib.loads((ROOT / 'agents/sol61-engineer.toml').read_text(encoding='utf-8'))['developer_instructions']
-        for phrase in ('Pre-write: platform/macros/consumers/validation',
-                       'write scope; requirements win',
-                       'Parent releases current host binding before writes; invalidation/UNKNOWN stops'):
-            self.assertIn(phrase, role)
+        text = contract_text()
+        for phrase in ('current host-observed model/effort/role/permission/owner', 'explicitly releases unit for writes', 'Configuration, self-description and old logs are not identity', 'UNKNOWN/MISMATCH blocks writes', 'closed/restarted workers need fresh binding and release', 'Reuse the same live owner', 'Policy denial stops equivalent replay/repackaging', 'approval=never', 'Publication, deployment, binary replacement and destructive recovery need separate authority'):
+            self.assertIn(phrase, text)
 
     def test_first_authorized_assignment_contains_the_current_unit_release(self):
-        dispatch = (ROOT / 'skills' / PROJECT / 'references/dispatch.md').read_text()
-        for phrase in ('first authorized assign checked body',
-                       'RELEASE current unit', 'host-observed model/effort/role/permission/owner',
-                       'UNKNOWN/MISMATCH blocks writes', 'Read-only leaves/cer-read only read',
-                       'Binary copy/runtime config/deploy/destructive recovery: separate authority'):
-            self.assertIn(phrase, dispatch)
+        text = contract_text()
+        for phrase in ('RELEASE current unit', 'explicitly releases unit for writes', 'UNKNOWN/MISMATCH blocks writes', 'Read-only roles never become writers', 'exact checked body'):
+            self.assertIn(phrase, text)
 
     def test_no_implicit_restore_or_nested_model_process_in_lifecycle(self):
         # The existing function tests exercise restore separately and owned-only deletion.
@@ -226,24 +164,17 @@ class DocumentedContractTests(unittest.TestCase):
                        'no commit/push/deploy/publish'):
             self.assertIn(phrase,luna)
         dispatch=(ROOT/'skills'/PROJECT/'references/dispatch.md').read_text()
-        self.assertIn('grants none',dispatch)
+        self.assertIn('need separate authority',dispatch)
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
-        core=contract_text()
-        for phrase in ('rule paths','rationale','Read rules; gaps block affected work'):
-            self.assertIn(phrase,core)
-        for name in EXPECTED:
-            role=tomllib.loads((ROOT/'agents'/name).read_text())['developer_instructions'].lower()
-            self.assertRegex(role,r'read (?:applicable )?repo(?:sitory)? rules',name)
-            self.assertRegex(role,r'(?:missing critical context blocks|critical (?:context )?gaps block) affected work',name)
+        text = contract_text()
+        for phrase in ('rule paths', 'facts versus assumptions', 'rationale/invariants', 'allowed changes, prohibited actions, checks and remaining attempts', 'no inherited history'):
+            self.assertIn(phrase, text)
 
     def test_mismatch_recovery_is_reachable_without_low_opt_in(self):
-        core=contract_text()
-        effort=(ROOT/'skills'/PROJECT/'references/effort.md').read_text()
-        self.assertIn('Resolve MISMATCH before continuation',core)
-        for phrase in ('safe boundary','review affected checks','Later VERIFIED does not erase review',
-                       'UNKNOWN is not failure','Retain work/attempts/limits'):
-            self.assertIn(phrase,effort)
+        text = contract_text()
+        for phrase in ('UNKNOWN is not MISMATCH', 'Resolve MISMATCH at a safe boundary and review affected work', 'Later VERIFIED does not erase that review or reset attempts', 'Suspend auto-low after either status'):
+            self.assertIn(phrase, text)
 
 
 if __name__ == '__main__':

@@ -167,8 +167,8 @@ class InstallerTests(unittest.TestCase):
         self.assertFalse(self.config().exists())
 
     def test_child_defaults_user_scope(self):
-        codex = Path(self.temp.name) / "user codex"
-        home = Path(self.temp.name) / "home"
+        codex = Path(self.temp.name).resolve() / "user codex"
+        home = Path(self.temp.name).resolve() / "home"
         home.mkdir()
         with patch.object(Path, "home", return_value=home), patch.dict(os.environ, {"CODEX_HOME": str(codex)}):
             installer.install("user", None, False, set_subagent_defaults=True)

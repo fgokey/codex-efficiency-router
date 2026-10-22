@@ -1,5 +1,3 @@
-# Astra
+# Astra judgment
 
-Prerequisites/reasoning-bound/no cheap check; labels/counts fail. No Sol trial/user reapproval. User Astra pin: prerequisites, before cheap check.
-
-Leaves read-only; plans grant no rollout authority. Contrary evidence reopens; offline rules prove no quality/savings.
+Use Astra for a very complex unresolved decision with a concrete reason Sol61 is insufficient. A cheap safe check or prerequisite repair comes first. Repeated qualified failures require diagnosis, not blind retries; failure count alone is not admission. An Astra parent diagnoses directly without spawning its own copy. Executors run the experiments and implement the settled result. Astra stays read-only throughout.

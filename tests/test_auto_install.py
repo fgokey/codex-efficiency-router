@@ -158,7 +158,7 @@ class AutomaticInstallTests(unittest.TestCase):
         self.install(dry_run=True)
         self.assertEqual(self.state(),before);self.assertEqual(self.backup(),old_backup)
         self.install()
-        self.assertEqual(self.manifest()['version'],'0.8.5')
+        self.assertEqual(self.manifest()['version'],(ROOT/'VERSION').read_text().strip())
         self.assertEqual(len(self.manifest()['files']),18)
         self.assertEqual(len(list(self.agents.glob('*.toml'))),10)
         backup=self.backup()
@@ -260,7 +260,7 @@ class AutomaticInstallTests(unittest.TestCase):
 
     def test_source_payload_refuses_duplicate_reader_or_launcher(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root=Path(tmp)
+            root=Path(tmp).resolve()
             for directory in ('skills','agents','hooks'):
                 shutil.copytree(ROOT/directory,root/directory)
             shutil.copy2(ROOT/'cer.ps1',root/'cer.ps1')

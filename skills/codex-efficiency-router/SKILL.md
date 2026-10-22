@@ -1,30 +1,28 @@
 ---
 name: codex-efficiency-router
-description: All delegation/reuse/review.
+description: Route substantial Codex coding, diagnosis and review to suitable model/effort pairs. Reuse workers and verify results; do not invoke for trivial questions or stack routers.
 ---
 
-<!-- CER version: 0.8.5 -->
+<!-- CER version: 0.8.6 -->
 
 Installation: fixed; automatic low: disabled.
 
-Start: no trusted tools/binding/permission? Report gaps; stop dispatch/writes. Opt in: scripts/install.py --host-mode compat. Report once: v/modes/Guard/policy SHA; UNKNOWN
+Keep the parent model and exact pins. Low is opt-in. Use no classifier, nested model CLI/API or hidden configuration changes.
 
-Reuse loaded unchanged rules; fully read required new/changed rules. Use physical paths; keep link checks. Released writers: native scoped/bounded root/link/budget reads; else guarded. Reader: Verified Python `-I -B <Skill>/scripts/readonly_reader.py`. Batch independent small/targeted reads; full pages for long required rules. Check exit before JSON; inspect every result/status/error/cursor. No full-file slicing/merging pages/files. JSON+CRLF+framing <=4KiB; unknown framing: gap; handoff both.
+Root Astra defaults read-only. Astra leaves and read-only roles NEVER write. Unknown identity/effects grant no writes; native admission has no repair exceptions. Permissions take priority over local shortcuts. Preserve existing edits.
 
-Keep parent model/exact pins; Low is opt-in; no classifier/nested model CLI/API/hidden config edits.
+Check available tools once; do not run doctor/tests as a task prerequisite. Missing write evidence blocks affected writes, not safe inspection or an available identity-only spawn. Report version/mode/Guard once; unobserved facts stay UNKNOWN. Never switch host modes implicitly.
 
-Cheap local Q&A/status/low-risk: no children/references. Released routine leaf with complete scope/acceptance: core+role+repo rules; skip parent procedures. Delegation always routes. Honor repo rules, current permissions/read-only roles. Unknown identity/effects grant no writes.
+Reuse loaded unchanged rules; fully read required new/changed rules. Prefer scoped native reads for released writers; retain guarded reads elsewhere. Use verified paths and link checks. Batch independent reads within the actual output budget; preserve every error and cursor. Reader: verified Python `-I -B <Skill>/scripts/readonly_reader.py`; check exit before JSON. Do not preload reports or copy the Router into workers.
 
 ## Completion
 
-Requirements win. [quality.md](references/quality.md): parent before first worker wait/collection or before an active engineering parent final; all: complex/cross-component lifecycle, eviction/callback loss, large/conflicting evidence/disputed validation.
+Read [quality.md](references/quality.md) before a parent's first collection/final, or complex, failed or disputed validation. Routine released leaves use their role, repository rules and complete task contract.
 
 ## Routing
 
-Read [effort.md](references/effort.md) before dispatch/lane changes; [routing.md](references/routing.md) for Astra admission.
-
-Astra: parent very-complex judgment AND concrete Sol61-unsuitable reason. Sends require Reader `assignment` prefix/body hash; FAIL/UNKNOWN block. Binding grants no new work.
+Read [effort.md](references/effort.md) before dispatch or a meaningful phase change; [routing.md](references/routing.md) for difficult judgment.
 
 ## Delegate
 
-Read [dispatch.md](references/dispatch.md) only for new delegation/binding or child delivery review. Astra leaves and read-only roles NEVER write. Root Astra defaults read-only; native admission has no repair exceptions.
+Read [dispatch.md](references/dispatch.md) before delegation or binding changes. Default to one implementer and an on-demand reviewer. Reuse the compatible owner; never create an agent per file. Tiny authorized work stays local, except Astra mutations.
