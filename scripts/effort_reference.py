@@ -21,19 +21,20 @@ PRESETS = {
     "astra": EXPECTED["astra-architect.toml"],
 }
 MODEL_ROLES = {model: role for role, model, _ in EXPECTED.values()}
-MODEL_ROLES["gpt-5.6-sol"] = EXPECTED["sol-engineer.toml"][0]
+# Only the canonical Sol61 role is selected; sol_engineer is an upgrade alias.
+MODEL_ROLES["gpt-6.1-sol"] = "sol61_engineer"
 MODEL_LANES = {
     "gpt-6-luna": "luna",
     "gpt-5.6-luna": "luna",
     "gpt-5.6-terra": "terra",
     "gpt-6.1-sol": "sol",
-    "gpt-6-sol": "sol",
-    "gpt-5.6-sol": "sol",
     "gpt-6-astra": "astra",
 }
 LEGACY_FALLBACKS = {
     "luna": ("gpt-5.6-luna",),
-    "sol": ("gpt-6-sol", "gpt-5.6-sol", "gpt-5.6-terra"),
+    # Only an independently eligible bounded Terra unit may use this fallback.
+    # Older Sol models are retired, including explicit pins and owner reuse.
+    "sol": ("gpt-5.6-terra",),
 }
 EVENTS = ("initial", "phase", "evidence", "classified_failure", "user", "none")
 
@@ -345,6 +346,8 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     if write_intent and gate.action == "reuse":
         owner = next(w for w in context.write_scope.writers if w.agent_id == gate.owner)
         owner_lane = MODEL_LANES.get(owner.model)
+        if owner_lane is None:
+            return result("blocked", "existing owner uses a retired or unknown model; reconcile at a safe boundary")
         current = context.current
         if context.keep_model and (current is None or owner.model != current.model):
             return result("blocked", "existing owner does not satisfy the model lock")
@@ -385,9 +388,9 @@ def plan(s: TaskSignals, context: Context, profile: Profile = Profile("auto"), *
     retained_effort = (current.effort if context.keep_model and current is not None
                        and LANES.index(current.lane) > LANES.index(rec.lane)
                        and context.current_sufficient else rec.effort)
-    if (candidate_model in ('gpt-6-sol', 'gpt-5.6-sol', 'gpt-5.6-terra')
+    if (candidate_model == 'gpt-5.6-terra'
             and not (context.keep_model and current is not None and context.current_sufficient)):
-        retained_effort = 'high' if minimum == 'high' else EXPECTED['sol-engineer.toml'][2]
+        retained_effort = 'high' if minimum == 'high' else EXPECTED['terra-executor.toml'][2]
     candidate = Configuration(requested_lane, automatic_effort or explicit_effort or retained_effort, candidate_model)
     if candidate.effort == "ultra" and candidate.lane not in ("sol", "astra"):
         return result("blocked", "ultra requires a Sol or Astra coordinator-capable role")

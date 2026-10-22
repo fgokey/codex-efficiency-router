@@ -1,6 +1,6 @@
 name = "sol_engineer"
-description = "Complex engineering diagnosis, integration and consequential review."
-model = "gpt-6-sol"
+description = "Compatibility name for GPT-6.1 Sol; prefer sol61_engineer for new routing."
+model = "gpt-6.1-sol"
 model_reasoning_effort = "medium"
 
 developer_instructions = """

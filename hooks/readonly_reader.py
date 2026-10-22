@@ -1010,25 +1010,23 @@ Minimal engineering review input (replace recipient/evidence with observed value
   signals.sol61_unsuitable_reason; both readable reasons appear in the prefix.
   force_astra alone is not a user authorization. Missing/unknown binding: no task send.
   Medium: confirmed_simple=true + current simple uncertainty/risk/coupling <=1,
-  no conflict/failure/irreversibility, novelty <=1; Luna/Terra always need this simple gate.
-  Exact shipped and legacy model IDs share admission. Astra floor remains high.
-  Low requires simple Luna work, explicit supported effort and reason; never inferred.
+  no conflict/failure/irreversibility, novelty <=1; admitted Astra floor remains high.
   xhigh/max/ultra: effort_supported=true + effort_reason; no support is inferred.
   Pure purpose/message continue/status/stop (or exact Chinese control word): same
   unit/scope/recipient/current-policy receipt may cache admission; added work text
   re-admits, even with unchanged IDs. Wait needs none. New spawn: explicit role/effort,
   HOLD identity report; verify binding before this existing-worker entry releases work.
 Native dispatch mode (independent trusted registration):
-  New work needs purpose=new_unit. An exact continue/status/stop with the same current
-  receipt reuses its unit/scope/binding, not write authority. Prefer native wait/interrupt/close.
-  Bare controls, changed work, stale policy or changed identity remain denied.
+  New work requires purpose=new_unit and current admission. Exact continue/status/stop
+  retain the original receipt and work hash; current host binding is rechecked.
+  Controls cannot release new work, expand scope or hide added instructions.
   Spawn body must be exactly this fixed identity HOLD, with no additional work:
   HOLD. Report only your identity and working directory; do not use tools or accept work until RELEASE.
-  Non-Astra medium/high identity-only HOLDs need no task preflight. For Astra creation, use
-  recipient.id="unbound-spawn", the explicitly requested model/effort, purpose=new_unit,
-  scope="identity HOLD", and message equal to the fixed HOLD above. Supply all readiness
-  signals plus very_complex=true, complexity_reason, and sol61_unsuitable_reason as above.
-  Check VERIFIED/exit 0, then send prefix + that exact HOLD as the spawn message.
+  Known executor medium/high may spawn with that plain body. For Astra creation, run
+  assignment with recipient.id="unbound-spawn", the explicitly requested model/effort,
+  purpose=new_unit, scope="identity HOLD", and message equal to the fixed HOLD above.
+  Supply all readiness signals plus very_complex=true, complexity_reason, and
+  sol61_unsuitable_reason. Check VERIFIED/exit 0, then send prefix + that exact HOLD.
   Requested spawn parameters are not an actual binding; verify host identity before work.
   Current callers prepend this exact line to the checked work message (not signals):
   CER execution (caller evidence): {"effects":["read"],"permission":"read-only","role_read_only":true,"parent_released":false}
@@ -1040,18 +1038,14 @@ Native dispatch mode (independent trusted registration):
 '''
 
 EXECUTION_PREFIX = 'CER execution (caller evidence): '
-
-# All shipped roles are reachable through the same admission contract. This table
-# is checked against package.EXPECTED/TOML in cross-layer tests. It describes our
-# presets, not account availability; caller/host catalog checks still apply.
 ASSIGNMENT_ROLES = {
     'luna_worker': ('gpt-6-luna', 'high'),
     'terra_executor': ('gpt-5.6-terra', 'medium'),
-    'sol_engineer': ('gpt-6-sol', 'medium'),
+    'sol_engineer': ('gpt-6.1-sol', 'medium'),
     'sol61_engineer': ('gpt-6.1-sol', 'high'),
     'astra_architect': ('gpt-6-astra', 'high'),
 }
-ASSIGNMENT_LEGACY_MODELS = ('gpt-5.6-sol', 'gpt-5.6-luna')
+ASSIGNMENT_LEGACY_MODELS = ('gpt-5.6-luna',)
 ASSIGNMENT_EFFORTS = ('low', 'medium', 'high', 'xhigh', 'max', 'ultra')
 CONTROL_WORDS = {'continue': ('continue', '继续'),
                  'status': ('status', '状态'), 'stop': ('stop', '停止')}
@@ -1122,6 +1116,8 @@ def assignment_boundary(*, recipient_id, model, effort, unit_id, purpose,
     """Caller evidence only. Work hidden in a control message needs fresh admission."""
     result = {'status': 'UNKNOWN', 'effective_purpose': purpose}
     if not all(isinstance(value, str) and value for value in (recipient_id, model, effort, unit_id)):
+        return result
+    if not assignment_pair_known(model, effort):
         return result
     controls = CONTROL_WORDS
     if purpose not in ('new_unit', *controls):
