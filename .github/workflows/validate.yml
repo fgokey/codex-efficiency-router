@@ -2,7 +2,7 @@ name: validate
 
 on:
   push:
-    branches: [main, fix/offline-hardening-v021, quality/codex-v030, feature/adaptive-effort-v040, feature/automatic-routing-v050, fix/astra-write-gate-v060, feature/verifiable-guard-v070]
+    branches: [main, fix/offline-hardening-v021, quality/codex-v030, feature/adaptive-effort-v040, feature/automatic-routing-v050, fix/astra-write-gate-v060, feature/verifiable-guard-v070, fix/sol61-only-routing]
   pull_request:
   workflow_dispatch:
 
