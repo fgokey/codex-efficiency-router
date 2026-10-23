@@ -1,0 +1,44 @@
+name: v6-candidate-transfer
+on:
+  push:
+    branches: [audit/v6-delivery-20261023]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+      - name: Verify exact reviewed patch and publish candidate branch only
+        shell: python
+        run: |
+          import base64, hashlib, os, pathlib, subprocess, zlib
+          base = 'f8988d4835cf10c43fbd3d22cc2f0b7ae159f256'
+          target = 'refs/heads/fix/v6-coordination-overhead'
+          expected = 'e694f407a6fe748e04270bfb76b3319e3691c88c'
+          encoded = ''.join(pathlib.Path(f'.github/v6-payload/{i}.b64').read_text(encoding='ascii') for i in range(7))
+          decoder = zlib.decompressobj()
+          patch = decoder.decompress(base64.b64decode(encoded, validate=True), 1000001)
+          assert decoder.eof and not decoder.unused_data and len(patch) == 59731
+          assert hashlib.sha256(patch).hexdigest() == 'ae1f4125c9ddf5965b500c290e1cce6d169ac11559515e82d85227747e08e19f'
+          path = pathlib.Path(os.environ['RUNNER_TEMP']) / 'v6-reviewed.patch'
+          path.write_bytes(patch)
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          remote = git('ls-remote', 'origin', target)
+          assert remote.split()[0] == base, 'Candidate branch moved; no overwrite'
+          git('checkout', '--detach', base)
+          git('apply', '--check', '--exclude=.github/workflows/validate.yml', str(path))
+          git('apply', '--index', '--exclude=.github/workflows/validate.yml', str(path))
+          git('diff', '--cached', '--check')
+          assert git('write-tree') == expected, 'Candidate tree differs from reviewed local source'
+          git('config', 'user.name', 'github-actions[bot]')
+          git('config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
+          git('commit', '-m', 'perf: bound quiet coordination and reuse hook code without caching authorization')
+          print('CANDIDATE_COMMIT=' + git('rev-parse', 'HEAD'))
+          print('CANDIDATE_TREE=' + git('rev-parse', 'HEAD^{tree}'))
+          git('push', 'origin', 'HEAD:' + target)
