@@ -1,0 +1,22 @@
+name: v6-source-snapshot
+on:
+  push:
+    branches: [audit/v6-source-20261023]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Bundle public source history only
+        run: git bundle create "$RUNNER_TEMP/source.bundle" --all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v6-source-snapshot
+          path: ${{ runner.temp }}/source.bundle
+          retention-days: 2
