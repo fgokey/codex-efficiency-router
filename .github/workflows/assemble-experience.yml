@@ -1,0 +1,70 @@
+name: assemble-reviewed-experience-tree
+on:
+  push:
+    branches: [audit/experience-publish-20261023]
+permissions:
+  contents: write
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assemble verified source tree without modifying refs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, hashlib, json, os, pathlib, subprocess, sys, urllib.request
+          base='deb63fe4ccc939a9f969922deaff0d947dbb2e2a'
+          expected='5896c080389666fa0286f418771fae59d426d67c'
+          changes=json.loads(pathlib.Path('.ci/experience-edits.json').read_text())
+          allowed={'hooks/readonly_reader.py','hooks/hooks.json','README.md','README.zh-CN.md','CHANGELOG.md'}
+          assert set(changes)==allowed
+          def git(*args):
+              return subprocess.check_output(['git',*args],text=True).strip()
+          for name,record in changes.items():
+              before=subprocess.check_output(['git','show',base+':'+name])
+              assert pathlib.Path(name).read_bytes()==before
+              assert hashlib.sha256(before).hexdigest()==record['base']
+              lines=before.decode('utf-8').splitlines(keepends=True)
+              for first,last,text in reversed(record['edits']):
+                  assert 0<=first<=last<=len(lines)
+                  lines[first:last]=[text]
+              pathlib.Path(name).write_bytes(''.join(lines).encode('utf-8'))
+          paths=sorted(allowed|{'tests/test_existing_flow_efficiency.py'})
+          git('read-tree',base)
+          git('add','--',*paths)
+          git('diff','--cached','--check')
+          actual=git('write-tree')
+          assert actual==expected, 'unexpected assembled tree: '+actual
+          subprocess.run([sys.executable,'-B','-m','unittest','discover','-s','tests','-p','test_existing_flow_efficiency.py','-v'],check=True)
+          repository=os.environ['GITHUB_REPOSITORY']
+          assert repository=='fgokey/codex-efficiency-router'
+          def post(endpoint,value):
+              req=urllib.request.Request('https://api.github.com/repos/'+repository+'/git/'+endpoint,
+                  data=json.dumps(value).encode(),method='POST',headers={
+                      'Authorization':'Bearer '+os.environ['GH_TOKEN'],
+                      'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+          entries=[]
+          for name in paths:
+              raw=pathlib.Path(name).read_bytes()
+              blob=post('blobs',{'content':base64.b64encode(raw).decode(),'encoding':'base64'})['sha']
+              assert blob==git('hash-object',name)
+              entries.append({'path':name,'mode':'100644','type':'blob','sha':blob})
+          tree=post('trees',{'base_tree':git('rev-parse',base+'^{tree}'),'tree':entries})['sha']
+          assert tree==expected
+          report={'base':base,'tree':tree,'paths':paths,'refs_modified':False,'model_calls':0}
+          print(json.dumps(report,indent=2))
+          (pathlib.Path(os.environ['RUNNER_TEMP'])/'candidate-tree.json').write_text(json.dumps(report,indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-experience-tree
+          path: ${{ runner.temp }}/candidate-tree.json
+          retention-days: 7
