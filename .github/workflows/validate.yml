@@ -107,3 +107,36 @@ jobs:
           if ($LASTEXITCODE -eq 0) { throw 'Explicit Python 3.10 was incorrectly accepted' }
           if (@(Get-ChildItem -Force $Project).Count -ne 0) { throw 'Rejected interpreter wrote files' }
           exit 0
+
+  windows-runtime-overhead:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Compare actual Hook processes and deterministic wait transport
+        shell: pwsh
+        run: |
+          $Base = Join-Path $env:RUNNER_TEMP 'cer overhead baseline'
+          $Archive = Join-Path $env:RUNNER_TEMP 'cer-overhead-baseline.tar'
+          $Report = Join-Path $env:RUNNER_TEMP 'cer-runtime-overhead.json'
+          git archive --format=tar --output=$Archive f8988d4835cf10c43fbd3d22cc2f0b7ae159f256
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline export failed' }
+          python -c "import sys,tarfile; tarfile.open(sys.argv[1]).extractall(sys.argv[2],filter='data')" $Archive $Base
+          if ($LASTEXITCODE -ne 0) { throw 'Baseline extraction failed' }
+          python -B evaluation/runtime_overhead.py --baseline-root $Base --iterations 30 --output $Report
+          if ($LASTEXITCODE -ne 0) { throw 'Paired runtime measurement failed' }
+          python -c "import json,sys; r=json.load(open(sys.argv[1])); assert r['wait_replay']['status']=='EXECUTED_SIMULATION'; assert r['hook_processes']['reader_code_loads_per_dispatch']=={'baseline':3,'candidate':1}" $Report
+          if ($LASTEXITCODE -ne 0) { throw 'Structural overhead checks failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-runtime-overhead
+          path: ${{ runner.temp }}/cer-runtime-overhead.json
+          if-no-files-found: error
+          retention-days: 14
