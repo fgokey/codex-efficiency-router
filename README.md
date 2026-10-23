@@ -14,6 +14,10 @@ Sol routing now uses **`gpt-6.1-sol` only**. `gpt-6-sol` and `gpt-5.6-sol` are r
 
 The owned `sol_engineer` / `cer_auto_sol_engineer` filenames remain migration aliases, also bound to 6.1. This preserves existing references and manifest-owned backup/restore without adding another selectable Sol model. Ordinary reinstall updates unchanged owned files; customized files stop for review. Historical fixtures and accounting evidence are not routing options. Reach a safe boundary, update the Skill and any separately registered Guard, then reload Codex; do not hot-switch running workers.
 
+## Existing-flow fixes
+
+Unchanged completed-worker reports are no longer repeated while other workers run. Revised final text remains visible even when its message ID is unchanged. Errors and undrained evidence remain actionable. Report pages fill the existing 4 KiB budget rather than repeatedly halving it. Source-page fitting no longer serializes the entire remaining file, but still verifies its full hash. No new role, mode, Hook or model call; permissions, model/effort policy and acceptance stay unchanged. These are tested transport/Reader improvements, not measured whole-task token or quality gains.
+
 ## Coordination overhead
 
 Keep one owner for a whole authorized repair unit, including implementation, fixes and verification. Do not poll status, admission or completion while nothing changed. Retain a compact checkpoint at safe phase boundaries and use supported compaction rather than copying a long transcript or restarting active workers.

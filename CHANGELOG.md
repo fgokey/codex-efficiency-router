@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased existing-flow fixes
+
+- Suppress unchanged completed reports while detecting revised final text and preserving errors.
+- Fill bounded report pages and cap serialization candidates without weakening full source checks.
+- Add regressions for evidence delivery, Unicode pagination, stale cursors and read bounds.
+- No roles, modes, services or permission changes; no live-model savings claim.
+
 ## Unreleased coordination corrections
 
 - Add a capability-checked, bounded quiet-wait adapter; preserve early error/final delivery and raw output recovery.

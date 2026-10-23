@@ -50,6 +50,7 @@ EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
 # Raw MCP results stay in cerRaw. On overflow/schema failure use PAGE, draining
 # every next offset before any new wait. Stored values are data, never code.
 # Rows: id,cursor,threadStatus,turnId,turnStatus,error,failedMarker,finalMessageId,changed,finalText.
+# Detect revised final text even when the message ID is reused.
 COORDINATION_JS = r'''
 let b=framingBytes;
 if(!Number.isInteger(b)||b<0||b>3900)throw Error("unknown framing");
@@ -58,10 +59,10 @@ if(parentReady!==true)text({action:"WORK"});else{
 const r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});store("cerRaw",r);store("cerPending",true);
 let s;try{s=JSON.parse(r.content.find(c=>c.type==="text").text);let old=load("cerWait")||{};
 s.polls=s.polls.map(p=>{
-let t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;
+let id=p.thread.id,t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;
 let a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,m?.phase==="final_answer"?m.id:null];
-let k=JSON.stringify(a),changed=old[p.thread.id]!==k;old[p.thread.id]=k;
-return [p.thread.id,p.cursor,...a,changed,a[5]?m.text:null];
+let k=JSON.stringify(a[5]?[a,m.text]:a),delta=old[id]!==k;old[id]=k;
+return [id,p.cursor,...a,delta,a[5]?m.text:null];
 });store("cerWait",old);}catch{s=null;}
 if(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+b<=4096){store("cerPending",false);text(s);}
 else text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});
@@ -77,7 +78,7 @@ COORDINATION_ADAPTIVE_JS = COORDINATION_JS.replace(
     '});store("cerWait",old);',
     '});store("cerWait",old);store("cerIdle",s.polls.some(p=>p[8])||s.errors?.length?0:(load("cerIdle")||0)+1);'
     'for(const p of s.polls)cursors[p[0]]=p[1];store("cerCursors",cursors);'
-    'let n=s.polls.length;s.polls=s.polls.filter(p=>p[8]||p[5]||p[6]||p[7]);s.unchanged=n-s.polls.length;')
+    'let n=s.polls.length;s.polls=s.polls.filter(p=>p[8]||p[5]||p[6]);s.unchanged=n-s.polls.length;')
 
 # Bounded default for quiet work on hosts advertising the required Code Mode
 # yield and native wait fields. Reuses the tested projection/pagination above.
@@ -136,14 +137,17 @@ text(out);
 COORDINATION_PAGE_JS = r'''
 if(!Number.isInteger(framingBytes)||framingBytes<0)throw Error("unknown framing");
 let raw=load("cerPage"),offset=load("cerOffset")||0;
-if(!raw){raw=JSON.stringify(load("cerRaw"));if(!raw)throw Error("missing snapshot");offset=0;store("cerPage",raw);store("cerPending",true);}
-let end=raw.length,page;
-while(true){
-page={status:end<raw.length?"PARTIAL":"PASS",offset,next:end<raw.length?end:null,data:raw.slice(offset,end)};
-if(encodeURIComponent(JSON.stringify(page)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096)break;
-if(end<=offset)throw Error("framing exceeds page budget");end=offset+Math.floor((end-offset)/2);
-}
-store("cerOffset",end);if(end===raw.length){store("cerPage",null);store("cerPending",false);}text(page);
+if(!raw){raw=JSON.stringify(load("cerRaw"));if(!raw)throw Error("missing snapshot");offset=0;}
+if(typeof raw!=="string"||!Number.isSafeInteger(offset)||offset<0||offset>raw.length)throw Error("invalid page state");
+const make=end=>({status:end<raw.length?"PARTIAL":"PASS",offset,next:end<raw.length?end:null,data:raw.slice(offset,end)});
+const fits=p=>encodeURIComponent(JSON.stringify(p)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096;
+let end=offset,page=null;
+if(raw.length-offset<=4096){const p=make(raw.length);if(fits(p)){page=p;end=raw.length;}}
+if(!page){let lo=offset+1,hi=Math.min(raw.length-1,offset+4096);
+while(lo<=hi){const mid=lo+Math.floor((hi-lo)/2),p=make(mid);
+if(fits(p)){page=p;end=mid;lo=mid+1;}else hi=mid-1;}}
+if(!page)throw Error("framing exceeds page budget");
+store("cerPage",end===raw.length?null:raw);store("cerOffset",end);store("cerPending",end<raw.length);text(page);
 '''
 
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
@@ -690,12 +694,14 @@ def indexed_page(root: Path, request: dict, path: Path) -> str:
                 'data': content[start:end],
                 'next_cursor': cursor_token(identity, end, first, last) if end < last else None,
                 'sha256': identity['sha256']}
-    complete = page(last)
-    try:
-        return envelope(complete, cap)
-    except ValueError:
-        pass
-    low, high, end = start + 1, last - 1, start
+    # Bound serialization, not verification: snapshot() still hashes the whole file.
+    # A JSON data character needs at least one UTF-8 byte.
+    if last - start <= cap:
+        try:
+            return envelope(page(last), cap)
+        except ValueError:
+            pass
+    low, high, end = start + 1, min(last - 1, start + cap), start
     while low <= high:
         mid = (low + high) // 2
         try:
