@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased coordination corrections
+
+- Add a capability-checked, bounded quiet-wait adapter; preserve early error/final delivery and raw output recovery.
+- Reuse one executor for an admitted unit and avoid unchanged status/admission/completion polling; retain compact handoffs.
+- Reuse Reader code within each Hook process without caching identities, authorization or policy decisions.
+- Add paired Windows Hook-process measurements and deterministic wait replay; no live-model savings claim or permission weakening.
+
 ## 0.8.5 — 2026-10-05
 
 - Validate canonical spawn bindings before executor/coordination passthrough; preserve fixed roles and explicit exact pins. Host identity and authority still require independent verification; unregistered Hooks do not enforce this preflight.

@@ -78,7 +78,10 @@
     "exact_model_identity_for_pins_observations_and_owner_reuse",
     "legacy_fallback_requires_confirmed_unavailability_and_exact_binding",
     "workload_evidence_distinguishes_luna_high_code_from_medium_data_transform",
-    "sol61_only_no_retired_sol_pin_fallback_or_reuse"
+    "sol61_only_no_retired_sol_pin_fallback_or_reuse",
+    "outer_yield_covers_bounded_native_waits",
+    "unchanged_waits_do_not_trigger_model_status_or_completion_probes",
+    "whole_repair_unit_and_compact_checkpoint_before_context_reuse"
   ],
   "astra_preconditions": [
     "parent_judges_this_unit_very_complex",

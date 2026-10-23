@@ -216,3 +216,45 @@ or eliminate local path TOCTOU; trusted local binaries/filesystem remain assumpt
 Source references for candidate packaging: [OpenAI Plugin guide](https://developers.openai.com/plugins/build/plugins)
 and [portable Plugin schema](https://agent-plugins.org/schemas/1.0.0/plugin.schema.json).
 Native scope/trust restrictions remain governed by the host version, not this package.
+
+
+## Hook cost and redundancy review
+
+These components do different work; "Hooks are slow" is not a removal criterion.
+
+| Component | Purpose | Keep or remove |
+| --- | --- | --- |
+| Strict write `PreToolUse` | Deny covered Astra/unknown-model mutations, including arbitrary shell; bounded read rewrite | Keep one effective, reviewed copy unless an equivalent native boundary has actually been verified. Do not narrow `*` to a list of known writers; unknown mutation tools would escape. |
+| Dispatch `PreToolUse` | Exact model/effort/recipient, scope and current policy validation at task handoff | Keep when required by `agent_admission_hook`. Removing it leaves that host blocked. It does not need a separate model status probe before every tool. |
+| `prepare_agent_task` | Obtain the checked work envelope | A tool, not an independent lifecycle Hook. Use for new/changed work, not polling. |
+| `completion_check` | Native objective/acceptance tracking when exposed | A tool, not a repeating Stop Hook. Preserve host-required lifecycle and final evidence; do not call at every unchanged wait. |
+| Reader / coordination adapter | Bounded evidence reads and waiting | Helpers, not another model. Released writers can use already authorized bounded native reads. Unknown and Astra boundaries stay in force. |
+
+This change caches only `reader_contract()` code loading during a single event's
+short-lived Hook process. Bundle validation still precedes execution. The current
+recipient database row, policy fingerprint and checked message are evaluated on
+every admission. A later process loads fresh code; no daemon, cross-call approval
+cache or trust bypass exists. Successful ordinary calls return `{}`, not recurring
+`additionalContext`. Preparation returns context only because it is requested work.
+
+Codex loads matching Hooks from all sources; project config does not replace user
+or plugin Hooks. Inspect `/hooks` once at installation/update or an observed failure,
+not each task step. Existing `write_guard.py status --json` reports the selected
+standalone layer, not the whole runtime. Check both `--boundary writes` and
+`--boundary dispatch` in the original scope. A plugin copy and standalone copy of
+the same policy may be redundant, while write and dispatch are different boundaries.
+Never remove unowned, managed or merely similar definitions automatically. Verify
+which source is trusted and what the host requires before using the documented
+owned `remove` command. Same-policy copies with different versions may conflict;
+reconcile them at a safe boundary, not by disabling enforcement.
+
+The uploaded diagnostic format does not record active Hook registrations or native
+Hook timing; absence of a denial marker is not proof a Hook is unnecessary. The
+repository's Windows `runtime_overhead.py` replay uses disposable fixtures, actual
+Hook processes and a synthetic wait clock, not private logs or live Codex requests.
+
+Source: [official Codex Hooks](https://developers.openai.com/codex/hooks) (reviewed
+2026-10-23). Synchronous decisions remain synchronous; async policy hooks cannot
+block the triggering call. Hosted tools and existing `write_stdin` paths remain
+outside complete coverage. Neither this audit nor fewer subprocess imports proves
+whole-task quality or model-cost improvement.

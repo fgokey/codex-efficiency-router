@@ -6,6 +6,7 @@ No model call, transcript read, state file, event logging or permission grants.
 from __future__ import annotations
 import base64
 from contextlib import closing
+from functools import cache
 import hashlib
 import json
 import os
@@ -22,6 +23,10 @@ VERSION = '0.8.5'
 READ_TOOLS = frozenset(('read_file', 'list_directory', 'search_files', 'read_thread'))
 COORDINATE_TOOLS = frozenset(('spawn_agent', 'Agent', 'send_input', 'wait', 'wait_agent', 'close_agent', 'update_plan', 'completion_check'))
 EXECUTOR_FAMILIES = ('gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna')
+# One short-lived Hook process handles one event. Cache code loading only; never
+# cache host identities, permissions, policy hashes, receipts or decisions. The
+# reviewed bundle is checked before the event and fresh processes see new bytes.
+@cache
 def reader_contract() -> dict:
     return runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
 
@@ -224,7 +229,7 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
         if not body.startswith(judgment):
             raise ValueError('Astra readable reasons differ from current admission')
         body = body[len(judgment):]
-    reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+    reader = reader_contract()
     if policy_root is None or not policy_root.is_absolute():
         raise ValueError('registered policy root UNKNOWN')
     policy = reader['assignment_policy_sha256'](policy_root)
@@ -278,7 +283,7 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                 raise ValueError('control preparation requires an exact control word and prior receipt')
             if policy_root is None or not policy_root.is_absolute():
                 raise ValueError('registered policy root UNKNOWN')
-            reader = runpy.run_path(str(Path(__file__).resolve().with_name('readonly_reader.py')))
+            reader = reader_contract()
             result = reader['assignment_preflight'](request,
                 policy_sha256=reader['assignment_policy_sha256'](policy_root))
             if result.get('status') != 'VERIFIED':
@@ -366,7 +371,7 @@ def decide(event: object, *, dispatch_only: bool = False,
         try:
             request = json.loads(data['command'][len(PREFIX):], object_pairs_hook=duplicate_checked, parse_constant=reject_constant)
             reader = Path(__file__).resolve().with_name('readonly_reader.py')
-            runpy.run_path(str(reader))['validate'](request)
+            reader_contract()['validate'](request)
             cwd = event.get('cwd')
             if not isinstance(cwd, str) or not Path(cwd).is_absolute() or any(c in cwd for c in '\x00\r\n'):
                 raise ValueError('invalid host workspace')

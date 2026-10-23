@@ -79,6 +79,59 @@ COORDINATION_ADAPTIVE_JS = COORDINATION_JS.replace(
     'for(const p of s.polls)cursors[p[0]]=p[1];store("cerCursors",cursors);'
     'let n=s.polls.length;s.polls=s.polls.filter(p=>p[8]||p[5]||p[6]||p[7]);s.unchanged=n-s.polls.length;')
 
+# Bounded default for quiet work on hosts advertising the required Code Mode
+# yield and native wait fields. Reuses the tested projection/pagination above.
+# Keep the pragma FIRST; insert caller declarations immediately after it. caps
+# are observed tool limits, not permission or identity evidence. Only waiting is
+# batched; no task dispatch, write, acceptance decision or permission retry here.
+COORDINATION_QUIET_JS = r'''// @exec: {"yield_time_ms": 120000, "max_output_tokens": 4096}
+if(parentReady!==true)text({action:"WORK"});else{
+if(typeof waitCapabilities!=="object"||waitCapabilities===null||
+ !Number.isSafeInteger(waitCapabilities.execYieldMs)||waitCapabilities.execYieldMs<120000||
+ !Number.isSafeInteger(waitCapabilities.nativeTimeoutMs)||waitCapabilities.nativeTimeoutMs<50000)
+ throw Error("quiet wait needs observed exec yield 120000 and native timeout 50000; use supported native wait");
+if(!Array.isArray(targets)||!targets.length||targets.length>8||
+ targets.some(t=>!t||typeof t.threadId!=="string"||!t.threadId||t.threadId.length>128||
+ Object.keys(t).some(k=>!["threadId","afterCursor"].includes(k))||
+ t.afterCursor!==undefined&&(typeof t.afterCursor!=="string"||!t.afterCursor))||
+ new Set(targets.map(t=>t.threadId)).size!==targets.length)throw Error("invalid wait targets");
+let current=targets.map(t=>({...t})),out,shape=true,started=Date.now();
+const once=async(tools,targets,text)=>{
+''' + COORDINATION_ADAPTIVE_JS + r'''
+};
+for(let n=0;n<2;n++){
+ if(n&&Date.now()-started>60000)break;
+ const before=Date.now();
+ const wrapped={mcp__codex_app__wait_threads:async args=>{
+  const r=await tools.mcp__codex_app__wait_threads({...args,timeoutMs:50000});
+  try{
+   if(r.isError||!Array.isArray(r.content)||r.content.length!==1||r.content[0].type!=="text")throw Error("result");
+   const s=JSON.parse(r.content[0].text),ids=new Set();
+   if(!s||Object.keys(s).some(k=>!["timedOut","wake","polls","errors"].includes(k))||
+    !Array.isArray(s.polls)||typeof s.timedOut!=="boolean"||
+    s.errors!==undefined&&!Array.isArray(s.errors))throw Error("schema");
+   for(const p of s.polls){
+    const id=p?.thread?.id;
+    if(!current.some(t=>t.threadId===id)||ids.has(id)||typeof p.cursor!=="string"||!p.cursor||
+     !p.latestTurn||typeof p.latestTurn.id!=="string"||
+     !["inProgress","completed","failed","interrupted"].includes(p.latestTurn.status))throw Error("row");
+    ids.add(id);
+   }
+   if(!s.errors?.length&&ids.size!==current.length)throw Error("missing target");
+  }catch{shape=false;}
+  return r;
+ }};
+ await once(wrapped,current,v=>{out=v;});
+ if(!shape){store("cerPending",true);out={status:"PARTIAL",detail:"COORDINATION_PAGE_JS"};}
+ if(!shape||out.status==="PARTIAL"||out.action||out.polls?.length||out.errors?.length||
+  out.wake||out.timedOut!==true||Date.now()-before<48000||Date.now()-started>=100000)break;
+ // Do not resend the caller's initial cursor on the next native wait.
+ current=current.map(t=>({threadId:t.threadId}));
+}
+text(out);
+}
+'''
+
 # Explicit data pagination only, also recovers the original result after schema errors.
 COORDINATION_PAGE_JS = r'''
 if(!Number.isInteger(framingBytes)||framingBytes<0)throw Error("unknown framing");

@@ -14,6 +14,16 @@ Sol routing now uses **`gpt-6.1-sol` only**. `gpt-6-sol` and `gpt-5.6-sol` are r
 
 The owned `sol_engineer` / `cer_auto_sol_engineer` filenames remain migration aliases, also bound to 6.1. This preserves existing references and manifest-owned backup/restore without adding another selectable Sol model. Ordinary reinstall updates unchanged owned files; customized files stop for review. Historical fixtures and accounting evidence are not routing options. Reach a safe boundary, update the Skill and any separately registered Guard, then reload Codex; do not hot-switch running workers.
 
+## Coordination overhead
+
+Keep one owner for a whole authorized repair unit, including implementation, fixes and verification. Do not poll status, admission or completion while nothing changed. Retain a compact checkpoint at safe phase boundaries and use supported compaction rather than copying a long transcript or restarting active workers.
+
+The optional `COORDINATION_QUIET_JS` adapter combines at most two unchanged native waits into one model-visible return on a capability-verified host. The outer Code Mode yield must cover the entire call, not only its inner wait. Completion, errors, approval state, new turns and unfamiliar results return early. Unsupported hosts keep their supported one-wait path. No daemon or hidden model call is introduced.
+
+Hooks retain their authority checks and only reuse validator **code loading within one short-lived process**. Identities, permissions, policy hashes and decisions are never cached. Successful ordinary checks add no model context. Avoid duplicate registrations across plugin/user/project sources; never disable all Hooks for speed or remove a configured mandatory admission handler. See the [Hook review](docs/WRITE-GATE.md#hook-cost-and-redundancy-review).
+
+Paired tests distinguish real Hook subprocess timings from simulated wait transport. Fewer tool returns are not claimed live token or task-speed savings. The commit's `windows-runtime-overhead` job publishes the Windows comparison. Model/effort policy and required acceptance remain unchanged.
+
 ## Current repair
 
 The Reader and dispatch guard share supported model/effort pairs. Shipped Luna, Terra and Sol61 bindings have complete admission paths. Known executor medium/high HOLD creation needs no redundant work-admission envelope. Actual binding and RELEASE remain required before writes.
