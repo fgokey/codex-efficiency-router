@@ -74,6 +74,8 @@ macOS/Linux 使用 `python3 scripts/install.py --scope user --dry-run`，确认�
 
 已注册 Guard 的用户，须按相应边界的生命周期更新，并在 `/hooks` 重新审查变化后的命令。单独更新 Skill 不会更新独立注册的 Hook。可选宿主补丁只打包明确允许的源文件，不包含自定义二进制；它的启用、V1/V2 及数据库兼容需要单独验收。源码入口 `cer.ps1 host <宿主目录> --persist --dry-run` 会校验 Windows 宿主包并自动发现当前桌面包；去掉 `--dry-run` 后持久设置用户级 `CODEX_CLI_PATH`，保存可恢复记录。先在安全边界完全退出桌面，再从普通图标重开。`cer.ps1 host` 会重新校验已保存的宿主再启动，`cer.ps1 host --restore` 恢复原用户设置。文件校验和设置保存不代表原生派发验收通过；具体启动与回滚边界见[安装说明](docs/INSTALL.md)。
 
+可选原生宿主对例外 Astra 创建使用带当前理由的 unbound-spawn 准备参数；实际身份核实前只投递固定 HOLD，RELEASE 另行准入。已 RELEASE 的 Sol61 工程代理可执行获准的只读观察命令。向已加载直接父代理排队发送的状态保留原有加密通道，只是不可信证据，不能授予任务权限。具体参数和投递边界见安装说明。
+
 ## 卸载与恢复
 
 ```powershell

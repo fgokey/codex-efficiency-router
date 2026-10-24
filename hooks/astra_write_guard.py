@@ -112,7 +112,7 @@ def validate_spawn(data: object) -> tuple[str, str]:
     return model, effort
 
 
-def host_recipient(session_id: object, target: object, directory: Path) -> dict:
+def host_recipient(session_id: object, target: object, directory: Path, *, parent_report=False) -> dict:
     """Adapter for the native state_5 threads schema. No writable connection/cache."""
     if not all(isinstance(value, str) and value and len(value) <= 512
                for value in (session_id, target)):
@@ -133,10 +133,16 @@ def host_recipient(session_id: object, target: object, directory: Path) -> dict:
         # persisted membership/archival only; model/effort projection may be NULL.
         # Recipient owner/model/effort stay mandatory below and are checked again by
         # the host's loaded-child control immediately before native assignment.
-        current = db.execute('SELECT archived FROM threads WHERE id=? LIMIT 2',
+        current = db.execute('SELECT archived, source FROM threads WHERE id=? LIMIT 2',
                              (session_id,)).fetchall()
         if len(current) != 1 or current[0][0] != 0:
             raise ValueError('current host caller identity UNKNOWN')
+        if parent_report:
+            owner = recipient_owner(current[0][1])
+            parents = db.execute('SELECT id, agent_path, archived FROM threads WHERE id=? LIMIT 2',
+                                 (owner,)).fetchall() if owner else []
+            if len(parents) == 1 and parents[0][2] == 0 and target in parents[0][:2]:
+                return {'parent_report': True}
         rows = db.execute('SELECT id, model, reasoning_effort, source, archived FROM threads '
                           'WHERE id=? LIMIT 2', (target,)).fetchall()
         if not rows:
@@ -324,7 +330,19 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                 raise ValueError('spawn body must be exactly: ' + HOLD_MESSAGE)
             return {}
         target, text = dispatch_message(data, canonical)
-        receiver = host_recipient(event.get('session_id'), target, host_directory)
+        # Hook command JSON flattens SubagentHookContext; session_id is shared.
+        if 'agent_id' in event:
+            caller = event['agent_id']
+        elif 'agent_type' in event or 'subagent' in event:
+            raise ValueError('native subagent caller identity UNKNOWN')
+        else:
+            caller = event.get('session_id')
+        receiver = host_recipient(caller, target, host_directory,
+                                  parent_report=canonical == 'send_message')
+        if receiver.get('parent_report'):
+            if not text.strip():
+                raise ValueError('parent status report must be nonempty')
+            return {}
         if canonical == 'send_message_to_thread' and any(
                 key in data and data[key] != receiver[identity] for key, identity in (
                     ('model', 'model'), ('thinking', 'effort'))):

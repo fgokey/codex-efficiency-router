@@ -1062,7 +1062,8 @@ ASSIGNMENT_HELP = '''CER existing-worker assignment preflight (caller evidence, 
   Exit 2: invalid input. Check exit/status, then send prefix + the exact checked body;
   verify body_sha256 before merging. Do not mirror the work prompt into tool output.
   admitted_agent_task: use admitted_dispatch_arguments plus body=prefix+message;
-  never inherit its Sol61/high defaults for another receiver. Raw sends use dispatch_arguments.
+  never inherit its Sol61/high defaults for another receiver. unbound-spawn returns spawn_hold;
+  add explicit task_name and agent_type. Existing IDs return assign. Raw sends use dispatch_arguments.
 Minimal engineering review input (replace recipient/evidence with observed values):
 {"unit_id":"review-1","purpose":"new_unit","scope":"Conan review","message":"Review Conan configuration","recipient":{"id":"observed-child","model":"gpt-6.1-sol","effort":"high","evidence_ref":"session_meta/current turn_context"},"signals":{"spec_complete":true,"authority_ready":true,"environment_ready":true,"observability_ready":true}}
   Astra new work: signals.very_complex=true, complexity_reason, and
@@ -1330,6 +1331,10 @@ def assignment_preflight(request: dict, *, policy_sha256: str | None = None) -> 
                   dispatch_arguments={'id': receiver['id']},
                   admitted_dispatch_arguments={'operation': 'assign', 'target': receiver['id'],
                       'model': receiver['model'], 'reasoning_effort': receiver['effort']})
+    if receiver['id'] == 'unbound-spawn':
+        result.pop('dispatch_arguments')  # There is no existing recipient for a raw send.
+        result['admitted_dispatch_arguments'].update(operation='spawn_hold')
+        result['admitted_dispatch_arguments'].pop('target')
     return result
 
 

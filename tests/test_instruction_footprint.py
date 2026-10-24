@@ -122,8 +122,12 @@ class InstructionFootprintTests(unittest.TestCase):
                     self.assertIn('Always read-only', instructions)
                     self.assertNotIn('unless RELEASED writer', instructions)
                 else:
-                    for phrase in ('Python -I -B <reader> unless RELEASED writer',
-                                   'aggregate+framing<=4KiB', 'no full-file slicing/merging',
+                    if role['model'] == 'gpt-6.1-sol':
+                        self.assertIn('RELEASED Sol61 may run authorized read commands', instructions)
+                        self.assertIn('else Python -I -B <reader>', instructions)
+                    else:
+                        self.assertIn('Python -I -B <reader> unless RELEASED writer', instructions)
+                    for phrase in ('aggregate+framing<=4KiB', 'no full-file slicing/merging',
                                    'Parent releases current host binding before writes; invalidation/UNKNOWN stops'):
                         self.assertIn(phrase, instructions)
                 name = key.removeprefix('agents/')

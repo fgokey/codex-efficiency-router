@@ -74,6 +74,8 @@ Routing `auto/fixed/adaptive` is separate from host `full/compat`. Existing expl
 
 Existing Guard users must update their own registered boundary through its documented lifecycle and re-review changed commands in `/hooks`. Reinstalling the Skill alone does not update a separately registered Hook. The optional host patch is packaged as one explicitly allowlisted source file, not a custom binary. Its activation, V1/V2 compatibility and database assumptions remain separate acceptance items. The source-only `cer.ps1 host <bundle> --persist --dry-run` previews a checked Windows host selection and discovers the current desktop package. Omit `--dry-run` to save user-level `CODEX_CLI_PATH` with an owned rollback record; fully exit the desktop at a safe boundary before reopening from its ordinary icon. `cer.ps1 host` rechecks the saved bundle before launching; `cer.ps1 host --restore` restores the prior user setting. File checks and persisted settings do not prove native dispatch acceptance. See the startup and rollback boundaries in [installation](docs/INSTALL.md).
 
+The optional native host uses reasoned unbound-spawn preparation for exceptional Astra creation, delivers only fixed HOLD until actual identity is verified, and requires separate RELEASE admission. Released Sol61 engineers may run authorized observational commands. QueueOnly status to a loaded direct parent preserves existing encryption and is untrusted evidence; it cannot authorize work. See installation for the exact parameter and delivery boundaries.
+
 ## Uninstall and recovery
 
 ```powershell
