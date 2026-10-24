@@ -72,7 +72,7 @@ macOS/Linux 使用 `python3 scripts/install.py --scope user --dry-run`，确认�
 
 路由档位 `auto/fixed/adaptive` 与宿主选择 `full/compat` 不同。保留既有显式选择，full 仍为默认。full 的相关操作需要真实绑定和已有授权；本地 `doctor --startup` 无法认证运行中的身份，报告 BLOCKED 不等于代码坏了，不要把它变成每项任务重复执行的前置条件。显式 compat 只在现有权限内提供规划、精简上下文和复核，不承诺模型路由，不解除沙箱/Hook，也不自动替换已有 full 安装。切换前阅读[安装与恢复](docs/INSTALL.md)。
 
-已注册 Guard 的用户，须按相应边界的生命周期更新，并在 `/hooks` 重新审查变化后的命令。单独更新 Skill 不会更新独立注册的 Hook。可选宿主补丁只打包明确允许的源文件，不包含自定义二进制；它的启用、V1/V2 及数据库兼容需要单独验收。本轮没有重编译或接管你正在运行的桌面宿主。
+已注册 Guard 的用户，须按相应边界的生命周期更新，并在 `/hooks` 重新审查变化后的命令。单独更新 Skill 不会更新独立注册的 Hook。可选宿主补丁只打包明确允许的源文件，不包含自定义二进制；它的启用、V1/V2 及数据库兼容需要单独验收。源码入口 `cer.ps1 host <宿主目录> --persist --dry-run` 会校验 Windows 宿主包并自动发现当前桌面包；去掉 `--dry-run` 后持久设置用户级 `CODEX_CLI_PATH`，保存可恢复记录。先在安全边界完全退出桌面，再从普通图标重开。`cer.ps1 host` 会重新校验已保存的宿主再启动，`cer.ps1 host --restore` 恢复原用户设置。文件校验和设置保存不代表原生派发验收通过；具体启动与回滚边界见[安装说明](docs/INSTALL.md)。
 
 ## 卸载与恢复
 
