@@ -19,6 +19,19 @@ def contract_text():
 
 
 class InstructionFootprintTests(unittest.TestCase):
+    def test_observed_overhead_repairs_keep_native_reads_and_review_concrete(self):
+        for name in ('sol61-engineer.toml', 'sol-engineer.toml'):
+            text = tomllib.loads((ROOT / 'agents' / name).read_text(encoding='utf-8'))['developer_instructions']
+            for phrase in ('Batch UTF-8 projections', 'before emit', 'counts/cursors/status/errors'):
+                self.assertIn(phrase, text)
+            self.assertLessEqual(len(text.encode('utf-8')), 945)
+        text = contract_text()
+        for phrase in ('open the actual source/diff/result',
+                       'child reports and completion_check declarations alone',
+                       'unit-specific context', 'do not resend unchanged rules or reports',
+                       'Store read_thread results; select'):
+            self.assertIn(phrase, text)
+
     def test_tightened_source_budgets(self):
         for key, limit in {'core_skill_bytes': 5200, 'full_skill_bytes': 10800,
                            'discovery_description_characters': 180,

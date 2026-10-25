@@ -196,13 +196,14 @@ for(const snapshot of input.snapshots){
  const original=snapshot.toolError ? {isError:true,content:[{type:'text',text:snapshot.toolError}]} : {content:[{type:'text',text:JSON.stringify(snapshot.schemaError||snapshot)}]};
  const tools={mcp__codex_app__wait_threads:async args=>{calls++;if(args.timeoutMs!==50000)throw Error('wait bound');if(calls>1&&!args.targets[0].afterCursor)throw Error('cursor missing');return original;}};
  await run(tools,targets,64,store,load,text,true);
- const summary=last;let recovered=load('cerRaw');
+ const summary=last;let recovered=load('cerRaw'),expected=load('cerPage')||recovered;
  if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('original result lost');
  if(last.status==='PARTIAL'){
   try{await run(tools,targets,64,store,load,text,true);throw Error('pending overwritten');}catch(e){if(e.message!=='pending page')throw e;pendingRejected++;}
   pages=[];do{await pageRun(64,store,load,text);}while(last.next!==null);
   let raw='',offset=0;for(const page of pages){if(page.offset!==offset)throw Error('page gap');raw+=page.data;offset+=page.data.length;}
-  recovered=JSON.parse(raw);if(JSON.stringify(recovered)!==JSON.stringify(original))throw Error('page evidence lost');
+  recovered=JSON.parse(raw);if(JSON.stringify(recovered)!==JSON.stringify(expected))throw Error('page evidence lost');
+  recovered=load('cerRaw');
  }
  const decoded=recovered.isError?recovered:JSON.parse(recovered.content[0].text);
  results.push({summary,decoded});if(snapshot.polls)targets=[{threadId:'worker',afterCursor:snapshot.polls[0].cursor}];
@@ -292,7 +293,8 @@ check(last.status==='PARTIAL'&&load('cerPending'),'overflow not recoverable');
 let rejected=false;try{await run();}catch(e){rejected=String(e).includes('pending page');}check(rejected,'pending overwritten');
 let raw='',offset=0;do{await new Async('framingBytes','store','load','text',input.page)(framing,store,load,text);
  check(last.offset===offset,'page gap');raw+=last.data;offset+=last.data.length;}while(last.next!==null);
-check(JSON.parse(JSON.parse(raw).content[0].text).errors.length===8,'error evidence lost');
+check(JSON.stringify(JSON.parse(raw).errors)===JSON.stringify(snapshot.errors),'error evidence lost');
+check(JSON.parse(load('cerRaw').content[0].text).errors.length===8,'original errors lost');
 await run(false);check(last.action==='WORK','review gate unusable after pages');
 process.stdout.write(JSON.stringify({calls:calls.length,timeouts:calls.map(c=>c.timeoutMs)}));
 })().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});

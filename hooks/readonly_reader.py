@@ -51,22 +51,11 @@ EXCLUDED_DIRS = ('.git', 'node_modules', 'dist', 'build', '.next', 'temp')
 # every next offset before any new wait. Stored values are data, never code.
 # Rows: id,cursor,threadStatus,turnId,turnStatus,error,failedMarker,finalMessageId,changed,finalText.
 # Detect revised final text even when the message ID is reused.
-COORDINATION_JS = r'''
-let b=framingBytes;
-if(!Number.isInteger(b)||b<0||b>3900)throw Error("unknown framing");
-if(load("cerPending"))throw Error("pending page");
-if(parentReady!==true)text({action:"WORK"});else{
-const r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});store("cerRaw",r);store("cerPending",true);
-let s;try{s=JSON.parse(r.content.find(c=>c.type==="text").text);let old=load("cerWait")||{};
-s.polls=s.polls.map(p=>{
-let id=p.thread.id,t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker;
-let a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,m?.phase==="final_answer"?m.id:null];
-let k=JSON.stringify(a[5]?[a,m.text]:a),delta=old[id]!==k;old[id]=k;
-return [id,p.cursor,...a,delta,a[5]?m.text:null];
-});store("cerWait",old);}catch{s=null;}
-if(s&&encodeURIComponent(JSON.stringify(s)).replace(/%[0-9A-F]{2}/g,"x").length+2+b<=4096){store("cerPending",false);text(s);}
-else text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});
-}
+# Whole-string matches validate final text/identity without normalizing either.
+# Counts accompany the first recovery page; each page keeps its offset/next.
+COORDINATION_JS = r'''let b=framingBytes,J=JSON.stringify,S=store;if(b!==Math.floor(b)||b<0||b>3900)throw Error("unknown framing");if(load("cerPending"))throw Error("pending page");if(parentReady!==true)text({action:"WORK"});else{
+const r=await tools.mcp__codex_app__wait_threads({targets,timeoutMs:50000});S("cerRaw",r);let s;try{s=r.content;if(r.isError||s.length-1||s[0].type!=="text")throw 0;s=JSON.parse(s[0].text);let old=load("cerWait")||{};s.polls=s.polls.map(p=>{
+let i=p.thread.id,t=p.latestTurn,m=p.latestAssistantMessage,f=p.latestToolMarker,z=m?.phase==="final_answer",v=z?m.text.match(/[^]*/)[0]:null;let a=[p.thread.status,t.id,t.status,t.error,["failed","error"].includes(f?.status)?f:null,z?m.id.match(/[^]+/)[0]:null];let k=J(z?[a,v]:a),d=old[i]!==k;old[i]=k;return [i,p.cursor,...a,d,z&&d?v:null];});S("cerWait",old);}catch{s=null;}let q=s&&encodeURIComponent(J(s)).match(/%..|./g).length+2+b<=4096;S("cerPending",!q);S("cerPage",q?null:s);text(q?s:{status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});}
 '''
 
 # Optional quiet-work variant, derived from the same transport rather than a
@@ -75,8 +64,8 @@ COORDINATION_ADAPTIVE_JS = COORDINATION_JS.replace(
     'const r=await', 'const cursors=load("cerCursors")||{};const r=await').replace(
     '{targets,timeoutMs:50000}',
     '{targets:targets.map(t=>({...t,afterCursor:t.afterCursor||cursors[t.threadId]})),timeoutMs:load("cerIdle")>=2?60000:50000}').replace(
-    '});store("cerWait",old);',
-    '});store("cerWait",old);store("cerIdle",s.polls.some(p=>p[8])||s.errors?.length?0:(load("cerIdle")||0)+1);'
+    '});S("cerWait",old);',
+    '});S("cerWait",old);store("cerIdle",s.polls.some(p=>p[8])||s.errors?.length?0:(load("cerIdle")||0)+1);'
     'for(const p of s.polls)cursors[p[0]]=p[1];store("cerCursors",cursors);'
     'let n=s.polls.length;s.polls=s.polls.filter(p=>p[8]||p[5]||p[6]);s.unchanged=n-s.polls.length;')
 
@@ -123,7 +112,7 @@ for(let n=0;n<2;n++){
   return r;
  }};
  await once(wrapped,current,v=>{out=v;});
- if(!shape){store("cerPending",true);out={status:"PARTIAL",detail:"COORDINATION_PAGE_JS"};}
+ if(!shape){store("cerPending",true);store("cerPage",null);store("cerOffset",0);out={status:"PARTIAL",detail:"COORDINATION_PAGE_JS"};}
  if(!shape||out.status==="PARTIAL"||out.action||out.polls?.length||out.errors?.length||
   out.wake||out.timedOut!==true||Date.now()-before<48000||Date.now()-started>=100000)break;
  // Do not resend the caller's initial cursor on the next native wait.
@@ -136,10 +125,22 @@ text(out);
 # Explicit data pagination only, also recovers the original result after schema errors.
 COORDINATION_PAGE_JS = r'''
 if(!Number.isInteger(framingBytes)||framingBytes<0)throw Error("unknown framing");
-let raw=load("cerPage"),offset=load("cerOffset")||0;
+let raw=load("cerPage"),offset=load("cerOffset")||0,counts={polls:null,errors:null};
+if(raw&&typeof raw==="object"){
+ try{const r=load("cerRaw"),s=JSON.parse(r.content[0].text);
+  if(r.isError||r.content.length!==1||r.content[0].type!=="text"||!s||
+   Object.keys(s).some(k=>!["timedOut","wake","polls","errors"].includes(k))||
+   !Array.isArray(s.polls)||typeof s.timedOut!=="boolean"||s.errors!==undefined&&!Array.isArray(s.errors))throw Error("schema");
+  for(const p of s.polls){const t=p?.latestTurn,m=p?.latestAssistantMessage;
+   if(typeof p?.thread?.id!=="string"||!p.thread.id||p.thread.status===undefined||typeof p.cursor!=="string"||!p.cursor||
+    !t||typeof t.id!=="string"||!["inProgress","completed","failed","interrupted"].includes(t.status)||
+    m?.phase==="final_answer"&&(typeof m.id!=="string"||typeof m.text!=="string"))throw Error("row");}
+  counts={polls:s.polls.length,errors:s.errors?.length||0};raw=JSON.stringify(raw);offset=0;
+ }catch{raw=null;}
+}
 if(!raw){raw=JSON.stringify(load("cerRaw"));if(!raw)throw Error("missing snapshot");offset=0;}
 if(typeof raw!=="string"||!Number.isSafeInteger(offset)||offset<0||offset>raw.length)throw Error("invalid page state");
-const make=end=>({status:end<raw.length?"PARTIAL":"PASS",offset,next:end<raw.length?end:null,data:raw.slice(offset,end)});
+const make=end=>({...(offset?{}:counts),status:end<raw.length?"PARTIAL":"PASS",offset,total:raw.length,next:end<raw.length?end:null,data:raw.slice(offset,end)});
 const fits=p=>encodeURIComponent(JSON.stringify(p)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096;
 let end=offset,page=null;
 if(raw.length-offset<=4096){const p=make(raw.length);if(fits(p)){page=p;end=raw.length;}}

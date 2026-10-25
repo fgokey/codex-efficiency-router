@@ -24,6 +24,90 @@ class ExistingWaitTests(unittest.TestCase):
         result['polls'].append(other)
         return result
 
+    def test_short_native_errors_and_non_single_text_results_require_raw_recovery(self):
+        result = quiet.snapshot(status='completed', phase='final_answer', text='short final')
+        content = {'type': 'text', 'text': json.dumps(result)}
+        cases = [dict(isError=True, content=[content]),
+                 dict(content=[content, {'type': 'text', 'text': 'other evidence'}]),
+                 dict(content=[dict(content, type='image')])]
+        for code in (R['COORDINATION_JS'], R['COORDINATION_QUIET_JS']):
+            for raw in cases:
+                replay = self.run_adapter([dict(duration=10, raw=raw)], memory={}, code=code, drain=True)
+                self.assertEqual(replay['outputs'][0]['status'], 'PARTIAL')
+                self.assertTrue(replay['memory']['cerPending'])
+                self.assertEqual(replay['rawRecovered'], raw)
+                blocked = self.run_adapter([], memory=replay['memory'], code=code)
+                self.assertEqual(blocked['calls'], [])
+                self.assertIn('pending page', blocked['error'])
+
+    def test_short_final_requires_nonempty_text_identity_and_text_body(self):
+        for field, value in (('id', None), ('id', ''), ('id', 1), ('text', None), ('text', {})):
+            response = quiet.snapshot(status='completed', phase='final_answer', text='short final')
+            response['polls'][0]['latestAssistantMessage'][field] = value
+            for code in (R['COORDINATION_JS'], R['COORDINATION_QUIET_JS']):
+                replay = self.run_adapter([dict(duration=10, snapshot=response)], memory={}, code=code, drain=True)
+                self.assertEqual(replay['outputs'][0]['status'], 'PARTIAL')
+                self.assertEqual(json.loads(replay['rawRecovered']['content'][0]['text']), response)
+
+    def test_basic_wait_does_not_repeat_unchanged_final_evidence(self):
+        response = quiet.snapshot(status='completed', phase='final_answer', text='evidence' * 200)
+        first = self.run_adapter([dict(duration=10, snapshot=response)], memory={},
+                                 code=R['COORDINATION_JS'])
+        response['polls'][0]['cursor'] = 'next-cursor'
+        again = self.run_adapter([dict(duration=10, snapshot=response)], memory=first['memory'],
+                                 code=R['COORDINATION_JS'])
+        row = again['outputs'][0]['polls'][0]
+        self.assertEqual(row[1], 'next-cursor')
+        self.assertFalse(row[8])
+        self.assertTrue(row[9] is None, 'unchanged final must use its existing evidence')
+        self.assertLess(len(json.dumps(again['outputs'][0])), len(json.dumps(first['outputs'][0])))
+
+    def test_overflow_summary_counts_all_targets_and_errors_without_losing_raw_evidence(self):
+        response = self.mixed()
+        response['polls'][0]['latestAssistantMessage']['text'] = 'evidence😀' * 2000
+        response['errors'] = [{'threadId': 'third', 'error': 'native failure'}]
+        result = self.run_adapter([dict(duration=10, snapshot=response)], memory={}, drain=True,
+                                  targets=[{'threadId': 'worker'}, {'threadId': 'second'}])
+        summary = result['outputs'][0]
+        self.assertEqual(summary['status'], 'PARTIAL')
+        page = result['pageSummary']
+        self.assertEqual((page['polls'], page['errors'], page['offset']), (2, 1, 0))
+        self.assertIsNotNone(page['next'])
+        self.assertEqual(json.loads(result['memory']['cerRaw']['content'][0]['text']), response)
+        self.assertEqual(result['rawRecovered']['errors'], response['errors'])
+        rows = result['rawRecovered']['polls']
+        self.assertEqual([row[1] for row in rows], [p['cursor'] for p in response['polls']])
+        self.assertEqual(rows[0][9], response['polls'][0]['latestAssistantMessage']['text'])
+        self.assertGreater(result['pageCount'], 1)
+
+    def test_valid_overflow_pages_selected_evidence_instead_of_raw_metadata(self):
+        response = quiet.snapshot(status='completed', phase='final_answer',
+                                  error={'message': 'failed😀' * 1000}, text='final😀' * 1000)
+        response['polls'][0]['thread']['metadata'] = 'irrelevant history' * 10000
+        result = self.run_adapter([dict(duration=10, snapshot=response)], memory={}, drain=True)
+        projected = result['rawRecovered']
+        self.assertIn('polls', projected)
+        row = projected['polls'][0]
+        source = response['polls'][0]
+        self.assertEqual(row[:6], ['worker', 'c1', source['thread']['status'], 't1',
+                                  'completed', source['latestTurn']['error']])
+        self.assertEqual(row[9], source['latestAssistantMessage']['text'])
+        self.assertEqual(json.loads(result['memory']['cerRaw']['content'][0]['text']), response)
+        self.assertNotIn('metadata', json.dumps(projected))
+        self.assertLess(len(json.dumps(projected)), len(json.dumps(response)) // 4)
+
+    def test_quiet_schema_failure_discards_candidate_projection_only(self):
+        for code in (R['COORDINATION_JS'], R['COORDINATION_QUIET_JS']):
+            for missing_id in (False, True):
+                response = quiet.snapshot(status='completed', phase='final_answer', text='evidence' * 3000)
+                if missing_id:
+                    del response['polls'][0]['latestAssistantMessage']['id']
+                else:
+                    response['polls'][0]['latestTurn']['status'] = 'unsupported'
+                result = self.run_adapter([dict(duration=10, snapshot=response)], memory={}, drain=True, code=code)
+                self.assertEqual(len(result['calls']), 1)
+                self.assertEqual(json.loads(result['rawRecovered']['content'][0]['text']), response)
+
     def test_completed_report_not_repeated_while_another_worker_runs(self):
         targets = [{'threadId':'worker'}, {'threadId':'second'}]
         first = self.run_adapter([dict(duration=10, snapshot=self.mixed())], targets=targets, memory={})
@@ -68,6 +152,7 @@ const Async=Object.getPrototypeOf(async function(){}).constructor;
  do{await new Async('framingBytes','store','load','text',input.code)(64,store,load,p=>{
    const size=Buffer.byteLength(JSON.stringify(p))+66;
    if(size>4096||p.offset!==offset)throw Error('size or offset');
+   if(p.total!==JSON.stringify(raw).length)throw Error('missing total');
    if(p.next!==null&&size<4080)throw Error('page underfilled');
    recovered+=p.data;offset+=p.data.length;last=p;pages.push(size);
  });if(pages.length>200)throw Error('no progress');}while(last.next!==null);

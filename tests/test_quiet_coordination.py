@@ -41,7 +41,10 @@ const Async=Object.getPrototypeOf(async function(){}).constructor;
   rawRecovered=JSON.parse(raw);
  }
  Date.now=originalNow;
- process.stdout.write(JSON.stringify({calls,outputs,error,now,memory:beforeDrain,rawRecovered,pageCount:pages.length}));
+ const pageSizes=pages.map(p=>Buffer.byteLength(JSON.stringify(p))+2+input.framing);
+ const pageSummary=pages.length?Object.fromEntries(['polls','errors','offset','next','total'].map(k=>[k,pages[0][k]])):null;
+ process.stdout.write(JSON.stringify({calls,outputs,error,now,memory:beforeDrain,rawRecovered,pageCount:pages.length,
+  pageBytes:pageSizes.reduce((a,b)=>a+b,0),maxPageBytes:Math.max(0,...pageSizes),pageSummary}));
 })().catch(e=>{process.stderr.write(String(e));process.exitCode=1;});
 '''
 
@@ -134,7 +137,8 @@ class QuietCoordinationTests(unittest.TestCase):
         s=snapshot(status='completed',phase='final_answer',text='结果😀'*6000)
         r=self.run_adapter([dict(duration=100,snapshot=s)],drain=True)
         self.assertEqual(r['outputs'][0]['status'],'PARTIAL')
-        self.assertEqual(json.loads(r['rawRecovered']['content'][0]['text']),s)
+        self.assertEqual(json.loads(r['memory']['cerRaw']['content'][0]['text']),s)
+        self.assertEqual(r['rawRecovered']['polls'][0][9],s['polls'][0]['latestAssistantMessage']['text'])
         self.assertGreater(r['pageCount'],1)
 
     def test_parent_work_or_pending_page_does_not_start_another_wait(self):
