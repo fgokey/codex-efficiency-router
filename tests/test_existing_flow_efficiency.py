@@ -1,4 +1,5 @@
 # Regression coverage for existing wait/read paths; no model calls.
+import hashlib
 import json
 from pathlib import Path
 import runpy
@@ -174,6 +175,62 @@ class ExistingReaderTests(unittest.TestCase):
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name).resolve()
         self.path = self.root / 'source.txt'
+
+    def test_batched_required_rules_continue_without_losing_content(self):
+        pending = []
+        expected = {}
+        actual = {}
+        for index in range(3):
+            name = f'rules-{index}.md'
+            data = ((f'{index}: 必读规则 "\\"\r\n' * 240) + 'END\r\n').encode('utf-8')
+            (self.root / name).write_bytes(data)
+            expected[name] = hashlib.sha256(data).hexdigest()
+            actual[name] = hashlib.sha256()
+            pending.append({'op':'page','path':name})
+        for _ in range(100):
+            raw = R['run'](self.root, {'op':'batch','requests':pending,
+                'max_bytes':4096,'framing_bytes':128})
+            self.assertLessEqual(len(raw.encode('utf-8')) + 2 + 128, 4096)
+            page = json.loads(raw)
+            following = []
+            for request, row in zip(pending, page['results']):
+                actual[request['path']].update(row['data'].encode('utf-8'))
+                if row['next_cursor'] is not None:
+                    following.append({**request,'cursor':row['next_cursor']})
+            self.assertEqual(len(page['results']), len(pending))
+            self.assertEqual(page['status'], 'PARTIAL' if following else 'COMPLETE')
+            pending = following
+            if not pending:
+                break
+        else:
+            self.fail('required-rule continuation did not finish')
+        self.assertEqual({name:value.hexdigest() for name,value in actual.items()}, expected)
+
+    def test_test_result_projection_keeps_both_exits_and_failure_cursor(self):
+        # Representative captured-result data, not a claim about a live model run.
+        red = {'exit':1,'tests':199,'failures':5,'errors':0}
+        green = {'exit':0,'tests':198,'failures':0,'errors':0}
+        detail = 'assertion failed: expected retained owner\n' * 200
+        source = {'red':{'summary':red,'details':detail},
+                  'green':{'summary':green},'verbose_log':'noise\n' * 10000}
+        self.path.write_text(json.dumps(source), encoding='utf-8')
+        requests = [{'op':'json','path':'source.txt','pointer':pointer}
+                    for pointer in ('/red/summary','/green/summary','/red/details')]
+        raw = R['run'](self.root, {'op':'batch','requests':requests,
+            'max_bytes':4096,'framing_bytes':128})
+        self.assertLessEqual(len(raw.encode('utf-8')) + 2 + 128, 4096)
+        page = json.loads(raw)
+        self.assertEqual([json.loads(row['data']) for row in page['results'][:2]], [red,green])
+        self.assertEqual(page['status'], 'PARTIAL')
+        row = page['results'][2]
+        self.assertIsNotNone(row['next_cursor'])
+        parts = [row['data']]
+        while row['next_cursor'] is not None:
+            raw = R['run'](self.root, {**requests[2],'cursor':row['next_cursor']})
+            self.assertLessEqual(len(raw.encode('utf-8')) + 2, 4096)
+            row = json.loads(raw)
+            parts.append(row['data'])
+        self.assertEqual(json.loads(''.join(parts)), detail)
 
     def test_large_file_serialization_is_page_bounded(self):
         self.path.write_text('a' * (2 * 1024 * 1024), encoding='utf-8')

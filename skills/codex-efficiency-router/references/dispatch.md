@@ -2,7 +2,7 @@
 
 Default to one implementation owner plus an on-demand reviewer. Check authority, exclusive scope and capacity. Reuse a compatible owner at a safe boundary; wait when both writers are busy. Keep prior edits; no auto-revert.
 
-Handoff unit-specific context: goal, facts versus assumptions, revision/dirt, files/rule paths, rationale/invariants, scope/prohibitions, checks and attempts; do not resend unchanged rules or reports. Read required rules; critical gaps block affected work. Contrary evidence reopens decisions.
+Handoff unit-specific context: goal, facts versus assumptions, revision/dirt, files/rule paths, rationale/invariants, scope/prohibitions, checks/attempts. Loaded owner: deltas; do not resend unchanged rules or reports. Read required rules; critical gaps block affected work. Contrary evidence reopens decisions.
 
 Spawn with explicit role/effort and no inherited transcript. HOLD until current host model/effort/role/permission/owner is verified; then explicitly RELEASE the unit. UNKNOWN/MISMATCH blocks writes. Keep the same admitted executor for diagnosis, fixes, formatting, build configuration and targeted tests. Delegate that whole unit, not each command; report only completion, blockers or decision needs. Closed/unloaded/restarted workers need fresh binding/release; raw `resume_agent` cannot pin them.
 

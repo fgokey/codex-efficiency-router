@@ -115,9 +115,9 @@ class InstructionFootprintTests(unittest.TestCase):
             self.assertIn(phrase, text)
 
     def test_native_reads_do_not_expand_actor_authority(self):
-        for phrase in ('Released writers may use authorized bounded native reads',
-                       'Astra/readonly/unknown actors keep guarded reads',
-                       'Use physical paths and preserve link checks',
+        for phrase in ('Released writers: authorized bounded native reads',
+                       'Astra/readonly/unknown: guarded reads',
+                       'Verify physical paths/links',
                        'Missing capabilities block only affected actions',
                        'never fabricate identity or enforcement'):
             self.assertIn(phrase, contract_text())
