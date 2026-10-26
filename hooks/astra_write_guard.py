@@ -105,6 +105,8 @@ def validate_spawn(data: object) -> tuple[str, str]:
             raise ValueError('spawn fixed-role effort mismatch')
     else:
         model, effort = data.get('model'), data.get('reasoning_effort')
+        if role in (None, 'default') and model == 'gpt-6.1-sol':
+            raise ValueError('Sol61 requires sol61_engineer or cer_auto_sol61_engineer; default does not load engineering instructions')
         if model not in EXECUTOR_FAMILIES + ('gpt-6-astra',):
             raise ValueError('spawn default/inherit requires an explicit exact model pin')
     if not reader_contract()['assignment_pair_known'](model, effort):
@@ -143,23 +145,23 @@ def host_recipient(session_id: object, target: object, directory: Path, *, paren
                                  (owner,)).fetchall() if owner else []
             if len(parents) == 1 and parents[0][2] == 0 and target in parents[0][:2]:
                 return {'parent_report': True}
-        rows = db.execute('SELECT id, model, reasoning_effort, source, archived FROM threads '
+        rows = db.execute('SELECT id, model, reasoning_effort, source, archived, agent_role FROM threads '
                           'WHERE id=? LIMIT 2', (target,)).fetchall()
         if not rows:
             # Paths are resolved only inside the current caller's direct children.
-            candidates = db.execute('SELECT id, model, reasoning_effort, source, archived '
+            candidates = db.execute('SELECT id, model, reasoning_effort, source, archived, agent_role '
                                     'FROM threads WHERE agent_path=? LIMIT 1025', (target,)).fetchall()
             if len(candidates) > 1024:
                 raise ValueError('recipient path resolution exceeds bounded adapter limit')
             rows = [row for row in candidates if recipient_owner(row[3]) == session_id]
         if len(rows) != 1:
             raise ValueError('recipient identity missing or ambiguous')
-        identifier, model, effort, source, archived = rows[0]
+        identifier, model, effort, source, archived, role = rows[0]
         if archived != 0 or recipient_owner(source) != session_id:
             raise ValueError('recipient is archived or belongs to another parent')
         if not reader_contract()['assignment_pair_known'](model, effort):
             raise ValueError('recipient model/effort UNKNOWN or outside current admission policy')
-        return {'id': identifier, 'model': model, 'effort': effort,
+        return {'id': identifier, 'model': model, 'effort': effort, 'role': role,
                 'evidence_ref': 'native state_5.sqlite threads; current direct-parent ownership'}
 
 
@@ -223,6 +225,9 @@ def admit_text(text: str, receiver: dict, policy_root: Path | None) -> str:
     if control is not None and (not isinstance(control, str) or
             control not in reader['CONTROL_WORDS'] or body not in reader['CONTROL_WORDS'][control]):
         raise ValueError('control must be an exact word without additional work')
+    if control is None and receiver['model'] == 'gpt-6.1-sol' and (
+            not isinstance(receiver.get('role'), str) or not receiver['role'] or receiver['role'] == 'default'):
+        raise ValueError('Sol61 recipient engineering role UNKNOWN/default; create a named engineering-role HOLD')
     if control is None and receiver['model'] == 'gpt-6-astra':
         signals = request.get('signals')
         if not isinstance(signals, dict) or not isinstance(request.get('complexity_reason'), str):
@@ -324,6 +329,7 @@ def decide_dispatch(event: object, *, host_directory: Path = HOST_DIRECTORY,
                 if not isinstance(text, str):
                     raise ValueError('spawn requires the fixed identity HOLD')
                 receiver = {'id': 'unbound-spawn', 'model': model, 'effort': effort,
+                            'role': spawn.get('agent_type'),
                             'evidence_ref': 'explicit requested spawn pin; no actual host binding yet'}
                 text = admit_text(text, receiver, policy_root)
             if text != HOLD_MESSAGE:

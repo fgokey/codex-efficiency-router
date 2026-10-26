@@ -169,6 +169,149 @@ const Async=Object.getPrototypeOf(async function(){}).constructor;
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertEqual(p.stdout, 'ok')
 
+@unittest.skipUnless(shutil.which('node'), 'Node.js unavailable for adapter replay')
+class ExistingThreadExampleTests(unittest.TestCase):
+    def test_shipped_thread_example_pages_selected_evidence_and_keeps_native_cursors(self):
+        source = (ROOT / 'hooks/readonly_reader.py').read_text(encoding='utf-8')
+        example = source.split('# ```javascript\n', 1)[1].split('# ```', 1)[0]
+        code = '\n'.join(line.removeprefix('# ') for line in example.splitlines())
+        original = 'source and failure 证据😀\r\n' * 4000
+        harness = r"""
+const input=JSON.parse(require('fs').readFileSync(0,'utf8'));
+const Async=Object.getPrototypeOf(async function(){}).constructor;
+(async()=>{
+ const wrap=s=>({content:[{type:'text',text:JSON.stringify(s)}]});
+ const failure={type:'commandExecution',id:'bad',status:'failed',exitCode:2,
+  output:{text:input.original,truncated:false,originalChars:input.original.length}};
+ const final={type:'agentMessage',id:'final',phase:'final_answer',text:'最终证据😀'.repeat(800)};
+ const requiredItemIds=[...Array.from({length:20},(_,i)=>'ok'+i),'bad','final'];
+ const snapshot=(id,cursor)=>({schemaVersion:1,thread:{id:'worker',status:{type:'idle'},futureThread:{evidence:'retain'}},
+  futureTop:{evidence:'retain'},page:{order:'newest_first',limit:1,nextCursor:cursor,hasMore:cursor!==null},
+  turns:[{id,status:'completed',error:null,futureTurn:{evidence:'retain'},items:[
+   ...Array.from({length:1200},(_,i)=>({type:'agentMessage',id:'comment'+i,phase:'commentary',text:'old context'.repeat(100)})),
+   ...Array.from({length:20},(_,i)=>({type:'commandExecution',id:'ok'+i,status:'completed',exitCode:0,
+    futureItem:{evidence:'retain'},output:{text:i===0?input.original:i===1?'actual source diff':i===2?'Ran 3 tests; OK':'successful evidence '+i,
+     truncated:false,originalChars:i===0?input.original.length:40}})),failure,final]}]});
+ const server=(s,cap)=>{const copy=JSON.parse(JSON.stringify(s));for(const t of copy.turns)for(const i of t.items){
+  if(i.output&&i.output.text.length>cap)i.output={...i.output,text:i.output.text.slice(0,cap),truncated:true,originalChars:i.output.text.length};
+ }return wrap(copy);};
+ const first=server(snapshot('t2','older-page'),1800),second=server(snapshot('t1',null),1800);
+ const mem=new Map(),load=k=>mem.get(k),store=(k,v)=>mem.set(k,v),calls=[];
+ let outputs=[];
+ const text=v=>{const n=Buffer.byteLength(JSON.stringify(v))+66;if(n>4096)throw Error('native truncation risk');outputs.push(v);};
+ const baseline='const r=await tools.mcp__codex_app__read_thread({threadId,cursor,turnLimit:1,includeOutputs:true,maxOutputCharsPerItem:1800});text(r);';
+ let beforeOverflows=0;
+ for(const raw of [first,second]){try{await new Async('tools','threadId','cursor','text',baseline)(
+  {mcp__codex_app__read_thread:async()=>raw},'worker',undefined,text);}catch(e){if(e.message!=='native truncation risk')throw e;beforeOverflows++;}}
+ if(beforeOverflows!==2)throw Error('baseline did not reproduce whole-result overflow');
+ const run=new Async('tools','threadId','cursor','requiredItemIds','load','store','text',input.code);
+ const drain=async()=>{
+  let recovered='',last,offset=0,pageCount=0,pageBytes=0,maxPageBytes=0;
+  do{await new Async('framingBytes','load','store','text',input.page)(64,load,store,p=>{
+   const n=Buffer.byteLength(JSON.stringify(p))+66;
+   if(n>4096||p.offset!==offset)throw Error('size/offset');
+   maxPageBytes=Math.max(maxPageBytes,n);pageBytes+=n;
+   recovered+=p.data;offset+=p.data.length;last=p;
+  });if(++pageCount>1000)throw Error('no progress');}while(last.next!==null);
+  if(load('cerPending')!==false||load('cerPage')!==null)throw Error('not drained');
+  return {value:JSON.parse(recovered),pages:pageCount,pageBytes,maxPageBytes};
+ };
+ const tools={mcp__codex_app__read_thread:async args=>{calls.push(args);return calls.length===1?first:second;}};
+ await run(tools,'worker',undefined,requiredItemIds,load,store,text);
+ if(outputs.length!==1||outputs[0].status!=='PARTIAL')throw Error('raw result emitted');
+ let blocked=false;try{await run(tools,'worker',undefined,requiredItemIds,load,store,text);}catch(e){blocked=e.message==='pending page';}
+ if(!blocked||calls.length!==1)throw Error('pending evidence reread');
+ const firstReplay=await drain(),selected=firstReplay.value,turn=selected.snapshot.turns[0];
+ const originalFirst=JSON.parse(first.content[0].text);
+ if(selected.selection.availableItems!==1222||turn.items.length!==22)throw Error('counts lost');
+ const required=originalFirst.turns[0].items.filter(i=>requiredItemIds.includes(i.id));
+ if(JSON.stringify(turn.items)!==JSON.stringify(required))throw Error('successful source/diff/test or failure/final evidence lost');
+ if(turn.items.filter(i=>i.type==='commandExecution').some((i,n)=>i.exitCode!==(n===20?2:0)))throw Error('exit lost');
+ if(selected.selection.status!=='PARTIAL'||selected.selection.missing.length||JSON.stringify(selected.selection.truncated)!==JSON.stringify(['ok0','bad']))throw Error('missing evidence hidden');
+ if(turn.items[0].output.text.length!==1800||turn.items[0].output.text===input.original||turn.items[0].output.originalChars!==input.original.length)throw Error('server cap not modeled');
+ if(JSON.stringify(selected.snapshot.futureTop)!==JSON.stringify(originalFirst.futureTop)||
+  JSON.stringify(selected.snapshot.thread)!==JSON.stringify(originalFirst.thread)||JSON.stringify(turn.futureTurn)!==JSON.stringify(originalFirst.turns[0].futureTurn))throw Error('unknown nested evidence lost');
+ await run(tools,'worker',selected.snapshot.page.nextCursor,requiredItemIds,load,store,text);
+ const secondReplay=await drain(),older=secondReplay.value;
+ if(calls.length!==2||calls[1].cursor!=='older-page'||older.snapshot.turns[0].id!=='t1'||older.snapshot.page.hasMore!==false)throw Error('sequential page request');
+ const actual=snapshot('native-shape',null),all=actual.turns[0].items;
+ const nonempty={type:'reasoning',id:'reasoning-evidence',summary:['required evidence'],content:['retain actual reasoning content']};
+ actual.turns[0].items=[{type:'reasoning',id:'empty0',summary:[],content:[]},all[1200],
+  {type:'reasoning',id:'empty1',summary:[],content:[]},all[1201],
+  {type:'reasoning',id:'empty2',summary:[],content:[]},all[1202],nonempty,all[1220],all[1221]];
+ const actualRaw=server(actual,1800),actualIds=['ok0','ok1','ok2','reasoning-evidence','bad','final'];
+ await run({mcp__codex_app__read_thread:async()=>actualRaw},'worker',undefined,actualIds,load,store,text);
+ const actualReplay=await drain(),actualItems=JSON.parse(actualRaw.content[0].text).turns[0].items.filter(i=>actualIds.includes(i.id));
+ if(JSON.stringify(actualReplay.value.snapshot.turns[0].items)!==JSON.stringify(actualItems)||
+  actualReplay.value.selection.availableItems!==9||actualReplay.value.selection.status!=='PARTIAL')throw Error('actual reasoning/content/source/diff/test shape lost');
+ const unknownItem=JSON.parse(first.content[0].text);unknownItem.turns[0].items[0].futureEvidence={data:'unknown commentary field'};
+ const unselected=JSON.parse(first.content[0].text);unselected.turns[0].items.push({type:'commandExecution',id:'unrequested',status:'completed',exitCode:0,output:{text:'new source evidence'}});
+ const unselectedReasoning=JSON.parse(first.content[0].text);unselectedReasoning.turns[0].items.push(nonempty);
+ const unknownReasoning=JSON.parse(first.content[0].text);unknownReasoning.turns[0].items.push({type:'reasoning',id:'unknown-reasoning',summary:[],content:[],futureEvidence:'retain'});
+ const errors=[['nativeError',{isError:true,content:[{type:'text',text:'native error 证据'.repeat(800)}]}],
+  ['malformedJSON',{content:[{type:'text',text:'malformed native JSON'}]}],
+  ['extraContent',{content:[...first.content,{type:'text',text:'extra evidence'}]}],
+  ['schemaVersion',wrap({...originalFirst,schemaVersion:2})],['missingCursor',wrap({...originalFirst,page:{hasMore:true}})],
+  ['unknownNestedItem',wrap(unknownItem)],['unselectedSuccessfulEvidence',wrap(unselected)],
+  ['unselectedNonemptyReasoning',wrap(unselectedReasoning)],['unknownReasoningField',wrap(unknownReasoning)]],recoveries=[];
+ const codeBytes=Buffer.byteLength(input.code),pageCodeBytes=Buffer.byteLength(input.page),markerBytes=Buffer.byteLength(JSON.stringify(outputs[0]))+66;
+ for(const [name,raw] of errors){
+  await run({mcp__codex_app__read_thread:async()=>raw},'worker',undefined,requiredItemIds,load,store,text);
+  const replay=await drain();
+  if(JSON.stringify(replay.value)!==JSON.stringify(raw))throw Error('native error/schema evidence discarded');
+  const {value,...metrics}=replay;
+  recoveries.push({name,beforeBytes:Buffer.byteLength(JSON.stringify(raw))+66,...metrics,
+   totalBytes:codeBytes+pageCodeBytes*metrics.pages+metrics.pageBytes+markerBytes});
+ }
+ await run({mcp__codex_app__read_thread:async()=>first},'worker',undefined,[...requiredItemIds,'missing-id'],load,store,text);
+ const missing=await drain();if(missing.value.selection.status!=='PARTIAL'||missing.value.selection.missing[0]!=='missing-id')throw Error('missing item accepted');
+ const pages=firstReplay.pages+secondReplay.pages,pageBytes=firstReplay.pageBytes+secondReplay.pageBytes;
+ const beforeResultBytes=[first,second].reduce((n,r)=>n+Buffer.byteLength(JSON.stringify(r))+66,0);
+ process.stdout.write(JSON.stringify({principal:{beforeResultBytes,beforeTotalBytes:beforeResultBytes+Buffer.byteLength(baseline)*2,
+  selectedBytes:Buffer.byteLength(JSON.stringify(selected))+Buffer.byteLength(JSON.stringify(older)),pages,pageBytes,
+  codeBytes:codeBytes*2+pageCodeBytes*pages,totalBytes:codeBytes*2+pageCodeBytes*pages+pageBytes+markerBytes*2,
+  maxPageBytes:Math.max(firstReplay.maxPageBytes,secondReplay.maxPageBytes),nativeCalls:calls.length,beforeOverflows},
+  actualShape:{beforeResultBytes:Buffer.byteLength(JSON.stringify(actualRaw))+66,
+   beforeTotalBytes:Buffer.byteLength(JSON.stringify(actualRaw))+66+Buffer.byteLength(baseline),
+   codeBytes:codeBytes+pageCodeBytes*actualReplay.pages,pageBytes:actualReplay.pageBytes,pages:actualReplay.pages,
+   totalBytes:codeBytes+pageCodeBytes*actualReplay.pages+actualReplay.pageBytes+markerBytes,maxPageBytes:actualReplay.maxPageBytes},recoveries}));
+})().catch(e=>{console.error(e);process.exitCode=1;});
+"""
+        p = subprocess.run([shutil.which('node'), '-e', harness],
+            input=json.dumps({'code': code, 'page': R['COORDINATION_PAGE_JS'], 'original': original}),
+            text=True, encoding='utf-8', capture_output=True, timeout=15)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        self.measurements = json.loads(p.stdout)
+        principal = self.measurements['principal']
+        self.assertLess(principal['totalBytes'], principal['beforeTotalBytes'])
+        self.assertLessEqual(principal['maxPageBytes'], 4096)
+        self.assertEqual(principal['nativeCalls'], 2)
+        self.assertEqual(principal['beforeOverflows'], 2)
+        self.assertLessEqual(self.measurements['actualShape']['maxPageBytes'], 4096)
+        self.assertEqual(len(self.measurements['recoveries']), 9)
+        for recovery in self.measurements['recoveries']:
+            self.assertLessEqual(recovery['maxPageBytes'], 4096)
+        # The server-limited snapshot cannot recover these bytes. Use the known
+        # original artifact through the existing Reader, not another thread cursor.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / 'original.txt').write_bytes(original.encode('utf-8'))
+            request = {'op': 'page', 'path': 'original.txt'}
+            parts, page_bytes = [], []
+            while True:
+                raw = R['run'](root, request)
+                self.assertLessEqual(len(raw.encode('utf-8')) + 2, 4096)
+                page = json.loads(raw)
+                parts.append(page['data'])
+                page_bytes.append(len(raw.encode('utf-8')) + 2)
+                if page['next_cursor'] is None:
+                    break
+                request = {**request, 'cursor': page['next_cursor']}
+            self.assertEqual(''.join(parts), original)
+            self.measurements['originalArtifact'] = {'bytes': len(original.encode('utf-8')),
+                'pages': len(parts), 'pageBytes': sum(page_bytes), 'maxPageBytes': max(page_bytes)}
+
+
 class ExistingReaderTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

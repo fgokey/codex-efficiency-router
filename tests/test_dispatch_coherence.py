@@ -48,8 +48,28 @@ class DispatchCoherenceTests(unittest.TestCase):
         source = json.dumps({'subagent': {'thread_spawn': {'parent_thread_id': owner}}})
         with closing(sqlite3.connect(self.db)) as db, db:
             db.execute('INSERT OR REPLACE INTO threads VALUES (?,?,?,?,?,?,?,?,?)',
-                       (identifier, model, effort, source, '', '', identifier, 0, ''))
+                       (identifier, model, effort, source, '',
+                        'sol61_engineer' if model == 'gpt-6.1-sol' else 'astra_architect', identifier, 0, ''))
         return {'id': identifier, 'model': model, 'effort': effort, 'evidence_ref': 'temporary native row'}
+
+    def test_existing_default_sol_child_blocks_new_units_but_keeps_exact_controls(self):
+        receiver = self.child()
+        request = self.request(receiver)
+        prepared = self.prepare(request)
+        message = R['assignment_message'](prepared, request['message'])
+        self.assertEqual(self.send(receiver, message), {})
+        control = self.prepare({**request, 'purpose': 'status', 'message': 'status',
+                                'receipt': prepared['receipt']})
+        for role in ('default', '', None):
+            with closing(sqlite3.connect(self.db)) as db, db:
+                db.execute('UPDATE threads SET agent_role=? WHERE id=?', (role, receiver['id']))
+            rejected = self.send(receiver, message)
+            self.assertDenied(rejected)
+            self.assertIn('role UNKNOWN/default', str(rejected))
+            self.assertEqual(self.send(receiver, R['assignment_message'](control, 'status')), {})
+        with closing(sqlite3.connect(self.db)) as db, db:
+            db.execute('UPDATE threads SET agent_role=? WHERE id=?', ('sol61_engineer', receiver['id']))
+        self.assertEqual(self.send(receiver, message), {})
 
     def request(self, receiver, *, simple=False):
         return {'unit_id': 'fix_1', 'purpose': 'new_unit', 'scope': 'src/example.py and its tests',

@@ -91,7 +91,8 @@ class NativeDispatchTests(unittest.TestCase):
         source = json.dumps({'subagent': {'thread_spawn': {'parent_thread_id': owner}}}) if owner else 'desktop'
         with self.connect() as db:
             db.execute('INSERT INTO threads VALUES (?,?,?,?,?,?,?,?,?)',
-                       (identifier, model, effort, source, '', '', path, archived, ''))
+                       (identifier, model, effort, source, '',
+                        'sol61_engineer' if model == 'gpt-6.1-sol' else 'astra_architect', path, archived, ''))
 
     def request(self, recipient='sol', model='gpt-6.1-sol', message='Review the owned source unit', **changes):
         request = {'unit_id': 'source-review', 'purpose': 'new_unit', 'scope': 'owned source unit',

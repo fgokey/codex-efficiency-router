@@ -123,7 +123,7 @@ text(out);
 '''
 
 # Explicit data pagination only, also recovers the original result after schema errors.
-COORDINATION_PAGE_JS = r'''
+COORDINATION_PAGE_JS = r'''// @exec: {"max_output_tokens":4096}
 if(!Number.isInteger(framingBytes)||framingBytes<0)throw Error("unknown framing");
 let raw=load("cerPage"),offset=load("cerOffset")||0,counts={polls:null,errors:null};
 if(raw&&typeof raw==="object"){
@@ -139,17 +139,55 @@ if(raw&&typeof raw==="object"){
  }catch{raw=null;}
 }
 if(!raw){raw=JSON.stringify(load("cerRaw"));if(!raw)throw Error("missing snapshot");offset=0;}
-if(typeof raw!=="string"||!Number.isSafeInteger(offset)||offset<0||offset>raw.length)throw Error("invalid page state");
+if(typeof raw!=="string"||!Number.isSafeInteger(offset)||offset<0||offset>raw.length)throw Error("page state");
 const make=end=>({...(offset?{}:counts),status:end<raw.length?"PARTIAL":"PASS",offset,total:raw.length,next:end<raw.length?end:null,data:raw.slice(offset,end)});
 const fits=p=>encodeURIComponent(JSON.stringify(p)).replace(/%[0-9A-F]{2}/g,"x").length+2+framingBytes<=4096;
-let end=offset,page=null;
+let end=offset,page;
 if(raw.length-offset<=4096){const p=make(raw.length);if(fits(p)){page=p;end=raw.length;}}
 if(!page){let lo=offset+1,hi=Math.min(raw.length-1,offset+4096);
 while(lo<=hi){const mid=lo+Math.floor((hi-lo)/2),p=make(mid);
 if(fits(p)){page=p;end=mid;lo=mid+1;}else hi=mid-1;}}
-if(!page)throw Error("framing exceeds page budget");
+if(!page)throw Error("framing budget");
 store("cerPage",end===raw.length?null:raw);store("cerOffset",end);store("cerPending",end<raw.length);text(page);
 '''
+
+# read_thread command-diagnostic example (Code Mode; threadId/cursor/requiredItemIds are caller inputs):
+# Capture once on an actionable turn; cursor is the prior page.nextCursor, not a wait cursor.
+# Select known required item IDs, including successful source/diff/test evidence; never guess IDs.
+# Unknown unselected items fall back to raw pages. Selected items and all enclosing fields stay intact.
+# output.truncated means missing evidence: read the known original file/artifact with Reader;
+# a thread page cursor cannot recover characters removed by maxOutputCharsPerItem.
+# Keep cerRaw for missing evidence. Drain COORDINATION_PAGE_JS before another capture;
+# stop at next=null and retain page.hasMore/nextCursor for a separate older-page request.
+# ```javascript
+# // @exec: {"max_output_tokens": 4096}
+# if(load("cerPending"))throw Error("pending page");
+# if(!Array.isArray(requiredItemIds)||!requiredItemIds.length)throw Error("required item IDs");
+# const r=await tools.mcp__codex_app__read_thread({threadId,cursor,turnLimit:1,includeOutputs:true,maxOutputCharsPerItem:1800});
+# store("cerRaw",r);let selected=null;
+# try{
+#  if(r.isError||r.content.length!==1||r.content[0].type!=="text")throw Error("native error");
+#  const s=JSON.parse(r.content[0].text);
+#  if(s.schemaVersion!==1||
+#   typeof s.thread.id!=="string"||!s.thread.status||!Array.isArray(s.turns)||
+#   s.turns.some(t=>typeof t.id!=="string"||typeof t.status!=="string"||!("error" in t)||!Array.isArray(t.items))||
+#   typeof s.page.hasMore!=="boolean"||!(s.page.nextCursor===null||typeof s.page.nextCursor==="string"))throw Error("schema");
+#  const found=new Set(),truncated=[];
+#  const turns=s.turns.map(t=>({...t,items:t.items.filter(i=>{
+#   if(requiredItemIds.includes(i.id)){found.add(i.id);if(i.output?.truncated||i.truncated)truncated.push(i.id);return true;}
+#   const keys=i.type==="agentMessage"&&i.phase==="commentary"?["type","id","phase","text"]:
+#    i.type==="reasoning"&&Array.isArray(i.summary)&&!i.summary.length&&
+#     (i.content===undefined||Array.isArray(i.content)&&!i.content.length)?["type","id","summary","content"]:[];
+#   if(!keys.length||Object.keys(i).some(k=>!keys.includes(k)))throw Error("unselected evidence");
+#   return false;
+#  })}));
+#  const missing=requiredItemIds.filter(id=>!found.has(id));
+#  selected={snapshot:{...s,turns},selection:{status:missing.length||truncated.length?"PARTIAL":"SELECTED",
+#   requested:requiredItemIds,availableItems:s.turns.reduce((n,t)=>n+t.items.length,0),missing,truncated}};
+# }catch{}
+# store("cerPage",selected===null?null:JSON.stringify(selected));store("cerOffset",0);store("cerPending",true);
+# text({status:"PARTIAL",detail:"COORDINATION_PAGE_JS"});
+# ```
 
 HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
   batch --root ABS --requests JSON_ARRAY --max-bytes N --framing-bytes N
@@ -187,6 +225,9 @@ HELP = """CER read (UTF-8; each JSON response <=4096 bytes including CRLF)
     rejects changed files or stale cursors.
 Paths are literal and relative to ABS. max-bytes is 256..4096, default 4096.
 Use a verified Python executable with -I -B and this script for repeated reads.
+
+read_thread: command-diagnostic example beside COORDINATION_PAGE_JS in this source.
+
 """
 
 
