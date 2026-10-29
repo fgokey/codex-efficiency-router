@@ -29,6 +29,12 @@ class InstructionFootprintTests(unittest.TestCase):
         for phrase in ('open the actual source/diff/result',
                        'child reports and completion_check declarations alone',
                        'unit-specific context', 'do not resend unchanged rules or reports',
+                       'Check authority, exclusive scope and capacity',
+                       'For required independent Standards/Spec',
+                       'Reuse compatible owners at safe boundaries',
+                       'pin revision/dirt/rules/spec',
+                       'dispatch separate read-only owners before waiting',
+                       'Locate once; batch independent required ranges',
                        'Store read_thread results; select'):
             self.assertIn(phrase, text)
 
