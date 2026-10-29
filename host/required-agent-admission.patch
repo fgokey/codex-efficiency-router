@@ -1224,10 +1224,10 @@ index 5a9967d30..e9e6169ee 100644
      server_name: &str,
      tool_name: &str,
 diff --git a/codex-rs/core/src/session/mod.rs b/codex-rs/core/src/session/mod.rs
-index 96cfaa197..559bfc359 100644
+index 96cfaa197..a6f7a1303 100644
 --- a/codex-rs/core/src/session/mod.rs
 +++ b/codex-rs/core/src/session/mod.rs
-@@ -1684,6 +1684,27 @@ impl Session {
+@@ -1684,6 +1684,27 @@
              InitialHistory::Resumed(resumed_history) => {
                  let turn_context = self.new_default_turn().await;
                  let rollout_items = resumed_history.history;
@@ -1255,7 +1255,7 @@ index 96cfaa197..559bfc359 100644
                  if matches!(
                      rollout_items.iter().rev().find_map(|item| match item {
                          RolloutItem::EventMsg(event) => agent_status_from_event(event),
-@@ -2436,6 +2457,18 @@ impl Session {
+@@ -2436,6 +2457,18 @@
          }
      }
 
@@ -1274,7 +1274,7 @@ index 96cfaa197..559bfc359 100644
      /// Record a terminal CodexErr before the app-server completion notification is reduced.
      pub(crate) fn track_turn_codex_error(&self, turn_context: &TurnContext, error: &CodexErr) {
          self.services
-@@ -2478,6 +2511,73 @@ impl Session {
+@@ -2478,6 +2511,73 @@
 
      /// Persist the event to rollout and send it to clients.
      pub(crate) async fn send_event(&self, turn_context: &TurnContext, msg: EventMsg) {
@@ -1348,7 +1348,23 @@ index 96cfaa197..559bfc359 100644
          let legacy_source = msg.clone();
          if let EventMsg::Error(error) = &legacy_source
              && error
-@@ -3737,6 +3837,28 @@ impl Session {
+@@ -3671,6 +3771,7 @@
+             model_info,
+             items,
+             image_preparations,
++            false,
+         )
+         .await;
+     }
+@@ -3681,6 +3782,7 @@
+         model_info: &ModelInfo,
+         mut items: Vec<ResponseItemEnvelope>,
+         image_preparations: Vec<ImagePreparationMetadata>,
++        independent_answer_turn_start: bool,
+     ) {
+         // Save the originating history budget for replay.
+         // Preserve any existing tool-specific override.
+@@ -3737,6 +3839,36 @@
                  .extension_data
                  .get::<retained_context::PendingAssistantMessageOrders>();
              for envelope in &mut items {
@@ -1365,6 +1381,14 @@ index 96cfaa197..559bfc359 100644
 +                    )
 +                {
 +                    state.parent_work.observe(&envelope.item);
++                    if independent_answer_turn_start
++                        && envelope.metadata.as_ref().is_some_and(|metadata| metadata.user_input_order.is_some())
++                        && matches!(&envelope.item, ResponseItem::Message { role, .. } if role == "user")
++                    {
++                        // Only real input at a fresh turn boundary may open this path.
++                        // Steers and synthetic/replayed user-context items only invalidate it.
++                        state.parent_work.start_user_turn(&turn_context.sub_id);
++                    }
 +                    if state.parent_work.dirty
 +                        || (state.parent_work.active()
 +                            && crate::context_manager::is_user_turn_boundary(&envelope.item))
@@ -1377,7 +1401,7 @@ index 96cfaa197..559bfc359 100644
                  if envelope
                      .metadata
                      .as_ref()
-@@ -5334,6 +5456,99 @@ impl Session {
+@@ -5334,6 +5466,99 @@
          }
      }
 
@@ -1477,6 +1501,17 @@ index 96cfaa197..559bfc359 100644
      pub(crate) async fn record_user_prompt_and_emit_turn_item(
          &self,
          turn_context: &TurnContext,
+@@ -5387,6 +5612,10 @@
+             model_info,
+             prepared_items,
+             image_preparations,
++            persist_context == PersistContext::TurnStart
++                && metadata.origin == codex_history::UserInputOrigin::User
++                && metadata.acceptance_order.is_some()
++                && !input.is_empty(),
+         )
+         .await;
+         user_message_item.client_id = client_id;
 diff --git a/codex-rs/core/src/session/retained_context.rs b/codex-rs/core/src/session/retained_context.rs
 index 8c4203bf1..1a562b57a 100644
 --- a/codex-rs/core/src/session/retained_context.rs
@@ -1490,13 +1525,15 @@ index 8c4203bf1..1a562b57a 100644
              (order, self.pending_code_mode_message_recordings())
          };
 diff --git a/codex-rs/core/src/session/retained_context_tests.rs b/codex-rs/core/src/session/retained_context_tests.rs
-index 6347e7d84..3bccbb06f 100644
+index 6347e7d84..20146c475 100644
 --- a/codex-rs/core/src/session/retained_context_tests.rs
 +++ b/codex-rs/core/src/session/retained_context_tests.rs
-@@ -20,6 +20,68 @@ fn delivered_message() -> RetainedUserMessage {
+@@ -18,6 +18,126 @@
+         complete: true,
+         phase: None,
      }
- }
-
++}
++
 +#[tokio::test]
 +async fn parent_completion_user_acceptance_invalidates_before_history_recording() {
 +    let (session, turn) = make_session_and_context().await;
@@ -1559,10 +1596,66 @@ index 6347e7d84..3bccbb06f 100644
 +    assert!(state.parent_work.stop(&turn.sub_id).unwrap().is_some());
 +}
 +
++async fn independent_parent_fixture() -> (super::Session, super::TurnContext) {
++    let (session, turn) = make_session_and_context().await;
++    session.state.lock().await.parent_work.request(&serde_json::json!({"operation":"begin",
++        "accepted_scope":"Finish ownership","required_work":[{"id":"ownership","requirement":"Close ownership"}]}), &turn.sub_id);
++    record_independent_user_input(&session, &turn, codex_thread_store::PersistContext::TurnStart).await;
++    assert_eq!(independent_parent_request(&session, &turn).await["accepted"], true);
++    (session, turn)
++}
++
++async fn record_independent_user_input(session: &super::Session, turn: &super::TurnContext, context: codex_thread_store::PersistContext) {
++    let order = session.reserve_user_input_order().await;
++    session.record_user_prompt_and_emit_turn_item(turn, &turn.capture_current_model_info(),
++        &[codex_protocol::user_input::UserInput::Text {text:"A standalone explanation".to_owned(),text_elements:vec![]}],
++        None, crate::session::UserInputMetadata {acceptance_order:Some(order),..Default::default()}, context).await;
++}
++
++async fn independent_parent_request(session: &super::Session, turn: &super::TurnContext) -> serde_json::Value {
++    let mut state = session.state.lock().await;
++    let current = state.parent_work.request(&serde_json::json!({"operation":"inspect","turn_scope":"independent_answer"}), &turn.sub_id);
++    state.parent_work.request(&serde_json::json!({"operation":"check","turn_scope":"independent_answer",
++        "task_revision":current["task_revision"],"event_version":current["event_version"],
++        "rationale":"This request only asks for an independent explanation"}), &turn.sub_id)
++}
++
++#[tokio::test]
++async fn parent_completion_steered_input_cannot_reopen_an_engineering_turn() {
++    let (session, turn) = independent_parent_fixture().await;
++    {
++        let mut state = session.state.lock().await;
++        state.parent_work.tool_started("patch", &codex_tools::ToolName::plain("apply_patch"), true, serde_json::json!({})).unwrap();
++        state.parent_work.tool_finished("patch", true);
++    }
++    record_independent_user_input(&session, &turn, codex_thread_store::PersistContext::SteeredUserInput).await;
++    assert_eq!(independent_parent_request(&session, &turn).await["accepted"], false);
++    assert!(session.state.lock().await.parent_work.active());
++}
++
++#[tokio::test]
++async fn parent_completion_synthetic_user_context_and_child_callbacks_invalidate_independence() {
++    use codex_protocol::protocol::{AgentStatus, CollabCloseEndEvent, EventMsg};
++    let (session, turn) = independent_parent_fixture().await;
++    let synthetic = serde_json::from_value(serde_json::json!({"type":"message","role":"user",
++        "content":[{"type":"input_text","text":"Child results changed the evidence"}]})).unwrap();
++    session.record_conversation_items(&turn, &turn.capture_current_model_info(), &[synthetic]).await;
++    assert_eq!(independent_parent_request(&session, &turn).await["accepted"], false);
++    record_independent_user_input(&session, &turn, codex_thread_store::PersistContext::TurnStart).await;
++    assert_eq!(independent_parent_request(&session, &turn).await["accepted"], false,
++        "a repeated turn-start record within the same turn must not reopen eligibility");
++
++    let (session, turn) = independent_parent_fixture().await;
++    session.send_event(&turn, EventMsg::CollabCloseEnd(CollabCloseEndEvent {
++        call_id:"child-callback".to_owned(),completed_at_ms:0,sender_thread_id:session.thread_id,
++        receiver_thread_id:codex_protocol::ThreadId::new(),receiver_agent_nickname:None,
++        receiver_agent_role:None,status:AgentStatus::Interrupted,
++    })).await;
++    assert_eq!(independent_parent_request(&session, &turn).await["accepted"], false);
+ }
+
  #[tokio::test]
- async fn shutdown_retains_an_admitted_delivery_until_persistence_finishes() {
-     let (session, _) = make_session_and_context().await;
-@@ -116,3 +178,28 @@ async fn confirmed_delivery_reserves_order_and_persists_before_a_fast_user_reply
+@@ -116,3 +236,28 @@
          .expect("confirmed delivery order");
      assert!(assistant_order < codex_history::RetainedContextOrder::Local(reply_order));
  }
@@ -2272,10 +2365,10 @@ index c23caa014..897f9ad26 100644
      )
      .await
 diff --git a/codex-rs/core/src/tools/handlers/plan.rs b/codex-rs/core/src/tools/handlers/plan.rs
-index 349565622..1e589e3b1 100644
+index 349565622..f02844d5e 100644
 --- a/codex-rs/core/src/tools/handlers/plan.rs
 +++ b/codex-rs/core/src/tools/handlers/plan.rs
-@@ -13,10 +13,833 @@ use codex_protocol::plan_tool::UpdatePlanArgs;
+@@ -13,9 +13,996 @@
  use codex_protocol::protocol::EventMsg;
  use codex_tools::ToolName;
  use codex_tools::ToolSpec;
@@ -2300,6 +2393,8 @@ index 349565622..1e589e3b1 100644
 +    denied_turn: String,
 +    #[serde(skip)]
 +    denials: u8,
++    #[serde(skip)]
++    independent_answer_turn: Option<(String, bool)>,
 +}
 +
 +impl ParentWorkState {
@@ -2316,11 +2411,26 @@ index 349565622..1e589e3b1 100644
 +    }
 +
 +    pub(crate) fn changed(&mut self) {
++        if let Some((_, allowed)) = &mut self.independent_answer_turn {
++            *allowed = false;
++        }
 +        if self.active() {
 +            self.event_version += 1;
 +            self.receipt = None;
 +            self.dirty = true;
 +        }
++    }
++
++    pub(crate) fn start_user_turn(&mut self, turn_id: &str) {
++        let fresh = self.independent_answer_turn.as_ref().is_none_or(|(turn, _)| turn != turn_id);
++        self.changed();
++        if fresh {
++            self.independent_answer_turn = Some((turn_id.to_string(), true));
++        }
++    }
++
++    fn independent_answer_allowed(&self, turn_id: &str) -> bool {
++        self.independent_answer_turn.as_ref().is_some_and(|(turn, allowed)| turn == turn_id && *allowed)
 +    }
 +
 +    pub(crate) fn tool_started(
@@ -2457,6 +2567,13 @@ index 349565622..1e589e3b1 100644
 +
 +    fn apply(&mut self, args: &JsonValue, turn_id: &str) -> Result<bool, String> {
 +        let operation = args["operation"].as_str().unwrap_or("");
++        if let Some(scope) = args.get("turn_scope") {
++            self.receipt = None;
++            self.dirty = true;
++            if operation != "check" || scope.as_str() != Some("independent_answer") {
++                return Err("turn_scope must be independent_answer on inspect/check".to_string());
++            }
++        }
 +        if matches!(operation, "begin" | "append") {
 +            if operation == "begin" && self.active() && !self.scope.is_empty() {
 +                return Err(
@@ -2520,6 +2637,9 @@ index 349565622..1e589e3b1 100644
 +            self.task_revision += 1;
 +            self.event_version += 1;
 +            self.receipt = None;
++            if let Some((_, allowed)) = &mut self.independent_answer_turn {
++                *allowed = false;
++            }
 +            self.dirty = true;
 +            return Ok(false);
 +        }
@@ -2543,6 +2663,27 @@ index 349565622..1e589e3b1 100644
 +            || args["event_version"].as_u64() != Some(self.event_version)
 +        {
 +            return Err("stale completion check; inspect current task/event versions".to_string());
++        }
++        if args["turn_scope"] == "independent_answer" {
++            if !self.independent_answer_allowed(turn_id) {
++                return Err("new evidence or engineering work requires full reconciliation".to_string());
++            }
++            if args.get("work").is_some()
++                || args.get("accepted_scope").is_some()
++                || args.get("required_work").is_some()
++                || !args["rationale"].as_str().is_some_and(|reason| {
++                    !reason.trim().is_empty() && reason.len() <= 1024
++                })
++            {
++                return Err("independent_answer needs a bounded rationale and cannot change retained work".to_string());
++            }
++            self.receipt = Some((
++                turn_id.to_string(),
++                self.task_revision,
++                self.event_version,
++                true,
++            ));
++            return Ok(false);
 +        }
 +        let work = args["work"]
 +            .as_array()
@@ -2624,6 +2765,9 @@ index 349565622..1e589e3b1 100644
 +                    .to_string(),
 +            );
 +        }
++        if let Some((_, allowed)) = &mut self.independent_answer_turn {
++            *allowed = false;
++        }
 +        if self.receipt.as_ref().is_some_and(|r| !r.3) {
 +            self.scope.clear();
 +            self.required.clear();
@@ -2642,6 +2786,11 @@ index 349565622..1e589e3b1 100644
 +            ),
 +            ..Self::default()
 +        });
++        // Retained-work receipts cannot finalize a resumed turn, including an
++        // independent answer. All-done receipts remain for terminal replay.
++        if self.receipt.as_ref().is_some_and(|receipt| receipt.3) {
++            self.receipt = None;
++        }
 +        // An old process cannot deliver these callbacks. Retain known work and
 +        // require fresh reconciliation instead of leaving a permanent busy flag.
 +        let interrupted = std::mem::take(&mut self.pending);
@@ -2658,8 +2807,18 @@ index 349565622..1e589e3b1 100644
 +        serde_json::json!({"format_version":1,"state":self})
 +    }
 +
-+    fn inspect(&self, args: &JsonValue) -> Result<JsonValue, String> {
++    fn inspect(&self, args: &JsonValue, turn_id: &str) -> Result<JsonValue, String> {
 +        use sha2::{Digest, Sha256};
++        if let Some(scope) = args.get("turn_scope") {
++            if scope.as_str() != Some("independent_answer") || args.get("offset").is_some() {
++                return Err("independent_answer inspection has no inventory cursor".to_string());
++            }
++            return Ok(serde_json::json!({"task_revision":self.task_revision,
++                "event_version":self.event_version,"retained_required_count":self.required.len(),
++                "independent_answer_allowed":self.independent_answer_allowed(turn_id) && self.active() && !self.scope.is_empty()
++                    && self.recovery_error.is_none() && self.in_flight() == 0,
++                "in_flight":self.in_flight(),"recovery_error":self.recovery_error}));
++        }
 +        let offset = match args.get("offset") {
 +            None => 0,
 +            Some(value) => value
@@ -2707,13 +2866,18 @@ index 349565622..1e589e3b1 100644
 +
 +    pub(crate) fn request(&mut self, args: &JsonValue, turn_id: &str) -> JsonValue {
 +        if args["operation"] == "inspect" {
-+            self.inspect(args)
++            self.inspect(args, turn_id)
 +                .unwrap_or_else(|reason| serde_json::json!({"accepted":false,"reason":reason}))
 +        } else {
 +            match self.apply(args, turn_id) {
 +                Ok(_) => {
-+                    serde_json::json!({"native_parent_completion":1,"accepted":true,"turn_id":turn_id,
-+                    "task_revision":self.task_revision,"event_version":self.event_version})
++                    let mut result = serde_json::json!({"native_parent_completion":1,"accepted":true,"turn_id":turn_id,
++                        "task_revision":self.task_revision,"event_version":self.event_version});
++                    if args["turn_scope"] == "independent_answer" {
++                        result["objective_completed"] = false.into();
++                        result["retained_required_count"] = self.required.len().into();
++                    }
++                    result
 +                }
 +                Err(reason) => {
 +                    serde_json::json!({"native_parent_completion":1,"accepted":false,"reason":reason})
@@ -2732,7 +2896,7 @@ index 349565622..1e589e3b1 100644
 +
 +    fn spec(&self) -> ToolSpec {
 +        use codex_tools::{JsonSchema, ResponsesApiTool};
-+        let properties = ["operation", "accepted_scope"]
++        let properties = ["operation", "accepted_scope", "turn_scope", "rationale"]
 +            .into_iter()
 +            .map(|name| (name.to_string(), JsonSchema::string(None)))
 +            .chain(
@@ -2752,7 +2916,7 @@ index 349565622..1e589e3b1 100644
 +            .collect();
 +        ToolSpec::Function(ResponsesApiTool {
 +            name: "completion_check".to_string(),
-+            description: "Native parent finalization check, not a goal or proof of business correctness. Invoke alone. inspect returns bounded retained work and task/event versions; follow next_offset with those versions until complete. begin records accepted_scope and required_work [{id,requirement}]; append adds requirements without replacing scope/items. check requires current task_revision/event_version and every work [{id,status:done|actionable|external_block,evidence}]; external_block also needs missing_resource,affected_scope,external_action, with unaffected work finished. New tool results/user input invalidate a receipt. No caller operation can clear/shrink existing work or claim cancellation/budget exemption; native lifecycle owns those exits.".to_string(),
++            description: "Native parent finalization check, not a goal or proof of correctness. Invoke alone. No retained engineering work: no check or dummy scope. inspect pages retained work and task/event versions; follow next_offset with those versions. begin records original accepted_scope and required_work [{id,requirement}]; append only adds work. check needs current task_revision/event_version and every work [{id,status:done|actionable|external_block,evidence}]. external_block also needs missing_resource,affected_scope,external_action; finish unaffected work. Only for an independent current question WITH retained work, use turn_scope:independent_answer on compact inspect/check, current versions plus check rationale (1..1024 UTF-8 bytes), without work. All requirements remain; objective_completed=false. The model judges independence; continued engineering cannot use this scope. Engineering/new evidence disables it; input/results invalidate receipts; restart discards it. No caller clear/shrink/cancellation/budget exemption; native lifecycle owns exits.".to_string(),
 +            strict: false, defer_loading: None,
 +            parameters: JsonSchema::object(properties, Some(vec!["operation".to_string()]), Some(false.into())),
 +            output_schema: None,
@@ -2796,7 +2960,7 @@ index 349565622..1e589e3b1 100644
 +}
 
  pub struct PlanHandler;
-
++
 +#[cfg(test)]
 +mod parent_completion_tests {
 +    use super::*;
@@ -2862,6 +3026,99 @@ index 349565622..1e589e3b1 100644
 +        restored.finish("turn-2").unwrap();
 +        assert!(!restored.active());
 +        assert!(restored.stop("standalone-question").unwrap().is_none());
++    }
++
++    fn independent_answer(state: &mut ParentWorkState, turn: &str) -> JsonValue {
++        state.request(&json!({"operation":"check","turn_scope":"independent_answer",
++            "task_revision":state.task_revision,"event_version":state.event_version,
++            "rationale":"The user asks for a standalone explanation, not continued engineering."}), turn)
++    }
++
++    #[test]
++    fn independent_answer_retains_every_requirement_and_full_completion_still_clears_them() {
++        let mut state = open();
++        check(&mut state, "turn-1", "external_block").unwrap();
++        state.finish("turn-1").unwrap();
++        let scope = state.scope.clone();
++        let required = state.required.clone();
++        state.start_user_turn("turn-2");
++        let inspection = state.request(&json!({"operation":"inspect","turn_scope":"independent_answer"}), "turn-2");
++        assert_eq!(inspection["independent_answer_allowed"], true);
++        assert!(inspection.get("required_work").is_none());
++        let accepted = independent_answer(&mut state, "turn-2");
++        assert_eq!(accepted["accepted"], true);
++        assert_eq!(accepted["objective_completed"], false);
++        assert!(state.stop("turn-2").unwrap().is_none());
++        state.finish("turn-2").unwrap();
++        assert_eq!(state.scope, scope);
++        assert_eq!(state.required, required);
++        assert!(state.stop("continue-without-declaration").unwrap().is_some());
++        state.start_user_turn("turn-2");
++        assert!(!state.receipt_current("turn-2"));
++        check(&mut state, "turn-3", "done").unwrap();
++        state.finish("turn-3").unwrap();
++        assert!(!state.active());
++    }
++
++    #[test]
++    fn independent_answer_rejects_malformed_stale_recovered_and_inflight_state() {
++        let mut state = open();
++        state.start_user_turn("turn-2");
++        let fresh = json!({"operation":"check","turn_scope":"independent_answer",
++            "task_revision":state.task_revision,"event_version":state.event_version,"rationale":"Independent question"});
++        for rationale in [JsonValue::Null, json!(" "), json!("界".repeat(342))] {
++            let mut args = fresh.clone();
++            args["rationale"] = rationale;
++            assert_eq!(state.request(&args, "turn-2")["accepted"], false);
++        }
++        let mut unknown = fresh.clone();
++        unknown["turn_scope"] = json!("continue");
++        assert_eq!(state.request(&unknown, "turn-2")["accepted"], false);
++        let mut mixed = fresh.clone();
++        mixed["work"] = json!([]);
++        assert_eq!(state.request(&mixed, "turn-2")["accepted"], false);
++        assert_eq!(state.request(&fresh, "turn-2")["accepted"], true);
++        let mut restored = ParentWorkState::default();
++        restored.restore(state.checkpoint());
++        assert!(!restored.receipt_current("turn-3"));
++        assert!(!restored.receipt_current("turn-2"));
++        assert_eq!(independent_answer(&mut restored, "turn-3")["accepted"], false);
++        state.start_user_turn("turn-2");
++        assert_eq!(state.request(&fresh, "turn-2")["accepted"], false);
++        state.tool_started("pending", &ToolName::plain("read_only"), true, json!({})).unwrap();
++        assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], false);
++        state.tool_finished("pending", true);
++        assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], false);
++        restored.restore(json!({"format_version":999}));
++        restored.start_user_turn("turn-3");
++        assert_eq!(independent_answer(&mut restored, "turn-3")["accepted"], false);
++    }
++
++    #[test]
++    fn independent_answer_cannot_hide_new_engineering_dispatch_or_callback_evidence() {
++        for (name, args) in [
++            ("apply_patch", json!({})),
++            ("admitted_agent_task", json!({"operation":"assign","target":"child"})),
++        ] {
++            let mut state = open();
++            state.start_user_turn("turn-2");
++            assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], true);
++            state.tool_started("effect", &ToolName::plain(name), true, args).unwrap();
++            assert!(!state.receipt_current("turn-2"));
++            state.tool_finished("effect", true);
++            assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], false);
++            assert_eq!(state.required.len(), 2);
++        }
++        let mut state = open();
++        state.start_user_turn("turn-2");
++        assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], true);
++        state.changed();
++        assert!(!state.receipt_current("turn-2"));
++        assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], false);
++        let hook = serde_json::from_value(json!({"type":"message","role":"user",
++            "content":[{"type":"input_text","text":"synthetic stop feedback"}]})).unwrap();
++        state.observe(&hook);
++        assert_eq!(independent_answer(&mut state, "turn-2")["accepted"], false);
 +    }
 +
 +    #[test]
@@ -3076,7 +3333,7 @@ index 349565622..1e589e3b1 100644
 +        loop {
 +            let page = state
 +                .inspect(&json!({"offset":offset,"task_revision":state.task_revision,
-+                "event_version":state.event_version}))
++                "event_version":state.event_version}), "turn-1")
 +                .unwrap();
 +            assert!(page.to_string().len() + 2 < 3072);
 +            for (id, value) in page["required_work"].as_object().unwrap() {
@@ -3099,16 +3356,15 @@ index 349565622..1e589e3b1 100644
 +        assert!(
 +            state
 +                .inspect(
-+                    &json!({"offset":1,"task_revision":state.task_revision,"event_version":old})
++                    &json!({"offset":1,"task_revision":state.task_revision,"event_version":old}), "turn-1"
 +                )
 +                .is_err()
 +        );
 +    }
 +}
-+
+
  pub struct PlanToolOutput;
 
- const PLAN_UPDATED_MESSAGE: &str = "Plan updated";
 diff --git a/codex-rs/core/src/tools/handlers/read_only.rs b/codex-rs/core/src/tools/handlers/read_only.rs
 new file mode 100644
 index 000000000..430a5bf0c
@@ -4170,10 +4426,10 @@ index 1a8a06618..e7b4eb8f3 100644
      let v1 = probe(|turn| {
 diff --git a/codex-rs/core/tests/suite/admission_boundary.rs b/codex-rs/core/tests/suite/admission_boundary.rs
 new file mode 100644
-index 000000000..8ed3b1a77
+index 000000000..721888b25
 --- /dev/null
 +++ b/codex-rs/core/tests/suite/admission_boundary.rs
-@@ -0,0 +1,2031 @@
+@@ -0,0 +1,2090 @@
 +use anyhow::Context;
 +use anyhow::Result;
 +use codex_features::Feature;
@@ -5877,6 +6133,65 @@ index 000000000..8ed3b1a77
 +    Ok(())
 +}
 +
++fn parent_answer_check_script(independent: bool) -> String {
++    let scope = if independent { ",turn_scope:'independent_answer'" } else { "" };
++    let work = if independent {
++        "turn_scope:'independent_answer',rationale:'The current request only asks for an evidence prompt; it does not resume the retained engineering work.'".to_string()
++    } else {
++        "work:Object.keys(s.required_work).map(id=>({id,status:'external_block',evidence:'Current fixture evidence',missing_resource:'User-owned capture access',affected_scope:'Runtime capture validation',external_action:'Provide the missing capture access'}))".to_string()
++    };
++    format!("const s=JSON.parse(await tools.completion_check({{operation:'inspect'{scope}}})); const c={{operation:'check',task_revision:s.task_revision,event_version:s.event_version,{work}}}; text({{inspection:s,check:JSON.parse(await tools.completion_check(c)),check_input_bytes:JSON.stringify(c).length}});")
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn parent_completion_independent_answer_keeps_blocked_work_without_retrying_the_answer() -> Result<()> {
++    use core_test_support::responses::ev_custom_tool_call;
++    skip_if_no_network!(Ok(()));
++    let server = start_mock_server().await;
++    let responses = mount_sse_sequence(&server, vec![
++        sse(vec![ev_custom_tool_call("answer-begin", "exec", PARENT_BEGIN), ev_completed("i1")]),
++        sse(vec![ev_custom_tool_call("answer-block", "exec", &parent_check_script("external_block")), ev_completed("i2")]),
++        sse(vec![ev_assistant_message("answer-blocked", "Capture access remains missing"), ev_completed("i3")]),
++        sse(vec![ev_assistant_message("legacy-answer", "Here is the requested evidence prompt"), ev_completed("i4")]),
++        sse(vec![ev_custom_tool_call("legacy-recheck", "exec", &parent_answer_check_script(false)), ev_completed("i5")]),
++        sse(vec![ev_assistant_message("legacy-final", "The evidence prompt is ready"), ev_completed("i6")]),
++        sse(vec![ev_custom_tool_call("independent-check", "exec", &parent_answer_check_script(true)), ev_completed("i7")]),
++        sse(vec![ev_assistant_message("independent-final", "Here is the same requested evidence prompt"), ev_completed("i8")]),
++        sse(vec![ev_assistant_message("continue-without-check", "Local work passed"), ev_completed("i9")]),
++        sse(vec![ev_custom_tool_call("full-completion", "exec", &parent_check_script("done")), ev_completed("i10")]),
++        sse(vec![ev_assistant_message("full-final", "The original work is done"), ev_completed("i11")]),
++    ]).await;
++    let mut builder = test_codex().with_config(|config| {
++        config.agent_admission_hook = Some("required-admission".to_string());
++        config.features.enable(Feature::CodeMode).unwrap();
++    });
++    let test = builder.build(&server).await?;
++    test.submit_turn("Finish ownership").await?;
++    assert_eq!(responses.requests().len(), 3);
++    test.submit_turn("Write a standalone evidence prompt while capture access remains unavailable").await?;
++    assert_eq!(responses.requests().len(), 6);
++    test.submit_turn("Write the same standalone evidence prompt while capture access remains unavailable").await?;
++    let requests = responses.requests();
++    let payload = |value: serde_json::Value| -> serde_json::Value {
++        value["output"].as_array().unwrap().iter().find_map(|item| {
++            serde_json::from_str(item["text"].as_str()?).ok()
++        }).unwrap()
++    };
++    let legacy = payload(requests[5].custom_tool_call_output("legacy-recheck"));
++    let independent = payload(requests[7].custom_tool_call_output("independent-check"));
++    assert_eq!(independent["check"]["accepted"], true, "independent declaration must reach the native handler: {independent}");
++    assert_eq!(independent["check"]["objective_completed"], false);
++    assert_eq!(independent["inspection"]["retained_required_count"], 1);
++    assert_eq!(requests.len(), 8, "a declared independent answer must not trigger a post-answer retry");
++    assert!(legacy.to_string().len() > independent.to_string().len(), "the compact inspection must return less context: {legacy} vs {independent}");
++    assert!(legacy["check_input_bytes"].as_u64().unwrap() > independent["check_input_bytes"].as_u64().unwrap());
++    eprintln!("PARENT_ANSWER_FIXTURE legacy_requests=3 independent_requests=2 legacy_context_bytes={} independent_context_bytes={} legacy_check_input_bytes={} independent_check_input_bytes={} legacy_check_calls=2 independent_check_calls=2", legacy.to_string().len(), independent.to_string().len(), legacy["check_input_bytes"], independent["check_input_bytes"]);
++    test.submit_turn("继续").await?;
++    assert_eq!(responses.requests().len(), 11, "an independent answer must retain the original work and require a fresh engineering check");
++    assert!(responses.requests()[9].body_json().to_string().contains("Parent engineering work is still open"));
++    Ok(())
++}
++
 +#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 +async fn parent_completion_denial_ceiling_emits_native_failure_instead_of_success() -> Result<()> {
 +    use codex_core::TurnInputRequest;
@@ -6549,3 +6864,15 @@ index 1eb38f328..4b2ab892f 100644
   "shlex",
   "similar",
   "tempfile",
+diff --git a/codex-rs/core/src/session/inject.rs b/codex-rs/core/src/session/inject.rs
+index a7ddaf75d..c1ece8e7b 100644
+--- a/codex-rs/core/src/session/inject.rs
++++ b/codex-rs/core/src/session/inject.rs
+@@ -137,6 +137,7 @@
+             model_info,
+             annotated_items,
+             image_preparations,
++            false,
+         )
+         .await;
+     }

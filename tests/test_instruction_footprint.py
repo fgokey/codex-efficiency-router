@@ -103,6 +103,16 @@ class InstructionFootprintTests(unittest.TestCase):
                        'Never start unrequested monitoring or risky measurements'):
             self.assertIn(phrase, contract_text())
 
+    def test_independent_answer_is_explicit_bounded_and_keeps_engineering_protection(self):
+        self.assertIn('turn_scope:independent_answer', contract_text())
+        docs = (ROOT / 'README.md').read_text(encoding='utf-8')
+        for phrase in ('turn_scope:independent_answer', 'current versions', '1..1024 UTF-8 bytes',
+                       'retains every engineering requirement', 'never completes the objective',
+                       'The model judges independence', 'No automatic exemption',
+                       'engineering or new evidence requires full reconciliation',
+                       'restart discards the declaration'):
+            self.assertIn(phrase, docs)
+
     def test_entry_is_small_but_authority_and_triggers_are_explicit(self):
         text = SKILL.read_text(encoding='utf-8')
         self.assertLessEqual(len(text.encode('utf-8')), 2048)
