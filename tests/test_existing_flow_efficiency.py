@@ -319,6 +319,25 @@ class ExistingReaderTests(unittest.TestCase):
         self.root = Path(self.tmp.name).resolve()
         self.path = self.root / 'source.txt'
 
+    def test_packet_index_locates_existing_identity_without_unrelated_output(self):
+        identity = {'guid':'known-guid', 'age':2, 'sha256':'a' * 64}
+        self.path.write_text(json.dumps({'modules':{'MainFrame.dll':identity},
+            'unrelated':'verbose evidence\n' * 10000}), encoding='utf-8')
+        request = {'op':'json', 'path':'source.txt', 'pointer':''}
+        index = json.loads(R['run'](self.root, {**request, 'mode':'members'}))
+        self.assertIsNone(index['next_cursor'])
+        pointers = {member['key']:member['pointer'] for member in index['members']}
+        self.assertEqual(pointers['modules'], '/modules')
+        raw = R['run'](self.root, {**request, 'pointer':pointers['modules'] + '/MainFrame.dll'})
+        page = json.loads(raw)
+        self.assertEqual(json.loads(page['data']), identity)
+        self.assertIsNone(page['next_cursor'])
+        self.assertEqual(page['sha256'], index['sha256'])
+        self.assertLessEqual(len(raw.encode('utf-8')) + 2, 4096)
+        self.assertNotIn('verbose evidence', raw)
+        with self.assertRaisesRegex(ValueError, 'Pointer does not exist'):
+            R['run'](self.root, {**request, 'pointer':'/modules/missing.dll'})
+
     def test_batched_required_rules_continue_without_losing_content(self):
         pending = []
         expected = {}

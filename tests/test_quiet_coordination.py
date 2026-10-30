@@ -209,7 +209,7 @@ class QuietCoordinationTests(unittest.TestCase):
         quality=(ROOT/'skills/codex-efficiency-router/references/quality.md').read_text()
         dispatch=(ROOT/'skills/codex-efficiency-router/references/dispatch.md').read_text()
         for phrase in ('WHOLE wait', 'never start another wait cell',
-                       'No status/admission/completion polling while unchanged',
+                       'No unchanged status/admission/completion polling',
                        'required gaps remain PARTIAL/BLOCKED'):
             self.assertIn(phrase,quality)
         for phrase in ('one implementation owner plus an on-demand reviewer',

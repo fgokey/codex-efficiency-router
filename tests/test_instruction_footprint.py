@@ -35,9 +35,12 @@ class InstructionFootprintTests(unittest.TestCase):
                        'pin revision/dirt/rules/spec',
                        'dispatch separate read-only owners before waiting',
                        'Locate once; batch independent required ranges',
+                       'Before declaring evidence missing, inspect packet keys and relevant pointers',
                        'Store read_thread results; select',
                        'Keep complete id/task_revision inventory; one work entry/id',
                        'Repage new revision',
+                       'event-only changes reuse ids',
+                       'resume with maximum supported yield',
                        'After tool results: fresh inspect then check alone',
                        'work/input invalidates it', 'Child status adds no work'):
             self.assertIn(phrase, text)
@@ -105,12 +108,12 @@ class InstructionFootprintTests(unittest.TestCase):
             self.assertIn(phrase, contract_text())
 
     def test_incomplete_work_continues_but_external_barriers_are_specific(self):
-        for phrase in ('CONTINUE while useful authorized diagnosis, delegation or implementation remains',
-                       'BLOCKED requires the exact external missing resource',
-                       'evidence, affected scope and required external action', 'finish unaffected work',
+        for phrase in ('CONTINUE useful authorized diagnosis/delegation/implementation',
+                       'BLOCKED names the exact external missing resource',
+                       'evidence, affected scope and external action', 'finish unaffected work',
                        'STOP on explicit pause/cancel, scope change or actual system budget ceiling',
-                       'Answer mid-task status briefly and continue', 'standalone questions end after answering',
-                       'Never start unrequested monitoring or risky measurements'):
+                       'Answer mid-task status briefly and continue', 'end standalone answers',
+                       'No unrequested monitoring or risky measurements'):
             self.assertIn(phrase, contract_text())
 
     def test_independent_answer_is_explicit_bounded_and_keeps_engineering_protection(self):
@@ -174,8 +177,8 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_reading_keeps_complete_evidence_and_real_output_limits(self):
         for phrase in ('Reuse unchanged loaded rules', 'fully read necessary new/changed rules',
-                       'Check exit before parsing', 'retain successful results, errors and each cursor',
-                       'one aggregate budget including JSON, CRLF and framing (<=4KiB)',
+                       'Check exit before parsing', 'retain successes, errors, cursors',
+                       'Batch UTF-8, JSON, CRLF and framing within one <=4KiB budget',
                        'Read required ranges completely', 'continue missing pages rather than rereading files',
                        'Never slice full-file output', 'concatenate pages to evade limits',
                        'Batch independent reads and merged worker waits'):
@@ -203,11 +206,11 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_monitoring_backs_off_instead_of_repeating_history(self):
         for phrase in ('Review available work before waiting',
-                       'Inspect detail only on actionable change, failure or completion',
+                       'Inspect detail on actionable change, failure or completion',
                        'after two unchanged snapshots back off',
-                       'One saved-offset diagnostic delta is enough',
-                       'do not repeat tails or nudges without new evidence',
-                       'Optional `COORDINATION_JS` is an adapter, not proof of work'):
+                       'One saved-offset diagnostic delta',
+                       'no repeated tails/nudges without new evidence',
+                       '`COORDINATION_JS` is an adapter, not proof of work'):
             self.assertIn(phrase, contract_text())
 
     def test_child_instructions_remain_self_contained(self):
@@ -229,7 +232,7 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_diagnosis_retry_and_quality_floor_survive_rewrite(self):
         for phrase in ('Astra participates directly in difficult diagnosis',
                        'repeated unexplained failure', 'no auto-revert', 'Two writers max',
-                       'Attempts persist per task/unit/failure across all owners',
+                       'Attempts persist per task/unit/failure across owners',
                        'Exhaustion stops blind edits, not Astra diagnosis', 'Never weaken assertions',
                        'Unrun evidence is UNKNOWN', 'required gaps remain PARTIAL/BLOCKED',
                        'only when provided by the host'):
