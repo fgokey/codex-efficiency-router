@@ -19,6 +19,17 @@ def contract_text():
 
 
 class InstructionFootprintTests(unittest.TestCase):
+    def test_scope_convergence_guidance_keeps_original_requirements_and_evidence_reopening(self):
+        # Text contract coverage, not a live agent behavior evaluation.
+        text = contract_text()
+        for phrase in ('Prioritize the current causal gap',
+                       'test hypotheses about it or serve named original requirements',
+                       'Keep unrelated findings; keep repairs in scope',
+                       'Reopen exclusions only on changed evidence/premises',
+                       'Name exact unknowns/next useful evidence; continue relevant authorized work',
+                       'Use supplied packet index/keys and relevant pointers'):
+            self.assertIn(phrase, text)
+
     def test_observed_overhead_repairs_keep_native_reads_and_review_concrete(self):
         for name in ('sol61-engineer.toml', 'sol-engineer.toml'):
             text = tomllib.loads((ROOT / 'agents' / name).read_text(encoding='utf-8'))['developer_instructions']
@@ -26,17 +37,17 @@ class InstructionFootprintTests(unittest.TestCase):
                 self.assertIn(phrase, text)
             self.assertLessEqual(len(text.encode('utf-8')), 945)
         text = contract_text()
-        for phrase in ('open the actual source/diff/result',
-                       'child reports and completion_check declarations alone',
+        for phrase in ('opens actual source/diff/result',
+                       'child reports/completion_check declarations alone',
                        'unit-specific context', 'do not resend unchanged rules or reports',
                        'Check authority, exclusive scope and capacity',
                        'For required independent Standards/Spec',
                        'Reuse compatible owners at safe boundaries',
                        'pin revision/dirt/rules/spec',
                        'dispatch separate read-only owners before waiting',
-                       'Locate once; batch independent required ranges',
-                       'Before declaring evidence missing, inspect packet keys and relevant pointers',
-                       'Store read_thread results; select',
+                       'reuse located artifacts',
+                       'Use supplied packet index/keys and relevant pointers before broader searches or missing-evidence claims/requests; reuse located artifacts',
+                       'Store read_thread results; Reader --help selects',
                        'Keep complete id/task_revision inventory; one work entry/id',
                        'Repage new revision',
                        'event-only changes reuse ids',
@@ -102,18 +113,18 @@ class InstructionFootprintTests(unittest.TestCase):
     def test_parent_completion_requires_objective_and_current_evidence(self):
         core = SKILL.read_text(encoding='utf-8')
         self.assertLess(core.index('## Completion'), core.index('## Routing'))
-        for phrase in ('original user objective', 'accepted scope', 'every remaining required item',
-                       'current authority', 'COMPLETE requires current evidence for every requirement',
-                       'child PASS or green local checks are not parent completion'):
+        for phrase in ('original user goal', 'accepted scope', 'all required items',
+                       'current authority', 'COMPLETE: each requirement has current evidence',
+                       'child PASS/green checks are not parent completion'):
             self.assertIn(phrase, contract_text())
 
     def test_incomplete_work_continues_but_external_barriers_are_specific(self):
-        for phrase in ('CONTINUE useful authorized diagnosis/delegation/implementation',
-                       'BLOCKED names the exact external missing resource',
-                       'evidence, affected scope and external action', 'finish unaffected work',
-                       'STOP on explicit pause/cancel, scope change or actual system budget ceiling',
-                       'Answer mid-task status briefly and continue', 'end standalone answers',
-                       'No unrequested monitoring or risky measurements'):
+        for phrase in ('CONTINUE useful authorized work',
+                       'BLOCKED: exact missing external resource/evidence',
+                       'evidence, affected scope/external action', 'finish unaffected work',
+                       'STOP: explicit pause/cancel, scope change or actual system budget ceiling',
+                       'Mid-task status: answer briefly, continue', 'end standalone answers',
+                       'No unrequested monitoring/risky measurements'):
             self.assertIn(phrase, contract_text())
 
     def test_independent_answer_is_explicit_bounded_and_keeps_engineering_protection(self):
@@ -176,12 +187,12 @@ class InstructionFootprintTests(unittest.TestCase):
                         self.assertEqual(role['model_reasoning_effort'], original['model_reasoning_effort'])
 
     def test_reading_keeps_complete_evidence_and_real_output_limits(self):
-        for phrase in ('Reuse unchanged loaded rules', 'fully read necessary new/changed rules',
-                       'Check exit before parsing', 'retain successes, errors, cursors',
-                       'Batch UTF-8, JSON, CRLF and framing within one <=4KiB budget',
-                       'Read required ranges completely', 'continue missing pages rather than rereading files',
-                       'Never slice full-file output', 'concatenate pages to evade limits',
-                       'Batch independent reads and merged worker waits'):
+        for phrase in ('Reuse unchanged loaded rules', 'fully read needed new/changed rules',
+                       'Check exit before parsing', 'keep successes/errors/cursors',
+                       'Batch UTF-8 JSON/CRLF/framing <=4KiB aggregate',
+                       'Complete ranges via missing pages', 'via missing pages, not rereads',
+                       'Never slice full-file output', 'join pages to evade limits',
+                       'Batch independent reads and waits'):
             self.assertIn(phrase, contract_text())
 
     def test_no_blanket_loading_or_development_probe_in_runtime(self):
@@ -205,12 +216,12 @@ class InstructionFootprintTests(unittest.TestCase):
             self.assertIn(phrase, contract_text())
 
     def test_monitoring_backs_off_instead_of_repeating_history(self):
-        for phrase in ('Review available work before waiting',
-                       'Inspect detail on actionable change, failure or completion',
-                       'after two unchanged snapshots back off',
+        for phrase in ('Review work before waiting',
+                       'Detail on actionable change/failure/completion',
+                       'back off after two unchanged snapshots',
                        'One saved-offset diagnostic delta',
                        'no repeated tails/nudges without new evidence',
-                       '`COORDINATION_JS` is an adapter, not proof of work'):
+                       '`COORDINATION_JS`: adapter, not proof of work'):
             self.assertIn(phrase, contract_text())
 
     def test_child_instructions_remain_self_contained(self):
@@ -234,8 +245,8 @@ class InstructionFootprintTests(unittest.TestCase):
                        'repeated unexplained failure', 'no auto-revert', 'Two writers max',
                        'Attempts persist per task/unit/failure across owners',
                        'Exhaustion stops blind edits, not Astra diagnosis', 'Never weaken assertions',
-                       'Unrun evidence is UNKNOWN', 'required gaps remain PARTIAL/BLOCKED',
-                       'only when provided by the host'):
+                       'Unrun: UNKNOWN', 'required gaps remain PARTIAL/BLOCKED',
+                       'Host-provided completion_check'):
             self.assertIn(phrase, contract_text())
 
 

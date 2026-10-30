@@ -117,9 +117,9 @@ class DocumentedContractTests(unittest.TestCase):
                       'Low remains opt-in', file='references/effort.md')
 
     def test_semantic_loss_and_review_evidence_are_required(self):
-        self.requires('platform/macros, consumers and lifecycle effects', 'Loss/eviction/coalescing',
+        self.requires('platform/macros, consumers and lifecycle effects', 'loss/eviction/coalescing',
                       'safe discard/replay/rebuild', 'source evidence or a requirement violation',
-                      'hypotheses and preexisting hazards', 'not proof of end-to-end correctness',
+                      'hypotheses/preexisting hazards', 'cannot prove end-to-end correctness',
                       file='references/quality.md')
 
     def test_astra_does_not_own_long_command_continuations(self):

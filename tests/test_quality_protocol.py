@@ -97,6 +97,46 @@ class QualityProtocolTests(unittest.TestCase):
     def test_complete_current_required_evidence_passes(self):
         self.assertEqual(completion(self.contract, self.evidence, final_review=self.review).status, 'PASS')
 
+    def test_scope_convergence_retains_multi_type_lifecycle_and_independent_requirements(self):
+        # Declared completion-model scenarios, not an agent's branch-selection test.
+        contract = Contract('scope-v1', 'capture-v1',
+                            ('sockets', 'registry', 'shell-com', 'independent-original-work'))
+        details = ('all requested handle types surveyed; socket owner remains in scope',
+                   'independent registry requirement retained',
+                   'Shell/COM thread ownership and cleanup lifecycle traced',
+                   'another named original requirement completed independently')
+        evidence = tuple(Evidence(item, 'PASS', contract.revision, contract.state, 'review', detail)
+                         for item, detail in zip(contract.required, details))
+        review = replace(self.review, contract_revision=contract.revision, state=contract.state,
+                         validated_requirements=contract.required,
+                         applicable_requirements=contract.required)
+        self.assertEqual(completion(contract, evidence, final_review=review).status, 'PASS')
+        for omitted in contract.required:
+            with self.subTest(omitted=omitted):
+                result = completion(contract, tuple(e for e in evidence if e.requirement != omitted),
+                                    final_review=review)
+                self.assertEqual(result.status, 'PARTIAL')
+                self.assertIn(f'{omitted}: missing evidence', result.gaps)
+        gap = (replace(evidence[0], verdict='UNKNOWN',
+                       detail='exact unknown: live socket holder; next evidence: holder lifecycle'),
+               *evidence[1:])
+        self.assertEqual(completion(contract, gap, final_review=review).status, 'PARTIAL')
+        self.assertEqual(progress_action(worker_active=True, progress_changed=False,
+            unchanged_polls=2, tail_cursor_current=True, parent_work_due=True), 'PARENT_WORK')
+        with self.assertRaisesRegex(ValueError, 'unknown or duplicate evidence requirement'):
+            completion(contract, (*gap, Evidence('unrelated-sdk-gray-fix', 'PASS',
+                contract.revision, contract.state, 'review', 'closed Listener finding retained')),
+                final_review=review)
+
+    def test_changed_evidence_can_reopen_an_original_requirement_without_narrowing_scope(self):
+        # Existing revision/state model invalidates old evidence, then accepts fresh review.
+        changed = replace(self.contract, state='capture-v2-contradicts-exclusion')
+        self.assertEqual(completion(changed, self.evidence, final_review=self.review).status, 'PARTIAL')
+        evidence = tuple(replace(item, state=changed.state) for item in self.evidence)
+        review = replace(self.review, state=changed.state)
+        self.assertEqual(changed.required, self.contract.required)
+        self.assertEqual(completion(changed, evidence, final_review=review).status, 'PASS')
+
     def test_parent_acceptance_requires_substantive_assessment(self):
         child_only = FinalReview('r1', self.contract.state, 'diff-sha256', 'diff-sha256',
                                  self.contract.required)
