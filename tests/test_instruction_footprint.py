@@ -35,7 +35,11 @@ class InstructionFootprintTests(unittest.TestCase):
                        'pin revision/dirt/rules/spec',
                        'dispatch separate read-only owners before waiting',
                        'Locate once; batch independent required ranges',
-                       'Store read_thread results; select'):
+                       'Store read_thread results; select',
+                       'Keep complete id/task_revision inventory; one work entry/id',
+                       'Repage new revision',
+                       'After tool results: fresh inspect then check alone',
+                       'work/input invalidates it', 'Child status adds no work'):
             self.assertIn(phrase, text)
 
     def test_tightened_source_budgets(self):
