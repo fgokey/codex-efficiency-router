@@ -122,6 +122,19 @@ class DocumentedContractTests(unittest.TestCase):
                       'hypotheses/preexisting hazards', 'cannot prove end-to-end correctness',
                       file='references/quality.md')
 
+    def test_failure_chain_review_reaches_assignment_without_general_audit_gate(self):
+        # Loading/coverage contract; behavioral transfer needs independent scenarios.
+        self.requires('before planning/delegating failure-handling work', file='SKILL.md')
+        self.requires('For failure/cleanup fixes',
+                      'ownership/register/publish/cleanup/notify/retry and cleanup failures before edits',
+                      'on-demand early independent review of this bounded chain',
+                      'Test production fault/gray/logger/build/link conditions',
+                      'Complex work: independent final stable review', file='references/quality.md')
+        self.requires('one implementation owner plus an on-demand reviewer',
+                      'chain/rationale/invariants/test boundaries', 'Loaded owner: deltas',
+                      'Batch known findings per revision; send new blockers promptly',
+                      file='references/dispatch.md')
+
     def test_astra_does_not_own_long_command_continuations(self):
         self.requires('Astra uses permitted reads and saved evidence, never `write_stdin`',
                       'Executors own long commands/continuation', file='references/dispatch.md')
@@ -135,31 +148,31 @@ class DocumentedContractTests(unittest.TestCase):
                 self.assertIn(phrase, instructions)
 
     def test_native_badge_support_is_separate_from_write_authority(self):
-        self.requires('file-change attribution is optional unless required by the user',
+        self.requires('Optional native file-change attribution; honor requests',
                       'never fake a badge', 'UNKNOWN/MISMATCH blocks writes',
                       file='references/dispatch.md')
 
     def test_native_root_astra_boundary_has_no_repair_exception(self):
         self.requires('Root Astra defaults read-only', 'native admission has no repair exceptions',
-                      'Strict Guard remains strict', 'Custom-host installation is separate')
+                      'Keep Guard strict', 'Custom-host installation is separate')
         self.assertNotIn('one bounded local repair unit', contract_text())
 
     def test_write_binding_and_reviewable_mutation_are_mandatory(self):
-        self.requires('host model/effort/role/permission/owner is verified',
-                      'explicitly RELEASE the unit', 'UNKNOWN/MISMATCH blocks writes',
+        self.requires('verify current host model/effort/role/permission/owner before explicit RELEASE',
+                      'UNKNOWN/MISMATCH blocks writes',
                       'Closed/unloaded/restarted workers need fresh binding',
-                      'raw `resume_agent` cannot pin them', 'Policy denial stops equivalent replay',
+                      '`resume_agent` cannot pin them', 'Denial stops equivalent replay',
                       'never evade `approval=never`', file='references/dispatch.md')
 
     def test_first_authorized_assignment_contains_the_current_unit_release(self):
-        self.requires('HOLD until current host', 'explicitly RELEASE the unit',
-                      'Send exactly the checked prefix and body', 'never grants authority',
-                      'always pass returned `admitted_dispatch_arguments`',
+        self.requires('HOLD; verify current host', 'before explicit RELEASE',
+                      'send exact checked prefix/body', 'never grants authority',
+                      'with returned `admitted_dispatch_arguments`',
                       file='references/dispatch.md')
 
     def test_controls_are_not_new_work_or_write_authority(self):
-        self.requires('Exact continue/status/stop controls reuse the current receipt, scope and binding',
-                      'Added instructions require new admission', 'Bare control words are not receipts',
+        self.requires('Exact continue/status/stop reuse current receipt/scope/binding without new work',
+                      'Added instructions need admission', 'bare controls are not receipts',
                       'Wait/interrupt/close remain separate controls', file='references/dispatch.md')
 
     def test_delivery_owner_requires_existing_user_authority(self):
@@ -173,7 +186,7 @@ class DocumentedContractTests(unittest.TestCase):
             self.assertIn(phrase, luna)
 
     def test_compact_handoff_preserves_rules_and_decision_rationale(self):
-        self.requires('facts versus assumptions', 'revision/dirt', 'rule paths', 'rationale/invariants',
+        self.requires('facts/assumptions', 'revision/dirt', 'files/rules', 'chain/rationale/invariants/test boundaries',
                       'critical gaps block affected work', 'Contrary evidence reopens decisions')
         for name in EXPECTED:
             role = tomllib.loads((ROOT / 'agents' / name).read_text())['developer_instructions'].lower()

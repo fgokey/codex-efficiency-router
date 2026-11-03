@@ -15,7 +15,7 @@ Keep the parent model and exact pins. No classifier call, nested model CLI/API, 
 
 ## Completion
 
-Requirements win. Read [quality.md](references/quality.md) before the first parent wait or final engineering answer, and for complex lifecycle or disputed evidence. A routine released leaf uses its role and applicable repository rules, not the whole Router.
+Requirements win. Read [quality.md](references/quality.md) before planning/delegating failure-handling work, before the first parent wait or final engineering answer, and for complex lifecycle or disputed evidence. Released leaves use role/repository rules, not the whole Router.
 
 ## Routing
 

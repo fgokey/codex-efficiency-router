@@ -105,6 +105,7 @@ class InstructionFootprintTests(unittest.TestCase):
         self.assertEqual(set(doctor.instruction_chain(SKILL)), {'SKILL.md',
             'references/dispatch.md', 'references/effort.md', 'references/quality.md', 'references/routing.md'})
         for phrase in ('before the first parent wait or final engineering answer',
+                       'before planning/delegating failure-handling work',
                        'for complex lifecycle or disputed evidence',
                        'before selecting a worker', 'for Astra admission',
                        'once before delegation', 'not the whole Router'):
@@ -192,7 +193,7 @@ class InstructionFootprintTests(unittest.TestCase):
                        'Batch UTF-8 JSON/CRLF/framing <=4KiB aggregate',
                        'Complete ranges via missing pages', 'via missing pages, not rereads',
                        'Never slice full-file output', 'join pages to evade limits',
-                       'Batch independent reads and waits'):
+                       'Batch independent reads/waits'):
             self.assertIn(phrase, contract_text())
 
     def test_no_blanket_loading_or_development_probe_in_runtime(self):
@@ -208,17 +209,18 @@ class InstructionFootprintTests(unittest.TestCase):
 
     def test_same_owner_and_control_paths_are_not_blanket_new_work(self):
         for phrase in ('Reuse the owner within the admitted unit',
-                       'Keep the same admitted executor',
-                       'Exact continue/status/stop controls reuse the current receipt',
-                       'Added instructions require new admission',
-                       'Bare control words are not receipts', 'Wait/interrupt/close remain separate controls',
+                       'Reuse the same admitted executor',
+                       'Exact continue/status/stop reuse current receipt/scope/binding without new work',
+                       'Added instructions need admission',
+                       'bare controls are not receipts', 'Wait/interrupt/close remain separate controls',
                        'admitted_dispatch_arguments', 'never grants authority'):
             self.assertIn(phrase, contract_text())
 
     def test_monitoring_backs_off_instead_of_repeating_history(self):
         for phrase in ('Review work before waiting',
-                       'Detail on actionable change/failure/completion',
-                       'back off after two unchanged snapshots',
+                       'Report changed evidence/decisions/failures/blockers/completion',
+                       'reuse facts; honor required progress',
+                       'Back off after two unchanged snapshots',
                        'One saved-offset diagnostic delta',
                        'no repeated tails/nudges without new evidence',
                        '`COORDINATION_JS`: adapter, not proof of work'):
